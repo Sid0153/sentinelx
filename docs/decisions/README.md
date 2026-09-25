@@ -14,3 +14,4 @@ When a decision changes, a new ADR supersedes the old one. Old ADRs are not rewr
 | [0007](0007-backend-authoritative-rbac.md) | Backend-authoritative RBAC with a test-enforced route table | Accepted (Phase 1) |
 | [0008](0008-synchronous-bounded-pipeline.md) | Synchronous, bounded, idempotent pipeline (no queue yet) | Accepted (Phase 1) |
 | [0009](0009-entity-based-incident-correlation.md) | Entity-overlap correlation of alerts into incidents | Accepted (Phase 1) |
+| [0010](0010-evidence-storage.md) | Evidence storage: exact bytes, append-only including TRUNCATE | Accepted (Phase 4) |

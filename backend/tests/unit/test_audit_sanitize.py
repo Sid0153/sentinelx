@@ -25,9 +25,14 @@ def test_long_strings_and_lists_are_capped() -> None:
 
 
 def test_deep_nesting_is_truncated() -> None:
-    assert sanitize({"a": {"b": {"c": {"d": {"e": 1}}}}}) == {
-        "a": {"b": {"c": {"d": "[truncated]"}}}
+    assert sanitize({"a": {"b": {"c": {"d": {"e": {"f": 1}}}}}}) == {
+        "a": {"b": {"c": {"d": {"e": "[truncated]"}}}}
     }
+
+
+def test_a_change_record_with_a_list_survives_intact() -> None:
+    details = {"changes": {"ip_addresses": {"from": ["10.0.0.1"], "to": ["10.0.0.2"]}}}
+    assert sanitize(details) == details
 
 
 def test_non_json_values_become_strings() -> None:

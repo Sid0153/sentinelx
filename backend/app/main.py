@@ -35,6 +35,11 @@ OPENAPI_TAGS = [
     {"name": "auth", "description": "Sign in, refresh and end sessions, change your password."},
     {"name": "users", "description": "User administration (ADMIN)."},
     {"name": "audit", "description": "Append-only log of security-relevant actions (ADMIN)."},
+    {"name": "assets", "description": "Asset inventory: read for all, changes by ADMIN."},
+    {
+        "name": "identities",
+        "description": "Identities seen in logs: read for all, changes by ADMIN.",
+    },
 ]
 
 

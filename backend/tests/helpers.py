@@ -9,6 +9,8 @@ from app.auth.passwords import hash_password
 from app.auth.tokens import create_access_token
 from app.core.config import get_settings
 from app.models.audit_log import AuditLog
+from app.models.context import Asset
+from app.models.event import LogSource
 from app.models.user import Role, User
 
 TEST_PASSWORD = "correct-horse-battery-staple"
@@ -63,3 +65,19 @@ def audit_entries(db: Session, action: str | None = None) -> list[AuditLog]:
     if action is not None:
         statement = statement.where(AuditLog.action == action)
     return list(db.scalars(statement))
+
+
+def make_source(db: Session, source_type: str = "linux_auth") -> LogSource:
+    source = LogSource(name=f"source-{uuid.uuid4().hex[:8]}", source_type=source_type)
+    db.add(source)
+    db.flush()
+    return source
+
+
+def make_asset(db: Session, hostname: str, criticality: str = "medium") -> Asset:
+    asset = Asset(
+        hostname=hostname, asset_type="server", environment="production", criticality=criticality
+    )
+    db.add(asset)
+    db.flush()
+    return asset

@@ -1,21 +1,48 @@
 # Event model, parsing and enrichment
 
-> Status: **DESIGN (Phase 1)**. Built in Phase 4 (model) and Phase 5 (parsers, enrichment).
-> See [ADR-003](decisions/0003-normalized-event-schema.md).
+> Status: **Model and storage implemented and tested (Phase 4):** `NormalizedEvent`
+> (`app/events/schema.py`), the `log_sources` / `raw_events` / `events` tables, and the event
+> store functions (`app/events/store.py`). Parsers, normalization of source formats and
+> enrichment: Phase 5. See [ADR-003](decisions/0003-normalized-event-schema.md) and
+> [ADR-0010](decisions/0010-evidence-storage.md).
 
 ## Raw and normalized are stored separately
 
 Security logs are evidence, so the original record is never modified.
 
-- `raw_events`: exactly what was received (text line or JSON, as a UTF-8 string), the source,
-  when it was received, a SHA-256 fingerprint, and the parse outcome. This row is written for
-  **every** record, including records that fail to parse. A malformed record is still evidence
-  that something sent it.
-- `events`: the normalized, enriched representation. Each row points to its `raw_events` row.
+- `raw_events`: **exactly the bytes received** (`bytea`; text input is stored as its UTF-8
+  bytes), the source, when it was received, a SHA-256 fingerprint, and the parse outcome.
+  This row is written for **every** record, including records that fail to parse. A malformed
+  record is still evidence that something sent it, and bytes that are not valid text (NUL,
+  invalid UTF-8) are kept as they are. For display only, the UI decodes them with replacement
+  characters.
+- `events`: the normalized, enriched representation. Each row points to its `raw_events` row
+  (unique: one normalized event per raw record). Text in it cannot contain NUL: a NUL becomes
+  U+FFFD, and a NUL or other control character in a user name is rejected.
 
-Both tables are append-only through database triggers that reject `UPDATE` and `DELETE`.
-Demo reset uses `TRUNCATE` through an admin CLI command, only when demo mode is enabled and
-the environment is not production. The reset is audited, and `audit_logs` is never truncated.
+Both tables are append-only through database triggers that reject `UPDATE`, `DELETE` and
+`TRUNCATE`, the same as `audit_logs`. The demo reset (Phase 16) will be designed without
+weakening this, for example by recreating the demo database.
+
+`log_sources` holds each configured origin: its name, `source_type` (which parser), a default
+host and a time zone for formats that lack them. It is created in Phase 4 because every
+event must name its source; its API and the ingestion batches arrive in Phase 5.
+
+## Canonical form (enforced by `NormalizedEvent` and database checks)
+
+- The timestamp **must** carry a time zone and is stored in UTC. A naive timestamp is
+  rejected: deciding the zone is the parser's job, from the log source's configuration.
+- `event_action` must belong to the category's controlled vocabulary (`ACTIONS` in
+  `schema.py`); rules match on these words, so a parser cannot invent synonyms.
+- Hostnames are lowercase RFC 1123 labels without a trailing dot. IPs are in canonical text
+  form, and IPv4-mapped IPv6 becomes plain IPv4. User names are lowercased and cannot contain
+  control characters.
+- `attributes` holds at most 50 flat `snake_case` keys with scalar values of at most 1,024
+  characters. Unknown top-level fields are rejected (`extra="forbid"`), and events are
+  immutable once built.
+- The database repeats the essential rules as `CHECK` constraints (categories, outcomes,
+  action format, port ranges, lowercase host and user, size limits), so a bug that bypasses
+  the model cannot store an invalid event either.
 
 ## Normalized fields
 
@@ -100,7 +127,8 @@ parser (`defusedxml`), which we add only if a real XML source is connected.
 
 ## Duplicate strategy
 
-`fingerprint = sha256(source_id ‖ raw_text)` with a unique index.
+`fingerprint = sha256(source_id ‖ 0x1F ‖ raw bytes)` with a unique index (the separator
+cannot occur in a UUID, so different (source, record) pairs cannot produce the same input).
 - Re-sending the same record from the same source is a **no-op**, counted as `duplicates` in
   the batch report. Retries and re-uploaded files are therefore safe.
 - The same text from two different sources is not a duplicate. They are different

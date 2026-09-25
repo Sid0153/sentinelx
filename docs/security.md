@@ -1,11 +1,14 @@
 # Security model and threat model
 
-> Status: **DESIGN (Phase 1)**. Controls are built in the phases shown. The full review is
-> Phase 13, and this document becomes the record of what was actually verified.
+> Status: **Implemented and tested:** authentication, authorization and audit logging
+> (Phase 3); append-only evidence storage and admin-only context inventory (Phase 4). The
+> other controls are planned in the phases shown. The full review is Phase 13, and this
+> document becomes the record of what was actually verified.
 
-## Authentication (Phase 3)
+## Authentication (Phase 3, implemented)
 
-The design reuses the model proven in CloudSentinel (same author).
+The design reuses the model proven in CloudSentinel (same author), with two improvements
+found while building it (revocation reasons and the pinned proxy address, below).
 - Passwords are hashed with **Argon2id** (`argon2-cffi`). Length policy is 12–128
   characters. There is no public registration: the first ADMIN is created by CLI with a hidden
   prompt.
@@ -13,14 +16,30 @@ The design reuses the model proven in CloudSentinel (same author).
   required), 15 minutes, kept **in JavaScript memory only**.
 - **Refresh token**: 384-bit random value, stored only as a SHA-256 hash, `httpOnly` +
   `SameSite=Strict` cookie scoped to `/api/auth`, `Secure` in production, **rotated on every
-  use**. Reuse of an old token revokes all of that user's sessions.
+  use**. Each revoked token records *why* (`ROTATED`, `LOGOUT`, `PASSWORD_CHANGED`,
+  `DEACTIVATED`, `REUSE_DETECTED`). Only replaying a **rotated** token counts as theft (two
+  parties hold a copy): every session of that user is revoked and `REFRESH_TOKEN_REUSED` is
+  audited. A token that ended by logout or password change is simply refused, so an old
+  browser tab after a logout does not sign the user out everywhere.
+- Concurrent refreshes never send the same cookie twice. Within a tab they share one request;
+  across tabs the Web Locks API runs them one after another (the second tab then sends the
+  already-rotated cookie). Without this, opening two tabs at once could look like theft.
 - The role is read from the database on every request, so a demotion or deactivation takes
   effect immediately.
 - Login hardening: one generic error for every failure, a dummy hash check for unknown emails
   (no timing difference), lockout after 5 failures for 15 minutes, and a per-IP rate limit.
-- Client IP for rate limits and audit is **never** the left-most `X-Forwarded-For` entry. It
-  comes from a configured number of trusted proxy hops. (CloudSentinel found and fixed this
-  exact bug in production.)
+- Client IP for rate limits and audit is **never** the left-most `X-Forwarded-For` entry
+  (`core/client_ip.py`). The header is read only when the direct peer is a trusted proxy
+  (`TRUSTED_PROXIES`), and then from the right ("rightmost untrusted"). Compose gives nginx a
+  fixed address (172.28.0.10) and trusts exactly that address, so requests that bypass nginx
+  (straight to the backend port, arriving from the bridge gateway) cannot choose their
+  address either. Counting proxy hops alone, as CloudSentinel first did, would trust a forged
+  header on the direct port. CI sends forged headers through both paths and expects the rate
+  limit to hold.
+- Users are never deleted, only deactivated (their sessions end immediately). Admins cannot
+  change their own role or status, so nobody can accidentally lock out the last admin.
+- Admin inputs reject unknown fields (`extra="forbid"`): a misspelled field in a user, asset
+  or identity change fails with 422 instead of looking like it worked.
 
 ## Authorization (Phase 3, extended every phase)
 
@@ -96,7 +115,7 @@ username) controls text that SentinelX parses, stores and shows to analysts.
 | Broken access control (IDOR, missing role check) | RBAC matrix test over every route and role; object-level checks for saved hunts | 3+ |
 | Session theft | In-memory access token, `httpOnly` `SameSite=Strict` refresh cookie, rotation plus reuse detection, CSP | 3 |
 | Credential stuffing against SentinelX itself | Rate limit, lockout, generic errors | 3 |
-| Evidence tampering in the database | Append-only triggers on events, raw records, notes, activity, audit; DB user without `TRUNCATE` in production (Phase 15 evaluates a separate migration role) | 4, 8, 15 |
+| Evidence tampering in the database | Append-only triggers rejecting UPDATE, DELETE **and TRUNCATE** on `audit_logs`, `raw_events`, `events` (implemented, tested) and later on notes and activity; raw records stored as exact bytes ([ADR-0010](decisions/0010-evidence-storage.md)); Phase 15 evaluates a separate, less privileged runtime DB role | 3, 4, 8, 15 |
 | Secrets leak through logs or Git | Env-only config, `.env` ignored, gitleaks in CI, redaction helper, raw events never logged at INFO | 2, 9, 13 |
 | Vulnerable dependencies | Hash-locked Python dependencies, `pip-audit`, `npm audit` in CI, few dependencies | 2, 13 |
 

@@ -1,8 +1,9 @@
 # Database design
 
-> Status: **DESIGN (Phase 1)**. Tables are created by Alembic migrations in the phase shown.
-> PostgreSQL 16. UUID primary keys (generated in the app) unless noted. All timestamps are
-> `timestamptz`, stored in UTC.
+> Status: tables marked ✅ exist (migrations 0001–0003) and are tested; the rest are design and
+> are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
+> unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
+> models with the migrated database and fails on any difference.
 
 ## Entity overview
 
@@ -34,15 +35,15 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 
 | Table | Phase | Purpose / key columns |
 |---|---|---|
-| `users` | 3 | email (unique, lowercased), password_hash (Argon2id), role (ADMIN/ANALYST/VIEWER), is_active, failed_login_count, locked_until, created_at |
-| `refresh_tokens` | 3 | user_id, token_hash (SHA-256, unique), expires_at, revoked_at, replaced_by |
-| `audit_logs` | 3 | timestamp, actor_user_id, actor_label, action, entity_type, entity_id, result (SUCCESS/DENIED/FAILED), client_ip, request_id, details JSONB (no secrets). **Append-only trigger** |
-| `assets` | 4 | hostname (unique, lowercased), ip_addresses inet[], asset_type, environment, criticality (low/medium/high/critical), owner, tags text[], status |
-| `identities` | 4 | username (unique, normalized), display_name, department, privilege_level (standard/privileged/service), status, tags |
-| `log_sources` | 5 | name, source_type (parser), default_host, timezone, syslog_year_policy, enabled, ingest_key_hash (Phase 13) |
-| `ingestion_batches` | 5 | source_id, submitted_by, channel (api/upload/cli/demo), status, received/parsed/failed/duplicate counts, alert/incident counts, error, started/finished_at |
-| `raw_events` | 5 | source_id, batch_id, received_at, raw_text, fingerprint (unique), parse_status (PARSED/FAILED), parse_error, simulated. **Append-only** |
-| `events` | 4/5 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id unique FK. **Append-only** |
+| `users` ✅ | 3 | email (unique; check: lowercase), password_hash (Argon2id), role (check: ADMIN/ANALYST/VIEWER), is_active, failed_login_count, locked_until, last_login_at, created_at |
+| `refresh_tokens` ✅ | 3 | user_id (FK, cascade), token_hash (SHA-256, unique), expires_at, revoked_at, revoked_reason (ROTATED/LOGOUT/PASSWORD_CHANGED/DEACTIVATED/REUSE_DETECTED), created_at |
+| `audit_logs` ✅ | 3 | occurred_at, action, result (check: SUCCESS/FAILURE/DENIED), actor_id (FK without cascade: a user with audit history cannot be deleted), actor_label (email at the time), entity_type, entity_id, client_ip, request_id, details JSONB (sanitized, no secrets). **Append-only** |
+| `assets` ✅ | 4 | hostname (unique; check: lowercase), ip_addresses inet[] (GIN), asset_type, environment, criticality (low/medium/high/critical), owner, description, tags, status (active/retired), created_at, updated_at |
+| `identities` ✅ | 4 | username (unique; check: lowercase), display_name, department, title, privilege_level (standard/privileged/service), status (active/disabled), tags, created_at, updated_at |
+| `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled. `ingest_key_hash` arrives in Phase 13 |
+| `ingestion_batches` | 5 | source_id, submitted_by, channel (api/upload/cli/demo), status, received/parsed/failed/duplicate counts, alert/incident counts, error, started/finished_at. Adds `raw_events.batch_id` |
+| `raw_events` ✅ | 4 | source_id (FK), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED/FAILED; check: FAILED ⇔ parse_error present), parse_error (short code), simulated. **Append-only** |
+| `events` ✅ | 4 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id (unique FK), source_id (FK), asset_id / identity_id (FK, restrict). Checks: category, outcome, action format, port ranges, lowercase host/user, IP scope, criticality, sizes. **Append-only** |
 | `detection_rules` | 6 | rule_id (PK text, e.g. AUTH-001), library_definition JSONB, library_hash, overrides JSONB, current_version, enabled, last_run_at, last_match_at, error_count |
 | `detection_rule_versions` | 6 | rule_id, version, effective_definition JSONB, source (library/admin), changed_by, change_reason, created_at; unique (rule_id, version) |
 | `mitre_techniques` | 6 | technique_id (PK), name, tactics text[], url, attack_version. Seeded from a checked-in file |
@@ -57,14 +58,24 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `saved_hunts` | 10 | owner_id, name, definition JSONB (validated structured query), shared bool |
 | `app_settings` | 8 | key/value for admin configuration (correlation window, internal networks); changes audited |
 
+`log_sources` moved from Phase 5 to Phase 4: every event references its source, so the event
+store cannot exist without it. The batches that group records per ingest request stay in
+Phase 5.
+
 ## Integrity rules enforced by the database
 
-- Check constraints on every enum-like column, on `event_count ≥ 1`, and on port ranges.
-- Foreign keys with `ON DELETE RESTRICT` for evidence chains (an event referenced by an alert
-  cannot disappear).
-- Append-only triggers on `audit_logs`, `raw_events`, `events`, `incident_notes`,
-  `incident_evidence` and `incident_activity`. They reject `UPDATE`/`DELETE`; demo reset uses
-  an audited `TRUNCATE` of pipeline tables only.
+- Check constraints on every enum-like column, port ranges, lowercase identifiers and size
+  limits (implemented for all ✅ tables and tested one by one), later also on
+  `event_count ≥ 1`.
+- Foreign keys without cascade on evidence chains. An asset or identity that events reference
+  cannot be deleted (it is retired or disabled instead), and neither can a user in the audit
+  log. The only cascade is refresh tokens with their user. Alerts will hold events in place
+  the same way (Phase 7).
+- **Append-only triggers** reject UPDATE and DELETE (per row) and TRUNCATE (per statement) on
+  `audit_logs`, `raw_events` and `events` (✅), later on `incident_notes`,
+  `incident_evidence` and `incident_activity`. They share one trigger function,
+  `reject_modification()`. How the demo is reset (Phase 16) will be designed without
+  weakening this ([ADR-0010](decisions/0010-evidence-storage.md)).
 - The partial unique index `alerts(dedup_key) WHERE status IN ('NEW','TRIAGED','IN_PROGRESS')`
   makes "one active alert per key" a database guarantee, not just application logic.
 - `incident_alerts(alert_id)` is unique.
@@ -73,28 +84,42 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 
 | Index | Serves |
 |---|---|
-| `events (timestamp DESC, id)` | Event explorer, keyset pagination, dashboard "today" |
-| `events (event_category, event_action, timestamp)` | Rule candidate prefilter |
-| `events (source_ip, timestamp)` | Pivots, AUTH rules, hunts |
-| `events (username, timestamp)` | Pivots, AUTH-004 history |
-| `events (host, timestamp)` | Pivots, host views |
-| `events (destination_ip, timestamp)` | Hunts, NET-001 |
-| `events USING gin (command_line gin_trgm_ops)`, same on `message` | Substring hunt search (`pg_trgm`) |
-| `raw_events (fingerprint)` unique | Duplicate detection |
+| ✅ `events (timestamp DESC, id DESC)` | Event explorer, keyset pagination, dashboard "today" |
+| ✅ `events (event_category, event_action, timestamp)` | Rule candidate prefilter |
+| ✅ `events (source_ip, timestamp)` | Pivots, AUTH rules, hunts |
+| ✅ `events (username, timestamp)` | Pivots, AUTH-004 history |
+| ✅ `events (host, timestamp)` | Pivots, host views |
+| ✅ `events (destination_ip, timestamp)` | Hunts, NET-001 |
+| ✅ `events USING gin (command_line gin_trgm_ops)`, same on `message` | Substring hunt search (`pg_trgm`) |
+| ✅ `events (asset_id)`, `events (identity_id)` | Asset and identity views; FK checks |
+| ✅ `raw_events (fingerprint)` unique | Duplicate detection |
+| ✅ `assets USING gin (ip_addresses)` | Enrichment: which asset owns this IP |
+| ✅ `audit_logs (occurred_at)`, `(entity_type, entity_id)`, `(action)`, `(actor_id)` | Audit views, incident history |
 | `alerts (status, priority_score DESC)` | Alert queue |
 | `alerts (rule_id, created_at)` | Rule metrics, coverage |
 | `alerts (created_at)` | Trends |
 | `incidents (status, last_activity_at)` | Correlation candidates, queue |
-| `audit_logs (timestamp DESC)`, `(entity_type, entity_id)` | Audit views, incident history |
 
 Composite indexes lead with the equality column and end with `timestamp`, because almost every
-query is "value X within time range T". Phase 14 checks the plans with `EXPLAIN ANALYZE` on a
-generated data set and records the measured results; no numbers are claimed before then.
+query is "value X within time range T".
+
+**How the indexes are tested now** (`tests/integration/test_schema.py`): for each query shape,
+sequential scans are disabled and the generic time index is dropped inside the rolled-back
+test transaction. The plan must then use the intended index, with the time range in its index
+condition rather than as a filter. This proves each index *fits* its query. It does not prove
+the planner *chooses* it at every table size: that needs real data, and Phase 14 checks it with
+`EXPLAIN ANALYZE` on a generated data set. No performance numbers are claimed before then.
+
+**Write cost.** Each event insert updates ten indexes on `events` (two of them GIN). That is
+the price of fast pivots and hunts, and it bounds ingest throughput. Phase 14 measures it
+rather than guessing; if it is too high, the trigram indexes are the first candidates to drop
+or defer.
 
 ## Growth plan (documented, not built)
 
 - Partition `events` and `raw_events` by month (declarative partitioning). The primary key
   would become `(timestamp, id)`, which is why keyset pagination already uses that pair.
 - A retention job drops old partitions. Evidence referenced by open incidents would be copied
-  or its partition held back.
+  or its partition held back. Dropping partitions is a deliberate operator action, separate
+  from the append-only triggers that stop the application from deleting rows.
 - A BRIN index on `timestamp` for very large, append-ordered partitions.

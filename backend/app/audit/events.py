@@ -21,6 +21,11 @@ class AuditAction(enum.StrEnum):
     USER_ROLE_CHANGED = "USER_ROLE_CHANGED"
     USER_DEACTIVATED = "USER_DEACTIVATED"
     USER_REACTIVATED = "USER_REACTIVATED"
+    # Context inventory: criticality and privilege change how alerts are prioritized.
+    ASSET_CREATED = "ASSET_CREATED"
+    ASSET_UPDATED = "ASSET_UPDATED"
+    IDENTITY_CREATED = "IDENTITY_CREATED"
+    IDENTITY_UPDATED = "IDENTITY_UPDATED"
 
 
 class AuditResult(enum.StrEnum):
@@ -32,3 +37,5 @@ class AuditResult(enum.StrEnum):
 class EntityType(enum.StrEnum):
     USER = "USER"
     ROUTE = "ROUTE"
+    ASSET = "ASSET"
+    IDENTITY = "IDENTITY"

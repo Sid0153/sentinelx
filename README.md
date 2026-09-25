@@ -2,9 +2,10 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 3 (authentication and RBAC) complete.** Sign-in with rotating sessions,
-> three roles enforced by the API, user administration and an append-only audit log work end
-> to end. **No detection features exist yet**: no ingestion, detection, alerts or incidents.
+> **Status: Phase 4 (assets, identities, event model) complete.** Sign-in, three roles
+> enforced by the API, an append-only audit log, the asset and identity inventory (API), and
+> the append-only event store with its normalized schema exist and are tested. **Nothing
+> ingests or detects yet**: log parsing arrives in Phase 5, detection in Phase 6.
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:

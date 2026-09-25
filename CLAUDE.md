@@ -16,6 +16,7 @@ its rules always apply:
 | 1 Architecture | Done (design docs only, no code) |
 | 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
 | 3 Auth and RBAC | Done, green in CI (168 backend tests, 98% coverage; 39 frontend tests; auth smoke script and forged-XFF checks on both ports in the Compose job) |
+| 4 Assets, identities, event model | Done locally (311 backend tests, 97.8% coverage; 39 frontend tests; migration 0003 applied on the Compose stack). Not yet pushed |
 
 Design: `docs/architecture.md` is the entry point; decisions are in `docs/decisions/`; the phase
 plan and exit criteria are in `docs/roadmap.md`. When implementation diverges from a doc,
@@ -98,3 +99,15 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
 - Local test accounts for the Compose stack live in the git-ignored `.env.local`
   (`LOCAL_ADMIN_EMAIL` / `LOCAL_ADMIN_PASSWORD`); never print them in chat.
 - Lists return `Page[T]` (`items`, `total`, `limit`, `offset`).
+- Event model: `app/events/schema.py` (`NormalizedEvent`, controlled `ACTIONS` per category) is
+  pure; `app/events/store.py` is the only writer of `raw_events` / `events`. Raw records are
+  bytes (`raw_data`), never text. `raw_events`, `events` and `audit_logs` reject UPDATE, DELETE
+  and TRUNCATE (ADR-0010): tests never clean them up.
+- Admin input schemas use `extra="forbid"`; PATCH schemas list nullable fields in `CLEARABLE`.
+- After changing a model: create a migration (`alembic revision --autogenerate`, then review);
+  `tests/integration/test_schema.py` fails if models and migrations differ. Update
+  `docs/database-schema.md`.
+- Migrations must not change once committed. An uncommitted one may be edited, but then
+  recreate the scratch database (`DROP DATABASE sentinelx_test` / `CREATE DATABASE ...`).
+- Doc edits: check that they applied. A chained command that fails before a doc edit leaves the
+  docs stale without an error (this happened in Phase 3).

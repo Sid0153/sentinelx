@@ -1,7 +1,7 @@
 # API plan
 
-> Status: **Implemented: `GET /api/health`, `GET /api/ready` (Phase 2).** Everything else is
-> planned. Routes are built in the phase shown. OpenAPI is served at
+> Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
+> identities). Everything else is planned in the phase shown. OpenAPI is served at
 > `/api/docs` (disabled in production unless enabled explicitly) and exported to
 > `docs/openapi.json`. A test fails if the export is stale.
 
@@ -12,7 +12,10 @@ Conventions:
   token), `403` (role), `404`, `409` (state conflict, e.g. illegal transition), `413`
   (payload too large), `422` (validation), `429` (rate limit).
 - Errors use one shape: `{"error": {"code": "...", "message": "...", "request_id": "..."}}`.
-- Lists: `limit` (default 50, max 200). Offset pagination for small tables. **Keyset cursor**
+- Request bodies reject unknown fields (422). PATCH changes only the fields sent; `null` clears
+  an optional field and is rejected for required ones.
+- Lists return `{"items": [...], "total", "limit", "offset"}`: `limit` (default 50, max 200),
+  offset pagination for small tables. **Keyset cursor**
   (`(timestamp, id)`, opaque) for events, hunts and timelines.
 - Time ranges: `from`/`to` in ISO 8601. Event queries require a range of at most 31 days.
 
@@ -23,14 +26,17 @@ with every role plus an unauthenticated call.
 | Method & path | Role | Phase | Purpose |
 |---|---|---|---|
 | GET `/api/health`, `/api/ready` | public | 2 ✅ | Liveness (no DB) / readiness (DB reachable and schema at the code's migration head; 503 with `checks` otherwise, no internal details) |
-| POST `/api/auth/login` | public (rate-limited) | 3 | Email + password → access token, refresh cookie |
-| POST `/api/auth/refresh` | cookie | 3 | Rotate refresh token |
-| POST `/api/auth/logout` | V | 3 | Revoke session |
-| GET `/api/auth/me` · POST `/api/auth/change-password` | V | 3 | Current user |
-| GET/POST `/api/users` · PATCH `/api/users/{id}` | AD | 3 | Create users, change role, deactivate |
-| GET `/api/assets` · GET `/api/assets/{id}` | V | 4 | Inventory (with alert/incident counts in Phase 9) |
-| POST/PATCH `/api/assets…` | AD | 4 | Maintain inventory |
-| GET/POST/PATCH `/api/identities…` | V / AD | 4 | Same for identities |
+| POST `/api/auth/login` | public (rate-limited, 10/min per client IP) | 3 ✅ | Email + password → access token (body) and refresh token (`sx_refresh` cookie). One generic 401 for every failure; lockout after 5 failures |
+| POST `/api/auth/refresh` | refresh cookie | 3 ✅ | Rotates the refresh token, returns a new access token. Replaying a rotated token revokes every session of the user |
+| POST `/api/auth/logout` | public (refresh cookie) | 3 ✅ | Revokes this session and clears the cookie; works after the access token expired |
+| GET `/api/auth/me` | V | 3 ✅ | Current user |
+| POST `/api/auth/change-password` | V | 3 ✅ | Needs the current password (400 if wrong); ends every session of the user |
+| GET/POST `/api/users` · PATCH `/api/users/{user_id}` | AD | 3 ✅ | List (paged), create, change role / deactivate / reactivate. Never delete; not yourself (400) |
+| GET `/api/audit` | AD | 3 ✅ | Audit log, newest first. Filters: `action` (repeatable), `result`, `actor_id`, `entity_type`, `entity_id`, `since`, `until` |
+| GET `/api/assets` · GET `/api/assets/{asset_id}` | V | 4 ✅ | Inventory. Filters: `criticality`, `environment`, `status`, `tag`, `search` (literal substring of hostname, owner or description). Alert and incident counts added in Phase 9 |
+| POST `/api/assets` · PATCH `/api/assets/{asset_id}` | AD | 4 ✅ | Create (409 on a duplicate hostname), change the fields sent. Hostname is fixed; retire with `status: retired`. Unknown fields → 422. Audited with before/after values |
+| GET `/api/identities` · GET `/api/identities/{identity_id}` | V | 4 ✅ | Filters: `privilege_level`, `status`, `tag`, `search` (username, display name, department) |
+| POST `/api/identities` · PATCH `/api/identities/{identity_id}` | AD | 4 ✅ | Same rules as assets; disable with `status: disabled` |
 | GET/POST/PATCH `/api/sources…` | V / AD | 5 | Log sources |
 | POST `/api/ingest/{source_id}` | A (Phase 13: or a per-source ingest key) | 5 | JSON `{records: [...]}` or `text/plain` lines |
 | POST `/api/ingest/{source_id}/upload` | A | 5 | Multipart file (same limits) |
@@ -51,7 +57,6 @@ with every role plus an unauthenticated call.
 | GET `/api/hunt/templates` · POST `/api/hunt/templates/{id}/run` | V | 10 | Parameterized hunts |
 | GET/POST/DELETE `/api/hunt/saved…` | A (own) | 10 | Saved hunts |
 | GET/PATCH `/api/settings` | AD | 8 | Correlation window, internal networks |
-| GET `/api/audit` | AD | 3/9 | Audit log search |
 | GET `/api/demo/scenarios` · POST `/api/demo/run` · POST `/api/demo/reset` | AD, only when `DEMO_ENABLED` | 16 | Simulated data |
 
 Open decision for Phase 16: whether VIEWER may run demo scenarios on a public demo instance.

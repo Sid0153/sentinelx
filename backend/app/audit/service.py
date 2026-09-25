@@ -23,13 +23,14 @@ from app.models.user import User
 
 MAX_TEXT = 300
 MAX_ITEMS = 20
+MAX_DEPTH = 4  # details -> changes -> field -> from/to -> list items
 # Keys that must never be stored, even if a caller passes them by mistake.
 _SECRET_KEY = re.compile(r"(?i)(password|passwd|secret|token|credential|api[_-]?key|cookie)")
 
 
 def sanitize(value: Any, depth: int = 0) -> Any:
     """Plain JSON only, secret-looking keys dropped, strings redacted and shortened."""
-    if depth > 3:
+    if depth > MAX_DEPTH:
         return "[truncated]"
     if value is None or isinstance(value, bool | int | float):
         return value

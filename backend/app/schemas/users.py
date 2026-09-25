@@ -33,6 +33,8 @@ class UserPublic(BaseModel):
 
 
 class UserCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # a misspelled field is an error, not ignored
+
     email: str = Field(max_length=254)
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     role: Role
@@ -49,6 +51,8 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     role: Role | None = None
     is_active: bool | None = None
 
