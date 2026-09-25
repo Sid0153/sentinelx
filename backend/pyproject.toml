@@ -1,0 +1,28 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["integration: needs a real PostgreSQL, set TEST_DATABASE_URL to run"]
+
+[tool.coverage.run]
+omit = ["alembic/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F pyflakes+pycodestyle, I import order, B bugbear, UP pyupgrade, S bandit-style security checks
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+# The local ./alembic/ migrations folder would otherwise make ruff treat the alembic library
+# as first-party code.
+known-third-party = ["alembic"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "tests"]

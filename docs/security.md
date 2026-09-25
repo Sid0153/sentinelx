@@ -1,0 +1,108 @@
+# Security model and threat model
+
+> Status: **DESIGN (Phase 1)**. Controls are built in the phases shown. The full review is
+> Phase 13, and this document becomes the record of what was actually verified.
+
+## Authentication (Phase 3)
+
+The design reuses the model proven in CloudSentinel (same author).
+- Passwords are hashed with **Argon2id** (`argon2-cffi`). Length policy is 12–128
+  characters. There is no public registration: the first ADMIN is created by CLI with a hidden
+  prompt.
+- **Access token**: JWT (HS256, algorithm pinned on decode, `iss`/`exp`/`iat`/`sub`/`typ`
+  required), 15 minutes, kept **in JavaScript memory only**.
+- **Refresh token**: 384-bit random value, stored only as a SHA-256 hash, `httpOnly` +
+  `SameSite=Strict` cookie scoped to `/api/auth`, `Secure` in production, **rotated on every
+  use**. Reuse of an old token revokes all of that user's sessions.
+- The role is read from the database on every request, so a demotion or deactivation takes
+  effect immediately.
+- Login hardening: one generic error for every failure, a dummy hash check for unknown emails
+  (no timing difference), lockout after 5 failures for 15 minutes, and a per-IP rate limit.
+- Client IP for rate limits and audit is **never** the left-most `X-Forwarded-For` entry. It
+  comes from a configured number of trusted proxy hops. (CloudSentinel found and fixed this
+  exact bug in production.)
+
+## Authorization (Phase 3, extended every phase)
+
+- ADMIN: users, roles, rules, settings, sources, audit log, demo controls, and everything
+  ANALYST can do.
+- ANALYST: ingest, triage alerts, work incidents, notes, evidence, saved hunts.
+- VIEWER: read-only across events, alerts, incidents, rules, assets, identities, dashboard.
+- Enforcement happens in FastAPI dependencies (`require_role`). The frontend only hides
+  controls. The RBAC matrix test fails if any route has no declared access rule.
+  See [ADR-007](decisions/0007-backend-authoritative-rbac.md).
+
+## Audit logging (Phase 3 onward)
+
+Recorded in the same transaction as the change:
+- login, logout, failed login (client IP only; the submitted email and password are never
+  stored), lockout, token reuse
+- access denied
+- user created / role changed / deactivated
+- rule change (old → new effective values plus reason)
+- settings change
+- source change
+- ingest rejected
+- detection re-run
+- alert transition
+- incident transition / assignment / note (ID only, not the body) / evidence / link / rename
+- demo run / reset
+
+`audit_logs` is append-only through a database trigger. No passwords, tokens or keys go into
+`details`, and a redaction helper plus tests enforce that.
+
+## Threat model (initial; completed in Phase 13)
+
+### Assets
+
+1. Stored security events and raw records (evidence integrity and confidentiality: they can
+   contain usernames, internal IPs, and sometimes secrets typed into command lines).
+2. Investigation records (alerts, incidents, notes, audit log): their integrity is the point
+   of the product.
+3. User accounts and sessions.
+4. Detection configuration: an attacker who can disable a rule is invisible.
+5. Server secrets (`JWT_SECRET`, database credentials).
+
+### Trust boundaries
+
+```
+[Log sources / shippers] ──(untrusted content)──► Ingest API ─┐
+[Browser (analyst)] ──(authenticated, untrusted input)──► API ─┼─► Backend ──► PostgreSQL
+[Admin CLI on server] ──(trusted operator)────────────────────┘
+```
+
+The key idea: **log content is attacker-controlled even when the sender is trusted.** An
+attacker who can make a host write a log line (for example an SSH login with a crafted
+username) controls text that SentinelX parses, stores and shows to analysts.
+
+### Threats and mitigations
+
+| Threat | Mitigation | Phase |
+|---|---|---|
+| Stored XSS through log content (usernames, user agents, command lines rendered in the UI) | React text rendering only, never `dangerouslySetInnerHTML`; raw records in `<pre>` as text; strict CSP (`default-src 'self'`) from nginx; tests with `<script>` / `"><img onerror>` payloads in every parser | 5, 9, 13 |
+| Log injection / forging, e.g. a newline inside a username faking a second line | Parsers treat one input record as one event; control characters are escaped for display; the fingerprint covers the whole raw text | 5 |
+| Parser crash or resource exhaustion from malformed input | Parsers are total functions (every record becomes an event or a `FAILED` raw row); per-request size and record limits; length caps per field; fuzz-style tests with random bytes | 5, 14 |
+| ReDoS through regex conditions | Regex only in repo-shipped rules, reviewed, 8 KB input cap, adversarial-length tests; admins cannot supply patterns | 6 |
+| Code execution through rule configuration | Rules are data validated by a schema; operator allowlist; `string.Template` for text; no `eval`/`exec`/`pickle`/`yaml.load` (only `safe_load`) | 6 |
+| Detection tampering (disabling rules, raising thresholds) | ADMIN only; every change is versioned and audited with a reason; bounds on tunable values; UI shows disabled rules prominently | 6, 12 |
+| Flooding the pipeline (event flood, alert flood) | Size limits, per-source rate limit, alert dedup, evidence cap, bounded queries | 5, 7, 13 |
+| Unauthorized ingestion (fake evidence) | Ingest needs ANALYST+ or a per-source ingest key (hashed, scoped to one source and ingest only); batch records who sent it | 5, 13 |
+| SQL injection via hunts or filters | Structured queries compile to SQLAlchemy expressions over an allowlisted field set; no string-built SQL | 10 |
+| Broken access control (IDOR, missing role check) | RBAC matrix test over every route and role; object-level checks for saved hunts | 3+ |
+| Session theft | In-memory access token, `httpOnly` `SameSite=Strict` refresh cookie, rotation plus reuse detection, CSP | 3 |
+| Credential stuffing against SentinelX itself | Rate limit, lockout, generic errors | 3 |
+| Evidence tampering in the database | Append-only triggers on events, raw records, notes, activity, audit; DB user without `TRUNCATE` in production (Phase 15 evaluates a separate migration role) | 4, 8, 15 |
+| Secrets leak through logs or Git | Env-only config, `.env` ignored, gitleaks in CI, redaction helper, raw events never logged at INFO | 2, 9, 13 |
+| Vulnerable dependencies | Hash-locked Python dependencies, `pip-audit`, `npm audit` in CI, few dependencies | 2, 13 |
+
+### Residual risks (accepted, documented)
+
+- Anyone with database superuser access can defeat the append-only triggers. Triggers protect
+  against application bugs and application-level compromise, not a DBA.
+- A compromised log source can inject convincing fake events. SentinelX can say who submitted
+  a batch, not whether the host told the truth.
+- Rate limiting and lockout are per backend instance.
+- There is no MFA and no password-reset flow at first.
+- Sensitive data inside raw logs (for example a password typed as a username) is stored as
+  received. Masking would alter evidence; access is limited by RBAC instead. This is a
+  trade-off to revisit.

@@ -1,0 +1,13 @@
+# Development and CI tools. Locked in requirements-dev.txt (see the command there).
+-c requirements.txt
+-r requirements.in
+pytest>=9.0.3,<10.0
+pytest-cov>=5.0
+# The HTTP client behind FastAPI's TestClient.
+httpx2>=2.13,<3.0
+ruff>=0.6
+mypy>=1.11
+# Checks locked packages against known vulnerabilities (PyPI advisory database).
+pip-audit>=2.7
+# Generates the lockfiles (uv pip compile --universal: one lock valid on every OS).
+uv>=0.5

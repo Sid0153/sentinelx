@@ -1,0 +1,5 @@
+# Secret scanning (run in CI) with gitleaks' default rules. Tests generate throwaway values at
+# runtime or use obviously fake ones, so no allowlist is needed yet. If one is ever added, it
+# must name exact values, never whole files or directories.
+[extend]
+useDefault = true
