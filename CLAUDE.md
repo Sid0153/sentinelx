@@ -15,7 +15,7 @@ its rules always apply:
 |---|---|
 | 1 Architecture | Done (design docs only, no code) |
 | 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
-| 3 Auth and RBAC | Done, green in CI (157 backend tests, 98% coverage; 36 frontend tests; auth smoke script and forged-XFF checks on both ports in the Compose job) |
+| 3 Auth and RBAC | Done, green in CI (168 backend tests, 98% coverage; 39 frontend tests; auth smoke script and forged-XFF checks on both ports in the Compose job) |
 
 Design: `docs/architecture.md` is the entry point; decisions are in `docs/decisions/`; the phase
 plan and exit criteria are in `docs/roadmap.md`. When implementation diverges from a doc,

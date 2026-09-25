@@ -68,6 +68,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [event-model.md](docs/event-model.md) | Normalized schema, supported sources, duplicates, enrichment |
 | [detection-engine.md](docs/detection-engine.md) | Rule format, evaluator kinds, the 8-rule library, alerts, dedup, workflow |
 | [correlation.md](docs/correlation.md) | Alert → incident correlation, incident lifecycle, timeline |
+| [threat-hunting.md](docs/threat-hunting.md) | Structured hunt queries, templates, pivoting, limits |
 | [risk-model.md](docs/risk-model.md) | SentinelX priority score (project-specific, not an industry standard) |
 | [mitre.md](docs/mitre.md) | ATT&CK mappings, verified against attack.mitre.org (v19.2) |
 | [database-schema.md](docs/database-schema.md) | Tables, integrity rules, indexes |
@@ -75,6 +76,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [security.md](docs/security.md) | Auth, RBAC, audit, threat model |
 | [testing.md](docs/testing.md) | Test strategy |
 | [decisions/](docs/decisions/README.md) | Architecture decision records |
+| [repository-assessment.md](docs/repository-assessment.md) | What existed before SentinelX, and what was reused from CloudSentinel |
 
 ## Stack
 

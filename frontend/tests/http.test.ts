@@ -118,3 +118,98 @@ describe("refreshSession", () => {
     expect(api.callsTo("POST /api/auth/refresh")).toHaveLength(1);
   });
 });
+
+/**
+ * A stand-in for navigator.locks that behaves like the real lock manager for one name: the
+ * lock is held until the callback's promise settles, waiters run one at a time, and
+ * request() resolves with the callback's result. jsdom does not provide the Web Locks API.
+ */
+function fakeLockManager() {
+  const log: string[] = [];
+  let tail: Promise<unknown> = Promise.resolve();
+  let held = false;
+  const request = vi.fn((name: string, callback: () => Promise<unknown>) => {
+    const run = tail.then(async () => {
+      held = true;
+      log.push(`acquire ${name}`);
+      try {
+        return await callback();
+      } finally {
+        held = false;
+        log.push(`release ${name}`);
+      }
+    });
+    tail = run.catch(() => undefined);
+    return run;
+  });
+  return { request, log, isHeld: () => held };
+}
+
+describe("refreshSession across tabs (Web Locks)", () => {
+  it("renews the session while holding the shared lock, and resolves with the token", async () => {
+    const locks = fakeLockManager();
+    vi.stubGlobal("navigator", { ...navigator, locks });
+    let heldDuringRequest = false;
+    mockApi({
+      "POST /api/auth/refresh": () => {
+        heldDuringRequest = locks.isHeld();
+        return REFRESHED;
+      },
+    });
+
+    const result = await refreshSession();
+
+    // The resolved value is the token response itself, not a nested promise.
+    expect(result.access_token).toBe("fresh-token");
+    expect(tokenStore.get()).toBe("fresh-token");
+    expect(heldDuringRequest).toBe(true);
+    expect(locks.request).toHaveBeenCalledWith("sentinelx-refresh", expect.any(Function));
+    expect(locks.log).toEqual(["acquire sentinelx-refresh", "release sentinelx-refresh"]);
+  });
+
+  it("releases the lock when the refresh fails, so the next attempt can run", async () => {
+    const locks = fakeLockManager();
+    vi.stubGlobal("navigator", { ...navigator, locks });
+    const api = mockApi({ "POST /api/auth/refresh": unauthorized("No session") });
+
+    await expect(refreshSession()).rejects.toBeInstanceOf(ApiError);
+    api.setRoute("POST /api/auth/refresh", REFRESHED);
+    await expect(refreshSession()).resolves.toMatchObject({ access_token: "fresh-token" });
+
+    expect(locks.log).toEqual([
+      "acquire sentinelx-refresh",
+      "release sentinelx-refresh",
+      "acquire sentinelx-refresh",
+      "release sentinelx-refresh",
+    ]);
+  });
+
+  it("serializes refreshes from two tabs, so the second sends the rotated cookie", async () => {
+    // Two tabs share the cookie jar but not this module's in-flight promise. Simulate the
+    // second tab by going through the lock manager directly, as its own module would.
+    const locks = fakeLockManager();
+    vi.stubGlobal("navigator", { ...navigator, locks });
+    // The browser's cookie jar: a request carries the value current when it is sent, and the
+    // rotated value only arrives with the response (Set-Cookie), a round trip later.
+    let cookie = "cookie-1";
+    const presented: string[] = [];
+    mockApi({
+      "POST /api/auth/refresh": () => {
+        presented.push(cookie);
+        const rotated = `cookie-${presented.length + 1}`;
+        setTimeout(() => {
+          cookie = rotated;
+        }, 20);
+        return { ...REFRESHED, delayMs: 20 };
+      },
+    });
+
+    const otherTab = locks.request("sentinelx-refresh", () =>
+      fetch("/api/auth/refresh", { method: "POST" }),
+    );
+    await Promise.all([refreshSession(), otherTab]);
+
+    // Each cookie value was presented exactly once: no replay, so no theft alarm.
+    expect(presented).toEqual(["cookie-1", "cookie-2"]);
+  });
+});

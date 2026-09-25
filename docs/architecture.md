@@ -161,23 +161,10 @@ Design points:
 
 ## Threat hunting (Phase 10)
 
-A hunt is a **structured query**, not a text query language: a required time range (at most
-31 days), a list of `{field, operator, value}` filters over an allowlisted set of normalized
-fields, a sort, and a keyset cursor. `hunting/compiler.py` turns it into a SQLAlchemy
-expression, so there is no string-built SQL. The same condition language as detection rules
-is reused, which is also the basis for "promote a hunt to a rule" later.
-
-Plans:
-- **Hunt templates**: parameterized, reviewed queries for questions that need more than
-  filters. Example: "successful logons within N minutes after ≥ K failures for the same
-  user/source". It is implemented as a window-function SQL query written in the codebase, not
-  user-supplied SQL.
-- **Pivoting**: every entity in the UI (IP, user, host, process) links to a hunt pre-filtered
-  on that value, with the hunt state kept in the URL.
-- **Text search**: substring search on `command_line` and `message` uses `pg_trgm` GIN
-  indexes (bundled with PostgreSQL). There is no Elasticsearch
-  ([ADR-002](decisions/0002-postgresql-event-store.md)).
-- **Saved hunts**: per user, optionally shared.
+Hunts are **structured queries** (a required time range of at most 31 days, allowlisted
+fields and operators, keyset pagination), compiled to parameterized SQL by the same compiler
+as detection conditions. Reviewed SQL templates cover questions that flat filters cannot
+answer. Full design, trade-offs and limits: [threat-hunting.md](threat-hunting.md).
 
 ## Frontend architecture
 

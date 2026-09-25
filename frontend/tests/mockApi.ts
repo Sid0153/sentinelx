@@ -8,6 +8,8 @@ export interface MockRoute {
   body?: unknown;
   rawBody?: string;
   headers?: Record<string, string>;
+  /** Answer only after this many milliseconds, like a real network round trip. */
+  delayMs?: number;
 }
 
 export const NETWORK_ERROR = Symbol("network error");
@@ -43,6 +45,7 @@ export function mockApi(routes: Routes) {
     if (handler === undefined) throw new Error(`Unmocked API call: ${key}`);
     if (handler === NETWORK_ERROR) throw new TypeError("Failed to fetch");
     const route = typeof handler === "function" ? handler(call) : handler;
+    if (route.delayMs) await new Promise((resolve) => setTimeout(resolve, route.delayMs));
     // 204 and friends must have a null body, or the Response constructor throws.
     const body = route.rawBody ?? (route.body === undefined ? null : JSON.stringify(route.body));
     return new Response(body, {

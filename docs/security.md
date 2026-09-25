@@ -28,6 +28,11 @@ The design reuses the model proven in CloudSentinel (same author).
   ANALYST can do.
 - ANALYST: ingest, triage alerts, work incidents, notes, evidence, saved hunts.
 - VIEWER: read-only across events, alerts, incidents, rules, assets, identities, dashboard.
+  The one exception is the viewer's **own account**: they can change their own password and
+  sign out. "Read-only" is about the security data, not about maintaining your own
+  credentials. Forbidding it would make an admin handle every password change and leave
+  viewers unable to react to a suspected leak, which is weaker, not safer. The route-access
+  test pins this (`/api/auth/change-password` is VIEWER-level).
 - Enforcement happens in FastAPI dependencies (`require_role`). The frontend only hides
   controls. The RBAC matrix test fails if any route has no declared access rule.
   See [ADR-007](decisions/0007-backend-authoritative-rbac.md).
