@@ -14,7 +14,7 @@ its rules always apply:
 | Phase | Status |
 |---|---|
 | 1 Architecture | Done (design docs only, no code) |
-| 2 Foundation | Done locally (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke checks run by hand). CI written, not yet run: no GitHub remote yet |
+| 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
 
 Design: `docs/architecture.md` is the entry point; decisions are in `docs/decisions/`; the phase
 plan and exit criteria are in `docs/roadmap.md`. When implementation diverges from a doc,

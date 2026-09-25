@@ -7,7 +7,7 @@ starts only on "Proceed to Phase N".
 | Phase | Scope | Exit criteria (verified, not claimed) | Status |
 |---|---|---|---|
 | 1 | Repository audit, architecture, data model, detection/correlation design, API/UI plan, security and test strategy, ADRs | Docs in `docs/`, reviewed | **Done** (design only) |
-| 2 | Foundation: backend skeleton, frontend skeleton, PostgreSQL, SQLAlchemy, Alembic, Compose, config, JSON logging, request IDs, health/ready, CI | `docker compose up` healthy; CI green (lint, types, tests, build, audits, gitleaks) | **Done locally**: all checks pass on this machine; CI workflow not yet run (no GitHub remote) |
+| 2 | Foundation: backend skeleton, frontend skeleton, PostgreSQL, SQLAlchemy, Alembic, Compose, config, JSON logging, request IDs, health/ready, CI | `docker compose up` healthy; CI green (lint, types, tests, build, audits, gitleaks) | **Done**, green in CI |
 | 3 | Users, roles, login/refresh/logout, RBAC dependencies, audit log (append-only), frontend auth, RBAC matrix test | Auth and RBAC tests green; audit trigger tested | Not started |
 | 4 | Assets, identities, `raw_events`/`events` tables, indexes, append-only triggers | Migrations up/down tested; constraints tested | Not started |
 | 5 | Log sources, 5 parsers, normalization, enrichment, ingestion service and API, batch reports, dedup | Golden fixtures per source; malformed/duplicate tests | Not started |
