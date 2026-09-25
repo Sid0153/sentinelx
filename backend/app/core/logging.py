@@ -20,6 +20,9 @@ from app.core.redaction import redact
 
 # Set per request by RequestContextMiddleware so every log line can be tied to one request.
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
+# The caller's address for the current request (None outside a request, e.g. the CLI).
+# Audit records read both, so services do not need the request object passed in.
+client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
 
 
 def _redact_value(value: Any) -> Any:

@@ -11,9 +11,11 @@ import time
 import uuid
 
 from starlette.datastructures import Headers, MutableHeaders
+from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.logging import request_id_var
+from app.core.client_ip import Network, resolve_client_ip
+from app.core.logging import client_ip_var, request_id_var
 
 logger = logging.getLogger("sentinelx.http")
 
@@ -38,19 +40,34 @@ def _security_headers(path: str) -> dict[str, str]:
     return headers
 
 
+def client_ip(request: Request) -> str:
+    """The client address worked out by RequestContextMiddleware (see core/client_ip.py)."""
+    resolved = getattr(request.state, "client_ip", None)
+    if isinstance(resolved, str):
+        return resolved
+    return request.client.host if request.client else "unknown"
+
+
 class RequestContextMiddleware:
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, trusted_networks: tuple[Network, ...] = ()) -> None:
         self.app = app
+        self.trusted_networks = trusted_networks
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        supplied = Headers(scope=scope).get("x-request-id", "")
+        headers = Headers(scope=scope)
+        supplied = headers.get("x-request-id", "")
         request_id = supplied if _SAFE_REQUEST_ID.match(supplied) else str(uuid.uuid4())
-        scope.setdefault("state", {})["request_id"] = request_id
+        peer = scope["client"][0] if scope.get("client") else None
+        ip = resolve_client_ip(peer, headers, self.trusted_networks)
+        state = scope.setdefault("state", {})
+        state["request_id"] = request_id
+        state["client_ip"] = ip
         token = request_id_var.set(request_id)
+        ip_token = client_ip_var.set(ip)
         path: str = scope["path"]
         extra_headers = {**_security_headers(path), "X-Request-ID": request_id}
         started = time.perf_counter()
@@ -85,10 +102,12 @@ class RequestContextMiddleware:
                         "path": path,  # no query string: it can carry search values
                         "status": status,
                         "duration_ms": duration_ms,
+                        "client_ip": ip,
                     }
                 },
             )
             request_id_var.reset(token)
+            client_ip_var.reset(ip_token)
 
     @staticmethod
     async def _send_internal_error(send: Send, request_id: str) -> None:

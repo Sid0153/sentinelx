@@ -29,8 +29,12 @@ services:
       APP_ENV: ${APP_ENV:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: json
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+      # Only nginx (its fixed address below) may say who the client is. Requests that reach
+      # the backend port directly arrive from the bridge gateway and are not trusted.
+      TRUSTED_PROXIES: 172.28.0.10/32
     depends_on:
       db:
         condition: service_healthy
@@ -52,6 +56,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      default:
+        ipv4_address: 172.28.0.10
     ports:
       - "127.0.0.1:8081:8080"
     security_opt:
@@ -62,6 +69,12 @@ services:
     tmpfs:
       - /tmp
     restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
 
 volumes:
   db_data:

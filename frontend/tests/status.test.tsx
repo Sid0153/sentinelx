@@ -1,25 +1,20 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { mockApi, NETWORK_ERROR } from "./mockApi";
+import { HEALTHY, mockApi, NETWORK_ERROR, signedInAs } from "./mockApi";
 import { renderApp } from "./renderApp";
 
-const HEALTHY = {
-  "GET /api/health": { body: { status: "ok", version: "0.1.0" } },
-  "GET /api/ready": {
-    body: { status: "ok", checks: { database: "up", migrations: "current" } },
-  },
-};
+const SIGNED_IN = signedInAs("VIEWER");
 
 describe("System status page", () => {
-  it("is where the app starts", async () => {
-    mockApi({ ...HEALTHY });
+  it("is where a signed-in user starts", async () => {
+    mockApi({ ...SIGNED_IN, ...HEALTHY });
     renderApp("/");
     expect(await screen.findByRole("heading", { name: "System status" })).toBeInTheDocument();
   });
 
   it("shows a healthy platform from the live checks", async () => {
-    mockApi({ ...HEALTHY });
+    mockApi({ ...SIGNED_IN, ...HEALTHY });
     renderApp("/status");
     expect(await screen.findByText("Operational")).toBeInTheDocument();
     expect(screen.getByText("Version 0.1.0")).toBeInTheDocument();
@@ -29,6 +24,7 @@ describe("System status page", () => {
 
   it("reports a database outage from a 503 readiness answer", async () => {
     mockApi({
+      ...SIGNED_IN,
       ...HEALTHY,
       "GET /api/ready": {
         status: 503,
@@ -43,6 +39,7 @@ describe("System status page", () => {
 
   it("reports pending migrations", async () => {
     mockApi({
+      ...SIGNED_IN,
       ...HEALTHY,
       "GET /api/ready": {
         status: 503,
@@ -54,7 +51,7 @@ describe("System status page", () => {
   });
 
   it("shows an error when the API cannot be reached, and recovers on retry", async () => {
-    const api = mockApi({ ...HEALTHY, "GET /api/health": NETWORK_ERROR });
+    const api = mockApi({ ...SIGNED_IN, ...HEALTHY, "GET /api/health": NETWORK_ERROR });
     renderApp("/status");
     expect(await screen.findByRole("alert")).toHaveTextContent("API unreachable");
 
@@ -66,6 +63,7 @@ describe("System status page", () => {
 
   it("treats a gateway error page (backend restarting) as unreachable", async () => {
     mockApi({
+      ...SIGNED_IN,
       ...HEALTHY,
       "GET /api/health": {
         status: 502,
@@ -82,14 +80,12 @@ describe("System status page", () => {
 
 describe("Routing", () => {
   it("shows a not-found page for unknown paths", async () => {
-    mockApi({});
+    mockApi({ ...SIGNED_IN });
     renderApp("/no-such-page");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Go to system status" })).toHaveAttribute(
-        "href",
-        "/status",
-      ),
+    expect(screen.getByRole("link", { name: "Go to system status" })).toHaveAttribute(
+      "href",
+      "/status",
     );
   });
 });

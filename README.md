@@ -2,9 +2,9 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 2 (foundation) complete.** The backend, frontend, database, migrations,
-> Docker Compose stack, structured logging, health checks and CI are in place. **No security
-> features exist yet**: no sign-in, ingestion, detection or incidents.
+> **Status: Phase 3 (authentication and RBAC) complete.** Sign-in with rotating sessions,
+> three roles enforced by the API, user administration and an append-only audit log work end
+> to end. **No detection features exist yet**: no ingestion, detection, alerts or incidents.
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:
@@ -29,11 +29,13 @@ Requirements: Docker with Compose v2.
 
 ```bash
 cp .env.example .env
-# set POSTGRES_PASSWORD in .env, e.g. to the output of: openssl rand -hex 24
+# set POSTGRES_PASSWORD (openssl rand -hex 24) and SECRET_KEY (openssl rand -hex 32) in .env
 docker compose up -d --build --wait
 ```
 
-- App: http://localhost:8081 (currently the system status page)
+- Create the first admin (there is no self-registration; the password is prompted, hidden):
+  `docker compose exec backend python -m app.cli create-admin --email you@example.com`
+- App: http://localhost:8081 (sign in, then: system status, users, audit log, account)
 - API health: http://localhost:8081/api/health · readiness: http://localhost:8081/api/ready
 - API docs (development only): http://localhost:8001/api/docs
 

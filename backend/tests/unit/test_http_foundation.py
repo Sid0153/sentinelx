@@ -5,7 +5,7 @@ import logging
 from collections.abc import Iterator
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
@@ -153,3 +153,22 @@ def test_cors_allows_only_configured_origins(client: TestClient) -> None:
         headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"},
     )
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_client_ip_comes_from_the_trusted_proxy_only() -> None:
+    """End to end through the middleware: nginx's address is trusted, nothing else is."""
+    from app.core.config import get_settings
+    from app.core.middleware import client_ip
+    from app.main import create_app
+
+    app = create_app(get_settings().model_copy(update={"trusted_proxies": "172.28.0.10/32"}))
+
+    @app.get("/api/_probe/ip")
+    def ip(request: Request) -> dict[str, str]:
+        return {"ip": client_ip(request)}
+
+    forged = {"X-Forwarded-For": "1.2.3.4, 198.51.100.7"}
+    with TestClient(app, client=("172.28.0.10", 50000)) as via_nginx:
+        assert via_nginx.get("/api/_probe/ip", headers=forged).json() == {"ip": "198.51.100.7"}
+    with TestClient(app, client=("172.28.0.1", 50000)) as direct:
+        assert direct.get("/api/_probe/ip", headers=forged).json() == {"ip": "172.28.0.1"}

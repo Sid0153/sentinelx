@@ -1,4 +1,5 @@
 import os
+import secrets
 
 # Must run before app modules are imported.
 # Tests never use a DATABASE_URL inherited from the developer's shell: they use
@@ -9,6 +10,10 @@ os.environ["DATABASE_URL"] = (
 )
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("LOG_FORMAT", "json")
+# Generated per test run: no signing key is ever written into the repository.
+os.environ.setdefault("SECRET_KEY", secrets.token_urlsafe(48))
+# Tests talk to the app directly; a developer's .env must not make them trust proxy headers.
+os.environ["TRUSTED_PROXIES"] = ""
 
 from collections.abc import Iterator  # noqa: E402
 

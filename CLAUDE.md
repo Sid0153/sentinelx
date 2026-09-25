@@ -15,6 +15,7 @@ its rules always apply:
 |---|---|
 | 1 Architecture | Done (design docs only, no code) |
 | 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
+| 3 Auth and RBAC | Done locally (157 backend tests, 98% coverage; 36 frontend tests; auth smoke script and forged-XFF checks pass against the live stack). Not yet pushed |
 
 Design: `docs/architecture.md` is the entry point; decisions are in `docs/decisions/`; the phase
 plan and exit criteria are in `docs/roadmap.md`. When implementation diverges from a doc,
@@ -84,4 +85,16 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
   request ID), types in `src/types/api.ts`, pages load with `useApi`. Tests render the whole
   app with `tests/renderApp.tsx` and mock fetch per route with `tests/mockApi.ts` (unmocked
   calls fail the test). The nav lists only pages that exist.
-- Do not run `ruff format` on existing files unless the file is already format-clean.
+- The backend is format-clean and CI runs `ruff format --check`: format everything you touch.
+  `scripts/` uses the backend config: `ruff check --config backend/pyproject.toml scripts`.
+- Security-relevant actions call `app.audit.service.record()` before the commit that saves the
+  change (same transaction). Never put secrets in `details`. `audit_logs` is append-only (DB
+  triggers): tests must not clean it up with DELETE.
+- Every new API route must be added to `EXPECTED_ACCESS` or `PUBLIC_ROUTES` in
+  `backend/tests/api/test_rbac.py`. Role checks: `CurrentUser` / `AnalystUser` / `AdminUser`
+  from `app.auth.deps` (backend is authoritative; the UI only hides controls).
+- Client IP: `app.core.middleware.client_ip(request)` / `client_ip_var`. Never read
+  X-Forwarded-For yourself. Compose trusts only nginx at 172.28.0.10.
+- Local test accounts for the Compose stack live in the git-ignored `.env.local`
+  (`LOCAL_ADMIN_EMAIL` / `LOCAL_ADMIN_PASSWORD`); never print them in chat.
+- Lists return `Page[T]` (`items`, `total`, `limit`, `offset`).

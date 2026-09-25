@@ -7,3 +7,6 @@ pydantic-settings>=2.4,<3.0
 sqlalchemy>=2.0.30,<2.1
 alembic>=1.13,<2.0
 psycopg[binary]>=3.2,<4.0
+# Password hashing (Argon2id) and access tokens (JWT, HS256).
+argon2-cffi>=23.1,<26.0
+PyJWT>=2.8,<3.0

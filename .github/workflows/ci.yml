@@ -51,6 +51,8 @@ jobs:
           pip-audit -r requirements-dev.txt --require-hashes --disable-pip --progress-spinner off
       - name: Lint (ruff, including bandit-style security rules)
         run: ruff check .
+      - name: Formatting (ruff format)
+        run: ruff format --check .
       - name: Type check (mypy --strict)
         run: mypy
       - name: Tests with coverage (fails under 90%)
@@ -99,10 +101,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Create .env with a generated throwaway password
+      - name: Create .env with generated throwaway secrets
         run: |
           cp .env.example .env
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
+          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
       - name: Build and start the stack (waits for health checks)
         run: docker compose up -d --build --wait --wait-timeout 240
       - name: Backend liveness (direct)
@@ -135,10 +138,27 @@ jobs:
           echo "$page" | grep -qi "x-frame-options: DENY"
           api="$(curl -fsS -D - -o /dev/null http://127.0.0.1:8081/api/health)"
           echo "$api" | grep -qi "cache-control: no-store"
-      - name: Database password never appears in the logs
+      - name: Sign-in, roles and the audit trail work end to end (through nginx)
         run: |
-          password="$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2)"
-          ! docker compose logs --no-color | grep -qF "$password"
+          admin_password="$(openssl rand -hex 16)"
+          echo "$admin_password" > /tmp/admin_password
+          docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend             python -m app.cli create-admin --email admin@ci.example
+          python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$admin_password"
+      - name: A forged X-Forwarded-For does not escape the login rate limit
+        run: |
+          for path in 8081 8001; do  # through nginx, and straight to the backend port
+            for i in $(seq 1 11); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:$path/api/auth/login                 -H 'Content-Type: application/json' -H "X-Forwarded-For: 198.51.100.$i"                 -d '{"email":"nobody@example.com","password":"wrong-password-123"}')"
+            done
+            echo "port $path, 11th attempt: $code"
+            test "$code" = "429"
+          done
+      - name: No secret appears in the logs
+        run: |
+          logs="$(docker compose logs --no-color)"
+          for secret in "$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2)"                         "$(grep ^SECRET_KEY= .env | cut -d= -f2)" "$(cat /tmp/admin_password)"; do
+            ! echo "$logs" | grep -qF "$secret"
+          done
       - name: Readiness reports a database outage (and recovers)
         run: |
           docker compose stop db
