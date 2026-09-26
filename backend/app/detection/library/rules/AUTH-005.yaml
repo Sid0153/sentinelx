@@ -1,0 +1,41 @@
+id: AUTH-005
+name: One account attacked from many sources
+description: >-
+  Failed logons for one existing account from many different sources in a short time: a
+  distributed brute-force attack, spread over many addresses so that no single source reaches
+  the per-source threshold of AUTH-001. Names that do not exist on the host are ignored (that
+  is enumeration, seen by AUTH-003). On an internet-facing SSH server, "root" is attacked from
+  many addresses all the time: expect this rule to fire there, and treat it as a reason to
+  disable password logons for root rather than as an incident each time.
+category: authentication
+kind: distinct
+severity: medium
+confidence: medium
+match:
+  all:
+    - {field: event_category, op: eq, value: authentication}
+    - {field: event_action, op: eq, value: logon}
+    - {field: event_outcome, op: eq, value: failure}
+    - {field: attributes.invalid_user, op: ne, value: true}
+group_by: [username]
+distinct_field: source_ip
+threshold: 5
+time_window: 10m
+tunable:
+  threshold: {min: 2, max: 1000}
+  time_window: {min: 1m, max: 24h}
+mitre:
+  - technique: T1110.001
+    reason: >-
+      Many password attempts against one account are Password Guessing, whether they come from
+      one address or are spread over many to stay under per-source limits.
+explanation: >-
+  "$username" failed to log on from $distinct_count different sources ($values_sample) within
+  $span, on $host. This rule alerts at $threshold sources within $time_window.
+investigation:
+  - Check whether "$username" logged on successfully from any address around $last_seen.
+  - Check whether the sources share a network or provider (a botnet or one cloud range).
+  - Check who owns "$username" and whether it should accept password logons at all.
+response:
+  - Require key-based or multi-factor authentication for "$username" if possible.
+  - If a logon succeeded, treat the account as compromised and follow your procedure.

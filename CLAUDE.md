@@ -17,7 +17,8 @@ its rules always apply:
 | 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
 | 3 Auth and RBAC | Done, green in CI (168 backend tests, 98% coverage; 39 frontend tests; auth smoke script and forged-XFF checks on both ports in the Compose job) |
 | 4 Assets, identities, event model | Done, green in CI (311 backend tests, 97.8% coverage; 39 frontend tests; migration 0003 applied on the Compose stack) |
-| 5 Ingestion and parsing | Done locally (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts pass on the live stack). Not yet pushed |
+| 5 Ingestion and parsing | Done, green in CI (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts in the Compose job) |
+| 6 Detection engine | Done locally (9 rules; 735 backend tests, 98% coverage; 39 frontend tests; every scenario triggers exactly its rules on the live stack; smoke scripts pass). Not yet pushed |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -122,5 +123,15 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
   `docs/database-schema.md`.
 - Migrations must not change once committed. An uncommitted one may be edited, but then
   recreate the scratch database (`DROP DATABASE sentinelx_test` / `CREATE DATABASE ...`).
+- Detection (`app/detection/`): conditions, evaluators, explain and the library loader are
+  pure; `engine.py` is the only code that reads events for rules; `storage.py` the only code
+  that writes rules. A new rule needs a YAML file named after its ID, techniques present in
+  `attack_techniques.yaml` (pinned; re-check on attack.mitre.org before changing), a demo
+  scenario listing it in `expected_rules`, and unit tests. Tests needing rules in the
+  database use the `seeded_rules` fixture.
+- Condition language: Python evaluation is authoritative; `to_sql()` must select a superset.
+  Compare text with `fold()` (ASCII only), never `casefold()`/`lower()`; a column may skip
+  folding in SQL only if listed in `LOWERCASE_COLUMNS`. `test_condition_sql.py` must stay
+  green: add awkward values there when adding an operator or field.
 - Doc edits: check that they applied. A chained command that fails before a doc edit leaves the
   docs stale without an error (this happened in Phase 3).

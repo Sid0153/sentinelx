@@ -31,6 +31,12 @@ class AuditAction(enum.StrEnum):
     SOURCE_CREATED = "SOURCE_CREATED"
     SOURCE_UPDATED = "SOURCE_UPDATED"
     INGEST_REJECTED = "INGEST_REJECTED"
+    # Detection rules: the library changing them, admins tuning them, manual runs.
+    RULE_ADDED = "RULE_ADDED"
+    RULE_LIBRARY_UPDATED = "RULE_LIBRARY_UPDATED"
+    RULE_RETIRED = "RULE_RETIRED"
+    RULE_UPDATED = "RULE_UPDATED"
+    DETECTION_RUN_REQUESTED = "DETECTION_RUN_REQUESTED"
 
 
 class AuditResult(enum.StrEnum):
@@ -45,3 +51,5 @@ class EntityType(enum.StrEnum):
     ASSET = "ASSET"
     IDENTITY = "IDENTITY"
     LOG_SOURCE = "LOG_SOURCE"
+    DETECTION_RULE = "DETECTION_RULE"
+    DETECTION_RUN = "DETECTION_RUN"

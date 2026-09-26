@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import audit, auth, context, health, ingestion, users
+from app.api import audit, auth, context, detections, health, ingestion, users
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -12,3 +12,5 @@ api_router.include_router(context.identities)
 api_router.include_router(ingestion.sources)
 api_router.include_router(ingestion.ingestion)
 api_router.include_router(ingestion.events)
+api_router.include_router(detections.detections)
+api_router.include_router(detections.mitre)

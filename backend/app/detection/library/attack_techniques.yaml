@@ -1,0 +1,44 @@
+# MITRE ATT&CK techniques referenced by SentinelX's own rules, and only those
+# (docs/mitre.md). Checked against attack.mitre.org; updating the version is a deliberate,
+# reviewed change. A rule referring to a technique that is not listed here stops the
+# application from starting.
+attack_version: "19.2"
+checked_on: "2026-09-25"
+source: "https://attack.mitre.org/"
+techniques:
+  - id: T1110
+    name: Brute Force
+    tactics: [Credential Access]
+  - id: T1110.001
+    name: "Brute Force: Password Guessing"
+    tactics: [Credential Access]
+  - id: T1110.003
+    name: "Brute Force: Password Spraying"
+    tactics: [Credential Access]
+  - id: T1078
+    name: Valid Accounts
+    tactics: [Stealth, Persistence, Privilege Escalation, Initial Access]
+  - id: T1548.003
+    name: "Abuse Elevation Control Mechanism: Sudo and Sudo Caching"
+    tactics: [Privilege Escalation]
+  - id: T1136.001
+    name: "Create Account: Local Account"
+    tactics: [Persistence]
+  - id: T1098.007
+    name: "Account Manipulation: Additional Local or Domain Groups"
+    tactics: [Persistence, Privilege Escalation]
+  - id: T1059.001
+    name: "Command and Scripting Interpreter: PowerShell"
+    tactics: [Execution]
+  - id: T1059.004
+    name: "Command and Scripting Interpreter: Unix Shell"
+    tactics: [Execution]
+  - id: T1027.010
+    name: "Obfuscated Files or Information: Command Obfuscation"
+    tactics: [Stealth]
+  - id: T1105
+    name: Ingress Tool Transfer
+    tactics: [Command and Control]
+  - id: T1046
+    name: Network Service Discovery
+    tactics: [Discovery]

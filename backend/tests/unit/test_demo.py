@@ -16,8 +16,10 @@ CONTEXT = ParseContext(
 )
 
 
-def events(lines: list[str]) -> list[NormalizedEvent]:
-    outcomes = [parse_record(SourceType.LINUX_AUTH, line.encode(), CONTEXT) for line in lines]
+def events(
+    lines: list[str], source_type: SourceType = SourceType.LINUX_AUTH
+) -> list[NormalizedEvent]:
+    outcomes = [parse_record(source_type, line.encode(), CONTEXT) for line in lines]
     assert not [o for o in outcomes if isinstance(o, ParseFailure)], "scenario lines must parse"
     return [o for o in outcomes if isinstance(o, NormalizedEvent)]
 
@@ -26,7 +28,7 @@ def events(lines: list[str]) -> list[NormalizedEvent]:
 def test_every_scenario_is_deterministic_and_parses(name: str) -> None:
     scenario = SCENARIOS[name]
     assert scenario.build(START) == scenario.build(START)
-    assert events(scenario.build(START))
+    assert events(scenario.build(START), scenario.source_type)
 
 
 def test_brute_force_is_one_source_one_account_many_failures() -> None:

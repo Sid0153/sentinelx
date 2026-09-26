@@ -1,0 +1,35 @@
+id: AUTH-004
+name: Logon from an unusual source
+description: >-
+  A successful logon from a network (/24 for IPv4, /64 for IPv6) the account has not logged on
+  from in the previous 14 days. Accounts without enough history are not judged, so new
+  accounts do not trigger it. VPN and DHCP changes trigger it too: an IP is not a location.
+category: authentication
+kind: new_value
+severity: low
+confidence: low
+match:
+  all:
+    - {field: event_category, op: eq, value: authentication}
+    - {field: event_action, op: eq, value: logon}
+    - {field: event_outcome, op: eq, value: success}
+group_by: [username]
+value_field: source_ip
+value_transform: ip_network
+lookback: 14d
+min_history: 5
+tunable: {}
+mitre:
+  - technique: T1078
+    reason: >-
+      A valid credential used from somewhere it never was before is one of the few visible
+      signs of a legitimate account being used by someone else.
+explanation: >-
+  "$username" logged on to $host from $source_ip ($value), a network not seen for this account
+  in the previous $lookback ($history_count earlier successful logons from other networks).
+investigation:
+  - Ask the owner of "$username" whether they logged on from $source_ip at $first_seen.
+  - Look at what "$username" did after this logon.
+response:
+  - If the owner does not recognise the logon, treat the account as compromised and follow
+    your procedure.

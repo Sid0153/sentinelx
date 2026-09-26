@@ -100,6 +100,16 @@ def main(base: str, email: str, password: str) -> None:
     status, detail = client.call("GET", f"/api/events/{events['items'][0]['id']}")
     check(status == 200 and detail["raw"]["parse_status"] == "PARSED", "event detail has its raw")
 
+    # Detection (Phase 6): the rules were seeded at startup and ran after the batch.
+    check(batch["status"] == "PROCESSED", "detection ran after the batch", batch["status"])
+    status, rules = client.call("GET", "/api/detections")
+    check(status == 200 and len(rules) == 9, "the rule library is loaded", len(rules))
+    window = {"from": (now - timedelta(hours=1)).isoformat(), "to": now.isoformat()}
+    status, run = client.json("POST", "/api/detections/run", window)
+    check(status == 201 and run["status"] == "COMPLETED", "a manual detection run completes")
+    status, runs = client.call("GET", "/api/detections/runs?trigger=manual")
+    check(status == 200 and runs["items"][0]["id"] == run["id"], "the run is listed")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

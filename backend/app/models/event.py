@@ -47,7 +47,10 @@ class BatchChannel(enum.StrEnum):
 
 
 class BatchStatus(enum.StrEnum):
-    STORED = "STORED"  # records stored; Phase 6 adds detection states after this one
+    STORED = "STORED"  # records committed; detection has not run (yet)
+    PROCESSED = "PROCESSED"  # detection ran over the batch
+    PROCESSED_WITH_ERRORS = "PROCESSED_WITH_ERRORS"  # detection ran; at least one rule failed
+    DETECTION_FAILED = "DETECTION_FAILED"  # detection could not run; records are safe, re-run
 
 
 def _check_in(column: str, values: type[enum.StrEnum], nullable: bool = False) -> str:
@@ -116,7 +119,8 @@ class IngestionBatch(Base):
     issues: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default=sa.text("'[]'::jsonb")
     )
-    # Event-time span of the parsed events: detection (Phase 6) re-reads this window.
+    detection_count: Mapped[int | None] = mapped_column(sa.Integer)  # None until detection ran
+    # Event-time span of the parsed events: detection re-reads this window.
     first_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     last_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     simulated: Mapped[bool] = mapped_column(default=False, server_default=sa.false())

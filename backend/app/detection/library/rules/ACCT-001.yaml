@@ -1,0 +1,50 @@
+id: ACCT-001
+name: Privileged account created
+description: >-
+  A new account is created and added to a privileged group (sudo, wheel, admin, Administrators)
+  on the same host within an hour. A common way to keep administrative access (persistence).
+  Linux (useradd then usermod or gpasswd) and Windows (4720 then 4732).
+category: account
+kind: sequence
+severity: high
+confidence: high
+steps:
+  - name: created
+    match:
+      all:
+        - {field: event_category, op: eq, value: iam}
+        - {field: event_action, op: eq, value: user_created}
+  - name: added
+    match:
+      all:
+        - {field: event_category, op: eq, value: iam}
+        - {field: event_action, op: eq, value: group_member_added}
+        - field: attributes.group_name
+          op: in
+          value: [sudo, wheel, admin, administrators, domain admins]
+# Windows identifies the account by SID in both events (4732 usually has no name); Linux by
+# name. target_account uses the SID when present.
+group_by: [host, target_account]
+threshold: 1
+time_window: 60m
+tunable:
+  threshold: null
+  time_window: {min: 5m, max: 24h}
+mitre:
+  - technique: T1136.001
+    reason: A local account was created (useradd, event 4720).
+  - technique: T1098.007
+    reason: >-
+      The new account was added to a privileged local group (usermod -aG, gpasswd, event
+      4732), which ATT&CK describes as Additional Local or Domain Groups.
+explanation: >-
+  A new account ($target_username) was created on $host and added to the privileged group
+  "$attr_group_name" $gap later (at $last_seen).
+investigation:
+  - Find who created the account and whether a change request covers it.
+  - Check how the creator logged on to $host before $first_seen.
+  - Look for logons by the new account after $last_seen.
+response:
+  - If the account is not authorized, disable it and remove it from "$attr_group_name"
+    following your account-management procedure.
+  - Review other privileged group memberships on $host.

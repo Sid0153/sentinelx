@@ -1,0 +1,36 @@
+id: AUTH-003
+name: One source attempting many accounts
+description: >-
+  One source fails to log on as many different accounts in a short time: password spraying or
+  account enumeration. A few tries per account keep each below per-account lockouts.
+category: authentication
+kind: distinct
+severity: medium
+confidence: medium
+match:
+  all:
+    - {field: event_category, op: eq, value: authentication}
+    - {field: event_action, op: eq, value: logon}
+    - {field: event_outcome, op: eq, value: failure}
+group_by: [source_ip]
+distinct_field: username
+threshold: 5
+time_window: 10m
+tunable:
+  threshold: {min: 2, max: 1000}
+  time_window: {min: 1m, max: 24h}
+mitre:
+  - technique: T1110.003
+    reason: >-
+      One source trying many accounts with few attempts each is what ATT&CK describes as
+      Password Spraying.
+explanation: >-
+  $source_ip ($source_ip_scope) failed to log on as $distinct_count different accounts
+  ($values_sample) within $span, on $host. This rule alerts at $threshold accounts within
+  $time_window.
+investigation:
+  - Check whether any of these accounts logged on successfully from $source_ip afterwards.
+  - Check which of the tried names are real accounts (valid names show an enumeration worked).
+response:
+  - If $source_ip is external and not expected, block it following your procedures.
+  - Review lockout and multi-factor settings for the real accounts that were tried.

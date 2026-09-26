@@ -20,6 +20,7 @@ from app.audit.events import AuditAction, AuditResult, EntityType
 from app.audit.service import record as audit
 from app.core.config import Settings
 from app.core.errors import AppError
+from app.detection.engine import run_for_batch
 from app.events.schema import NormalizedEvent, SourceType
 from app.events.store import (
     add_event,
@@ -53,6 +54,7 @@ class IngestRequest:
     channel: BatchChannel
     submitted_by: User | None
     simulated: bool = False
+    detect: bool = True  # run detection after storing (tests may switch it off)
 
 
 def reject(db: Session, actor: User | None, source_id: uuid.UUID | None, reason: str) -> None:
@@ -160,7 +162,7 @@ def ingest(db: Session, request: IngestRequest, settings: Settings) -> Ingestion
     db.flush()  # the batch and all raw records (one batched INSERT per table)
     for stored, event in parsed:
         add_event(db, stored, event, enrich(event, snapshot))
-    db.commit()
+    db.commit()  # the evidence is safe from here on, whatever happens to detection
 
     logger.info(
         "ingest.batch_stored",
@@ -175,4 +177,6 @@ def ingest(db: Session, request: IngestRequest, settings: Settings) -> Ingestion
             }
         },
     )
+    if request.detect:
+        run_for_batch(db, batch)
     return batch

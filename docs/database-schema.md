@@ -1,6 +1,6 @@
 # Database design
 
-> Status: tables marked ✅ exist (migrations 0001–0004) and are tested; the rest are design and
+> Status: tables marked ✅ exist (migrations 0001–0005) and are tested; the rest are design and
 > are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
 > unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
 > models with the migrated database and fails on any difference.
@@ -41,13 +41,14 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `assets` ✅ | 4 | hostname (unique; check: lowercase), ip_addresses inet[] (GIN), asset_type, environment, criticality (low/medium/high/critical), owner, description, tags, status (active/retired), created_at, updated_at |
 | `identities` ✅ | 4 | username (unique; check: lowercase), display_name, department, title, privilege_level (standard/privileged/service), status (active/disabled), tags, created_at, updated_at |
 | `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled. `ingest_key_hash` arrives in Phase 13 |
-| `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (STORED; detection states in Phase 6), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: Phase 6 moves it through detection states |
+| `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (check: STORED → PROCESSED / PROCESSED_WITH_ERRORS / DETECTION_FAILED), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), detection_count (Phase 6), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: detection moves it through its states |
 | `raw_events` ✅ | 4, 5 | source_id (FK), batch_id (FK, Phase 5), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED / SKIPPED / FAILED; check: parse_detail present ⇔ not PARSED), parse_detail (short reason code; `parse_error` until migration 0004), simulated. **Append-only** |
 | `events` ✅ | 4 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id (unique FK), source_id (FK), asset_id / identity_id (FK, restrict). Checks: category, outcome, action format, port ranges, lowercase host/user, IP scope, criticality, sizes. **Append-only** |
-| `detection_rules` | 6 | rule_id (PK text, e.g. AUTH-001), library_definition JSONB, library_hash, overrides JSONB, current_version, enabled, last_run_at, last_match_at, error_count |
-| `detection_rule_versions` | 6 | rule_id, version, effective_definition JSONB, source (library/admin), changed_by, change_reason, created_at; unique (rule_id, version) |
-| `mitre_techniques` | 6 | technique_id (PK), name, tactics text[], url, attack_version. Seeded from a checked-in file |
-| `detection_rule_techniques` | 6 | rule_id, technique_id, reason, indicator (for PROC-001's per-indicator mapping) |
+| `detection_rules` ✅ | 6 | rule_id (PK text, e.g. AUTH-001), name, category, kind, library_definition JSONB, library_hash, overrides JSONB (admin changes to tunable fields only), version, enabled, in_library (false once removed from the shipped library: kept, never run), last_run_at, last_match_at, match_count, error_count, created_at, updated_at |
+| `detection_rule_versions` ✅ | 6 | rule_id (FK), version, definition JSONB (the full effective definition), overrides, library_hash, source (check: library/admin), changed_by (FK users), change_reason, created_at; unique (rule_id, version). **Append-only** |
+| `mitre_techniques` ✅ | 6 | technique_id (PK), name, tactics text[], attack_version. Loaded from the checked-in, pinned reference file; the page URL is derived from the ID |
+| `detection_rule_techniques` ✅ | 6 | PK (rule_id, technique_id, indicator); indicator is `""` for the rule as a whole, or an indicator ID (PROC-001, PRIV-001); reason |
+| `detection_runs` ✅ | 6 | trigger (check: batch/manual), batch_id (FK), requested_by (FK users), range_start ≤ range_end (check), status (check: COMPLETED / COMPLETED_WITH_ERRORS), rule_results JSONB (per rule: version, candidates, detections, error code, ms), detections JSONB (each with explanation, facts, evidence IDs, ATT&CK), detection_count, duration_ms, started_at (indexed). Phase 7 turns detections into alerts |
 | `alerts` | 7 | see [detection-engine.md](detection-engine.md#alert-record); unique partial index on dedup_key WHERE status is active |
 | `alert_events` | 7 | alert_id, event_id, PK (alert_id, event_id), role (e.g. `step:failure`, `step:success`) |
 | `incidents` | 8 | see [correlation.md](correlation.md#incident-record) |
@@ -72,7 +73,7 @@ Phase 5.
   log. The only cascade is refresh tokens with their user. Alerts will hold events in place
   the same way (Phase 7).
 - **Append-only triggers** reject UPDATE and DELETE (per row) and TRUNCATE (per statement) on
-  `audit_logs`, `raw_events` and `events` (✅), later on `incident_notes`,
+  `audit_logs`, `raw_events`, `events` and `detection_rule_versions` (✅), later on `incident_notes`,
   `incident_evidence` and `incident_activity`. They share one trigger function,
   `reject_modification()`. How the demo is reset (Phase 16) will be designed without
   weakening this ([ADR-0010](decisions/0010-evidence-storage.md)).

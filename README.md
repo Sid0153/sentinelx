@@ -2,11 +2,12 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 5 (ingestion and parsing) complete.** Sign-in and roles, the audit log,
-> the asset and identity inventory, and **ingestion**: five log formats parsed, normalized and
-> enriched into an append-only event store, with batch reports and an events API. **Nothing
-> detects yet**: detection arrives in Phase 6. The UI has no event or ingestion pages yet
-> (Phase 9); use the API or the CLI below.
+> **Status: Phase 6 (detection engine) complete.** Sign-in and roles, the audit log, the
+> asset and identity inventory, ingestion of five log formats into an append-only event store,
+> and **detection**: 9 rules (YAML, mapped to ATT&CK v19.2) run after every ingest batch and on
+> demand, each detection with its explanation and evidence. **There are no alerts yet**:
+> detections are stored per run, and alerts arrive in Phase 7. The UI has no event or detection
+> pages yet (Phase 9); use the API or the CLI below.
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:
@@ -49,6 +50,16 @@ docker compose up -d --build --wait
   curl -X POST http://localhost:8081/api/ingest/<source-id> -H "Authorization: Bearer <token>"        -H "Content-Type: text/plain" --data-binary @auth.log
   ```
 
+- Detection runs after every batch (the demo-ingest output ends with
+  `PROCESSED, 2 detections` for the scenario above). The rules are loaded at start-up; to see
+  them, their ATT&CK mapping and the stored runs, or to re-run detection over a time range:
+
+  ```bash
+  curl http://localhost:8081/api/detections -H "Authorization: Bearer <token>"
+  curl http://localhost:8081/api/detections/runs -H "Authorization: Bearer <token>"
+  docker compose exec backend python -m app.cli run-detection --from 2026-09-26T00:00:00+00:00 --to 2026-09-27T00:00:00+00:00
+  ```
+
 Every port is bound to 127.0.0.1. The host ports (5433, 8001, 8081) are chosen so the stack
 can run next to others that use the usual 5432, 8000 and 8080.
 
@@ -77,7 +88,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [feature-coverage.md](docs/feature-coverage.md) | **Every feature of the brief, its phase and its status** |
 | [architecture.md](docs/architecture.md) | System shape, modules, pipeline, failure modes, frontend, observability, scale limits, extension plan |
 | [event-model.md](docs/event-model.md) | Normalized schema, supported sources, duplicates, enrichment |
-| [detection-engine.md](docs/detection-engine.md) | Rule format, evaluator kinds, the 8-rule library, alerts, dedup, workflow |
+| [detection-engine.md](docs/detection-engine.md) | Rule format, evaluator kinds, the 9-rule library and its known weaknesses, alerts, dedup, workflow |
 | [correlation.md](docs/correlation.md) | Alert → incident correlation, incident lifecycle, timeline |
 | [threat-hunting.md](docs/threat-hunting.md) | Structured hunt queries, templates, pivoting, limits |
 | [risk-model.md](docs/risk-model.md) | SentinelX priority score (project-specific, not an industry standard) |

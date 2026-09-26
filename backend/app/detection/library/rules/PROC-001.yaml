@@ -1,0 +1,97 @@
+id: PROC-001
+name: Suspicious command line
+description: >-
+  A process started with a command line that matches a known-suspicious pattern: an encoded
+  PowerShell command (also from a renamed copy of PowerShell), downloaded content run by a
+  shell, certutil used to download, or a shell redirected over a network socket. Pattern
+  matching: obfuscation evades it, a download and its execution in two separate commands are
+  not linked, and some administration tools produce the same patterns.
+category: process
+kind: single
+severity: high
+confidence: medium
+match:
+  all:
+    - {field: event_category, op: eq, value: process}
+    - {field: command_line, op: exists}
+indicators:
+  - id: encoded_powershell
+    name: Encoded PowerShell command
+    match:
+      any:
+        - all:
+            - {field: process_name, op: in, value: [powershell.exe, pwsh.exe, pwsh]}
+            # -EncodedCommand and every prefix PowerShell accepts (-e, -ec, -en, -enc, ...),
+            # written with -, / or the dashes PowerShell also accepts (en, em, horizontal bar),
+            # then a space or a colon, then a base64 blob.
+            - field: command_line
+              op: matches
+              value: '(?i)(?:^|\s)[-/\u2013\u2014\u2015](?:e|ec|en[a-z]{0,12})(?:\s+|:)[A-Za-z0-9+/=]{16,}'
+        # Whatever the program is called: -EncodedCommand takes UTF-16LE text in base64, and
+        # UTF-16LE text (every other byte zero) gives base64 a fixed 8-character rhythm. Three
+        # repetitions = 9 ASCII characters of command. Random base64 does not produce it
+        # (0 hits in 20,000 random 4 KB blobs), so a renamed powershell.exe is still caught.
+        - field: command_line
+          op: matches
+          value: '(?:[A-Za-z0-9+/][AQgw][AB][A-Za-z0-9+/]A[A-H][AEIMQUYcgkosw048]A){3,}'
+    mitre:
+      - technique: T1059.001
+        reason: >-
+          PowerShell (or a renamed copy of it) was started to execute a command given as
+          encoded text.
+      - technique: T1027.010
+        reason: The command is base64-encoded, which hides what it does from casual review.
+  - id: download_pipe_shell
+    name: Downloaded content run by a shell
+    match:
+      any:
+        # curl ... | sh
+        - field: command_line
+          op: matches
+          value: '(?i)\b(?:curl|wget)\b[^|]{0,2048}\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b'
+        # bash <(curl ...) and sh -c "$(curl ...)"
+        - field: command_line
+          op: matches
+          value: '(?i)\b(?:ba|z|da|k)?sh\b[^\n]{0,16}?(?:<\(|\$\()\s*(?:curl|wget)\b'
+        # curl -o x ... && sh x (download, then a shell runs a file, in the same command)
+        - field: command_line
+          op: matches
+          value: '(?i)\b(?:curl|wget)\b[^\n]{0,512}?(?:;|&&)\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\s+[^\s;&|-]'
+    mitre:
+      - technique: T1105
+        reason: Content is downloaded from a remote location onto the host.
+      - technique: T1059.004
+        reason: The downloaded content is executed by a Unix shell.
+  - id: certutil_download
+    name: certutil used to download a file
+    match:
+      all:
+        - {field: process_name, op: eq, value: certutil.exe}
+        - {field: command_line, op: matches, value: '(?i)[-/]urlcache\b'}
+    mitre:
+      - technique: T1105
+        reason: certutil's -urlcache downloads files, a known way to bring tools onto a host.
+  - id: dev_tcp_shell
+    name: Shell redirected over a network socket
+    match:
+      field: command_line
+      op: contains
+      value: /dev/tcp/
+    mitre:
+      - technique: T1059.004
+        reason: A Unix shell with input and output redirected to a network connection.
+group_by: [host]
+tunable:
+  threshold: null
+  time_window: null
+mitre: []
+explanation: >-
+  $indicator_name on $host: "$process_name" was started by "$username" at $first_seen with
+  the command line "$command_line".
+investigation:
+  - Decode or read the command line and find what it downloads or runs.
+  - Identify the parent process and how "$username" started it.
+  - Look for network connections from $host right after $first_seen.
+response:
+  - If the command is not a known administrative task, isolate $host following your
+    procedure and preserve the evidence.

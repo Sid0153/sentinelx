@@ -5,7 +5,7 @@ Updated at the end of every phase; a phase is not done until its rows here are t
 
 ✅ done and tested · ◐ partly done (what is missing is named) · ⬜ planned (phase)
 
-Last updated: **Phase 5**.
+Last updated: **Phase 6**.
 
 ## Primary product capabilities (brief §"Primary product capabilities")
 
@@ -15,9 +15,9 @@ Last updated: **Phase 5**.
 | 2 | Event parsing | 5 | ✅ five parsers, fuzzed and linear-time |
 | 3 | Event normalization | 4, 5 | ✅ `NormalizedEvent`, controlled vocabulary, DB checks |
 | 4 | Event enrichment | 5 | ✅ normalized users, host → asset, source classification, internal/external IP, categorization, asset criticality, identity context (actor). ◐ target-account context: Phase 11 |
-| 5 | Detection engineering | 6 | ⬜ |
-| 6 | Rule-based detection | 6 | ⬜ declarative YAML rules, safe condition language |
-| 7 | Temporal detection | 6 | ⬜ threshold / sequence / new-value windows |
+| 5 | Detection engineering | 6 | ✅ rule library as reviewed YAML, validated at startup; versions; tests per rule and per scenario |
+| 6 | Rule-based detection | 6 | ✅ declarative YAML rules, safe condition language (Python authoritative, SQL prefilter proven a superset) |
+| 7 | Temporal detection | 6 | ✅ threshold, distinct, sequence (with max gap) and new-value windows on event time |
 | 8 | Event correlation | 8 | ⬜ entity-overlap correlation of alerts |
 | 9 | Alert generation | 7 | ⬜ |
 | 10 | Alert deduplication | 7 | ⬜ dedup key, partial unique index |
@@ -26,17 +26,17 @@ Last updated: **Phase 5**.
 | 13 | Incident investigation | 8, 9 | ⬜ |
 | 14 | Timeline reconstruction | 8 | ⬜ from stored events and actions |
 | 15 | Threat hunting | 10 | ⬜ structured queries, templates, pivots, saved hunts |
-| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ mappings verified on attack.mitre.org (v19.2) in `mitre.md`; stored and shown from Phase 6 |
+| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7), incidents (8), coverage view (11) |
 | 17 | Evidence management | 7, 8 | ⬜ alert evidence links, incident evidence pins |
 | 18 | Analyst notes | 8 | ⬜ append-only |
-| 19 | Response recommendations | 6, 8 | ⬜ per-rule guidance, grouped per incident |
-| 20 | Detection-rule management | 6, 12 | ⬜ tunable fields, versions, audit |
+| 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection; grouped per incident: Phase 8 |
+| 20 | Detection-rule management | 6, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI: Phase 9/12 |
 | 21 | Search and filtering | 5, 10 | ◐ events API: time range, source, batch, category, action, outcome, host, user, source IP, keyset paging. Full hunting: Phase 10 |
 | 22 | Security analytics | 9, 11 | ⬜ dashboard aggregates, rule metrics |
 | 23 | Risk/context scoring | 7, 11 | ⬜ |
 | 24 | RBAC | 3 | ✅ ADMIN / ANALYST / VIEWER enforced by the API; route × role matrix test |
-| 25 | Audit logging | 3+ | ✅ append-only; ◐ alert/incident/rule actions arrive with their phases |
-| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events done; detections, alerts, incidents, hunt, MITRE, dashboard in their phases |
+| 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); ◐ alert/incident actions arrive with their phases |
+| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques done; alerts, incidents, hunt, coverage, dashboard in their phases |
 | 27 | SOC dashboard | 9 | ⬜ |
 | 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
@@ -48,11 +48,11 @@ Last updated: **Phase 5**.
 
 | Item | Phase | Status |
 |---|---|---|
-| Rule fields: id, name, description, category, severity, confidence, enabled, conditions, threshold, time window, aggregation, MITRE, investigation and response guidance | 6 | ⬜ designed in `detection-engine.md` |
-| A single-event, B threshold, C temporal, D sequence, E aggregation | 6 | ⬜ |
+| Rule fields: id, name, description, category, severity, confidence, enabled, conditions, threshold, time window, aggregation, MITRE, investigation and response guidance | 6 | ✅ all of them, plus kind, tunable bounds, exclusions, per-indicator ATT&CK |
+| A single-event, B threshold, C temporal, D sequence, E aggregation | 6 | ✅ `single`, `threshold`, time windows, `sequence`, `distinct` (count of distinct values per group); plus `new_value` |
 | F cross-event correlation | 8 | ⬜ |
-| AUTH-001, AUTH-002, AUTH-003, AUTH-004, PRIV-001, ACCT-001, PROC-001, NET-001 | 6 | ⬜ (ATT&CK mappings verified) |
-| Explainable alerts (what, why, which events, entities, confidence, severity, next steps) from real evidence | 6, 7 | ⬜ |
+| AUTH-001, AUTH-002, AUTH-003, AUTH-004, PRIV-001, ACCT-001, PROC-001, NET-001 | 6 | ✅ each fires on its scenario, in memory, in PostgreSQL and live; AUTH-004 with stored history. Plus AUTH-005 (distributed brute force), added to close a documented gap |
+| Explainable alerts (what, why, which events, entities, confidence, severity, next steps) from real evidence | 6, 7 | ◐ every detection has them, computed from its evidence; alerts carrying them: Phase 7 |
 
 ## Alerts, incidents, risk (brief §8–§12, §16, §22, §45)
 
@@ -100,7 +100,7 @@ Last updated: **Phase 5**.
 | /api/auth, /api/users, /api/audit | ✅ (3) |
 | /api/assets, /api/identities | ✅ (4) |
 | /api/events (+ /api/sources, /api/ingest) | ✅ (5) |
-| /api/detections, /api/mitre | ⬜ (6, 11) |
+| /api/detections, /api/mitre/techniques | ✅ (6); /api/mitre/coverage ⬜ (11) |
 | /api/alerts | ⬜ (7) |
 | /api/incidents | ⬜ (8) |
 | /api/dashboard | ⬜ (9) |
@@ -120,7 +120,7 @@ incident trends, recent alerts and incidents.
 | Login, logout, failed login | 3 | ✅ (plus lockout, rate limit, token reuse, access denied) |
 | User creation, role modification | 3 | ✅ (plus deactivate / reactivate) |
 | Configuration changes | 4, 5, 8 | ◐ assets, identities and log sources ✅; app settings (8) |
-| Rule modification | 6 | ⬜ |
+| Rule modification | 6 | ✅ `RULE_UPDATED` with from/to values and reason; library add/update/retire; manual runs |
 | Alert status change | 7 | ⬜ |
 | Incident status change, assignment, note creation | 8 | ⬜ |
 
@@ -129,9 +129,9 @@ incident trends, recent alerts and incidents.
 | Item | Phase | Status |
 |---|---|---|
 | Scenario selection, event count, time range (start and interval), host, user, source IP | 5 | ✅ `demo-ingest` options, validated; unsupported options refused |
-| 1 normal authentication · 10 benign activity | 5 | ✅ `benign` (the "triggers nothing" check arrives with rules, Phase 6) |
-| 2 brute force · 3 password spraying · 4 success after failures | 5 | ✅ |
-| 5 privilege escalation · 6 privileged account creation · 7 suspicious process · 8 suspicious network | 6 | ⬜ built with the rules they exercise |
+| 1 normal authentication · 10 benign activity | 5, 6 | ✅ `benign`, tested to trigger no rule |
+| 2 brute force · 3 password spraying · 4 success after failures | 5 | ✅ plus `distributed_brute_force` (AUTH-005) |
+| 5 privilege escalation · 6 privileged account creation · 7 suspicious process · 8 suspicious network | 6 | ✅ each in its own source format, tested to trigger exactly its rule |
 | 9 multi-stage correlated incident | 8 | ⬜ |
 | Clearly marked simulated; internally consistent | 5 | ✅ `simulated` flag on batch, raw record and event; RFC 5737 addresses |
 | Repeatable demonstrations, reset of the demo environment | 16 | ⬜ |
@@ -143,7 +143,7 @@ incident trends, recent alerts and incidents.
 | Modular monolith (§ARCHITECTURAL PRINCIPLE) | ✅ ADR-0001 |
 | Raw and normalized stored separately; raw never modified (§46) | ✅ bytes, append-only incl. TRUNCATE (ADR-0010) |
 | Threat model: assets, trust boundaries, attack surfaces, threats, mitigations, residual risks (§26) | ◐ initial in `security.md`; completed in Phase 13 |
-| Observability: request IDs, structured logs, ingestion counts, processing and database errors (§34) | ✅; detection execution information: Phase 6 |
+| Observability: request IDs, structured logs, ingestion counts, processing and database errors (§34) | ✅ including detection runs (per-rule candidates, detections, errors, time; `detection.run_completed` log) |
 | Docker: health checks, env config, persistent volume, documented start (§35) | ✅ |
 | ADR-001 … ADR-007 (§38) | ✅ plus 0008–0010 |
 | Performance: indexes, pagination, bounded responses, batch ingestion (§33) | ✅ so far (index-fit tests, keyset paging, batched inserts); measured benchmarks: Phase 14 |

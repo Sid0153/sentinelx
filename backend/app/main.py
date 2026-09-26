@@ -12,6 +12,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.core.rate_limit import SlidingWindowRateLimiter
+from app.detection.library import get_library
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,8 @@ OPENAPI_TAGS = [
     {"name": "sources", "description": "Log sources: where records come from, how to parse."},
     {"name": "ingest", "description": "Send records (ANALYST+) and read batch reports."},
     {"name": "events", "description": "Normalized events, with the raw record each came from."},
+    {"name": "detections", "description": "Detection rules (read; ADMIN tunes) and runs."},
+    {"name": "mitre", "description": "ATT&CK techniques SentinelX's rules map to."},
 ]
 
 
@@ -57,6 +60,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     """Application factory. Run with: uvicorn app.main:create_app --factory"""
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_format)
+    # A broken rule library is a deployment error: refuse to start instead of silently
+    # running without some rules. (LibraryError names the file and the problem.)
+    library = get_library()
+    logger.info(
+        "detection.library_loaded",
+        extra={"fields": {"rules": len(library.rules), "attack": library.attack.attack_version}},
+    )
 
     app = FastAPI(
         title="SentinelX API",

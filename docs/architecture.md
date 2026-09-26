@@ -72,8 +72,10 @@ backend/app/
        service.py   one batch: dedup, parse, enrich, store raw + events, report
   ✅ demo/          simulated scenario generator; emits RAW log lines, never normalized rows
   ✅ cli.py         check-config, export-openapi, create-admin, create-source, ingest-file,
-                   demo-scenarios, demo-ingest (later: seed-rules, run-detection)
-  detection/        (Phase 6) model.py, conditions.py, evaluators/, library/, engine.py, explain.py
+                   demo-scenarios, demo-ingest, seed-rules, reconcile-batches, run-detection
+  detection/        (Phase 6) conditions.py, events.py, model.py, evaluators/, evaluate.py,
+                    explain.py, library/ (YAML rules + pinned ATT&CK file), storage.py,
+                    engine.py, service.py
   alerts/           (Phase 7) dedup, persistence, workflow, prioritization
   correlation/      (Phase 8) alert → incident linking (pure scoring + persistence)
   incidents/        (Phase 8) lifecycle, notes, evidence pins, activity, timeline assembly
@@ -105,9 +107,10 @@ Rules we will enforce with tests or review:
 
 [ADR-008](decisions/0008-synchronous-bounded-pipeline.md) has the full reasoning. Summary:
 
-Implemented in Phase 5: steps 1–4, in one transaction per batch. The batch row is written
-with its final counts, status STORED. Steps 5–8 arrive with detection (Phase 6), together
-with the detection states of a batch and the startup reconciler. Files are sent as
+Implemented: steps 1–4 (Phase 5), in one transaction per batch, and step 5 plus the batch's
+detection states and the startup reconciler (Phase 6). Steps 6–7 arrive with alerts (Phase 7)
+and correlation (Phase 8); until then step 8 marks the batch PROCESSED after detection alone,
+and the detections are stored in a `detection_runs` row. Files are sent as
 `text/plain` to the same endpoint, so there is no separate upload route (and no multipart
 dependency).
 
@@ -128,10 +131,11 @@ POST /api/ingest/{source}  (JSON records or text/plain lines; also CLI ingest-fi
   ── commit ─────────────────────────────────────────────────────────────────────
   ── transaction B (serialized with pg_advisory_xact_lock('detection')) ─────────
   5. detection: for each enabled rule, load candidate events for the batch's time span
-     widened by the rule's window, run the evaluator → detections
-  6. alerts: dedup / create / extend, link evidence, compute priority
-  7. correlation: link alerts to incidents or create incidents
-  8. batch → PROCESSED (alerts created/updated, incidents created/updated)
+     widened by the rule's window, run the evaluator → detections that include at least
+     one of the batch's events; store the run                           [Phase 6 ✅]
+  6. alerts: dedup / create / extend, link evidence, compute priority     [Phase 7]
+  7. correlation: link alerts to incidents or create incidents            [Phase 8]
+  8. batch → PROCESSED / PROCESSED_WITH_ERRORS, detection_count          [Phase 6 ✅]
   ── commit ─────────────────────────────────────────────────────────────────────
   9. respond 201 with the batch report
 ```
@@ -163,10 +167,11 @@ Design points:
 | Malformed record | That record only | Raw kept with `parse_status=FAILED` and a short error code; counted in the batch report |
 | Whole payload invalid (not JSON, too big) | Request | `400`/`413`, nothing stored, audited as a rejected ingest |
 | Unknown / disabled source | Request | `404`/`409` |
-| DB error in transaction A | Batch | Rolled back; batch `FAILED`; client may retry (duplicates are skipped) |
-| Evaluator raises for one rule | That rule | Logged with rule ID and batch ID; other rules still run; batch `PROCESSED_WITH_ERRORS` |
-| DB error in transaction B | Detection for the batch | Events stay stored; batch `DETECTION_FAILED`; re-run is safe |
-| Process restart mid-batch | Batch | Startup reconciler marks `RECEIVED`/`STORED` batches older than N minutes as `DETECTION_FAILED` |
+| DB error in transaction A | Batch | Rolled back, including the batch row: nothing is stored; the client gets a 500 and may retry |
+| Evaluator raises for one rule | That rule | Recorded as `evaluation_error` in the run and logged with the rule ID; other rules still run; batch `PROCESSED_WITH_ERRORS` (tested) |
+| A rule has more than 20,000 candidate events | That rule | Not evaluated on a truncated set; recorded as `too_many_candidates`; batch `PROCESSED_WITH_ERRORS` (tested) |
+| DB error in transaction B | Detection for the batch | Events stay stored; batch `DETECTION_FAILED`; re-run is safe (tested) |
+| Process restart mid-batch | Batch | `cli reconcile-batches` (run at container start) marks `STORED` batches older than 5 minutes as `DETECTION_FAILED` (tested) |
 
 ## Threat hunting (Phase 10)
 

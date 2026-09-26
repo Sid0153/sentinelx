@@ -1,0 +1,51 @@
+id: AUTH-002
+name: Successful authentication after repeated failures
+description: >-
+  Several failed logons followed shortly by a successful one, for the same account, host and
+  source: a guessed or stuffed password may have worked. Works for any authentication source
+  (SSH, Windows logons, application logins).
+category: authentication
+kind: sequence
+severity: high
+confidence: medium
+steps:
+  - name: failures
+    match:
+      all:
+        - {field: event_category, op: eq, value: authentication}
+        - {field: event_action, op: eq, value: logon}
+        - {field: event_outcome, op: eq, value: failure}
+  - name: success
+    match:
+      all:
+        - {field: event_category, op: eq, value: authentication}
+        - {field: event_action, op: eq, value: logon}
+        - {field: event_outcome, op: eq, value: success}
+group_by: [source_ip, username, host]
+threshold: 3  # failures needed before the success
+time_window: 10m
+max_gap: 5m
+tunable:
+  threshold: {min: 2, max: 100}
+  time_window: {min: 1m, max: 24h}
+mitre:
+  - technique: T1110
+    reason: >-
+      The failures that preceded the success. The rule cannot tell guessing, spraying and
+      stuffing apart, so it maps to the parent technique.
+  - technique: T1078
+    reason: >-
+      The success means a working credential for the account was used, possibly by someone
+      other than its owner.
+explanation: >-
+  $failures_count failed logons for "$username" on $host from $source_ip ($source_ip_scope),
+  then a successful logon $gap after the last failure (at $last_seen). This rule alerts when
+  at least $threshold failures precede a success within $time_window.
+investigation:
+  - Confirm with the owner of "$username" whether they logged on to $host at $last_seen.
+  - Review everything "$username" did on $host after $last_seen (commands, sudo, new accounts).
+  - Check whether $source_ip is a known location for this account.
+response:
+  - If the logon was not authorized, follow your containment procedure for $host and reset
+    the credentials of "$username".
+  - End the active sessions of "$username" on $host if compromise is suspected.

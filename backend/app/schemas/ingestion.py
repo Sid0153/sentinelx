@@ -132,6 +132,7 @@ class BatchPublic(BaseModel):
     failed_count: int
     duplicate_count: int
     rejected_count: int
+    detection_count: int  # detections the batch's events took part in (Phase 6)
     issues: list[BatchIssue]
     first_event_at: datetime | None
     last_event_at: datetime | None

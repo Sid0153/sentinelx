@@ -10,8 +10,8 @@ starts only on "Proceed to Phase N".
 | 2 | Foundation: backend skeleton, frontend skeleton, PostgreSQL, SQLAlchemy, Alembic, Compose, config, JSON logging, request IDs, health/ready, CI | `docker compose up` healthy; CI green (lint, types, tests, build, audits, gitleaks) | **Done**, green in CI |
 | 3 | Users, roles, login/refresh/logout, RBAC dependencies, audit log (append-only), frontend auth, RBAC matrix test | Auth and RBAC tests green; audit trigger tested | **Done**, green in CI |
 | 4 | Assets, identities, `raw_events`/`events` tables, indexes, append-only triggers | Migrations up/down tested; constraints tested | **Done**, green in CI |
-| 5 | Log sources, 5 parsers, normalization, enrichment, ingestion service and API, batch reports, dedup | Table-driven cases per source; malformed/duplicate tests | **Done** (see CLAUDE.md for CI status) |
-| 6 | Rule schema, condition language, 5 evaluators, rule storage and versions, ATT&CK reference file, 8-rule library, explanations, detection runs | Positive/negative fixtures for every rule; order/split/idempotence tests | Not started |
+| 5 | Log sources, 5 parsers, normalization, enrichment, ingestion service and API, batch reports, dedup | Table-driven cases per source; malformed/duplicate tests | **Done**, green in CI |
+| 6 | Rule schema, condition language, 5 evaluators, rule storage and versions, ATT&CK reference file, 9-rule library (8 + AUTH-005), explanations, detection runs | Positive/negative fixtures for every rule; order/split/idempotence tests | **Done** (see CLAUDE.md for CI status) |
 | 7 | Alerts: dedup, evidence, priority, workflow, alert API and UI | Dedup and transition tests; UI tests | Not started |
 | 8 | Correlation, incidents, state machine, notes, evidence pins, assignment, activity, timeline, settings | Chain → one incident; window edges; concurrency test | Not started |
 | 9 | SOC dashboard, alert and incident workspaces, event explorer, asset and identity views | All numbers from the DB; empty states; visual check desktop + phone | Not started |

@@ -1,0 +1,39 @@
+id: AUTH-001
+name: Repeated SSH authentication failures
+description: >-
+  Many failed SSH logons for one account on one host from one source within a short time:
+  password guessing against that account.
+category: authentication
+kind: threshold
+severity: medium
+confidence: medium
+match:
+  all:
+    - {field: event_category, op: eq, value: authentication}
+    - {field: event_action, op: eq, value: logon}
+    - {field: event_outcome, op: eq, value: failure}
+    - {field: service, op: eq, value: sshd}
+group_by: [source_ip, host, username]
+threshold: 5
+time_window: 5m
+tunable:
+  threshold: {min: 2, max: 1000}
+  time_window: {min: 1m, max: 24h}
+mitre:
+  - technique: T1110.001
+    reason: >-
+      Repeated password attempts against a single account from one source is what ATT&CK
+      describes as Password Guessing.
+explanation: >-
+  $count failed SSH logons for "$username" on $host from $source_ip ($source_ip_scope)
+  within $span, between $first_seen and $last_seen. This rule alerts at $threshold failures
+  within $time_window.
+investigation:
+  - Check whether $source_ip has any successful logon on $host after $first_seen.
+  - Check whether "$username" is a real account on $host and who owns it.
+  - Look for the same source against other hosts and accounts in the same period.
+response:
+  - If $source_ip is external and not expected, block it at the perimeter following your
+    procedures.
+  - Make sure "$username" uses key-based authentication or a strong, unique password.
+  - Consider disabling password authentication for SSH on $host.

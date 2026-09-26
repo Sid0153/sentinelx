@@ -1,0 +1,36 @@
+id: NET-001
+name: Connections to many ports or hosts
+description: >-
+  An internal host connects to many different destination ports or hosts within a minute:
+  port or network scanning. Vulnerability scanners and monitoring systems do this on purpose
+  and should be added as exclusions.
+category: network
+kind: distinct
+severity: medium
+confidence: medium
+match:
+  all:
+    - {field: event_category, op: eq, value: network}
+    - {field: event_action, op: eq, value: connection}
+    - {field: source_ip_scope, op: eq, value: internal}
+group_by: [source_ip]
+distinct_field: destination
+threshold: 20
+time_window: 60s
+tunable:
+  threshold: {min: 5, max: 10000}
+  time_window: {min: 10s, max: 1h}
+mitre:
+  - technique: T1046
+    reason: >-
+      Many connection attempts to different ports or hosts in a short time is how services on
+      remote hosts are discovered.
+explanation: >-
+  $source_ip ($host) connected to $distinct_count different destinations within $span
+  (for example $values_sample). This rule alerts at $threshold destinations within
+  $time_window.
+investigation:
+  - Check whether $source_ip is a scanner or monitoring system (if so, add an exclusion).
+  - Find the process on $host that opened the connections.
+response:
+  - If the scanning is not authorized, isolate $host following your procedure.

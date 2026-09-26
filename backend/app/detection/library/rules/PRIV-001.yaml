@@ -1,0 +1,55 @@
+id: PRIV-001
+name: Suspicious privilege escalation indicator
+description: >-
+  sudo used to open an interactive root shell (sudo su, sudo -i, sudo -s, sudo bash), or a
+  user who is not allowed to use sudo trying to. Administrators do the first legitimately, so
+  its confidence is low; the second is rarer.
+category: privilege
+kind: single
+severity: medium
+confidence: low
+match:
+  all:
+    - {field: event_category, op: eq, value: privilege}
+    - {field: event_action, op: eq, value: sudo}
+indicators:
+  - id: not_in_sudoers
+    name: sudo attempted by a user without sudo rights
+    confidence: medium
+    match:
+      all:
+        - {field: event_outcome, op: eq, value: failure}
+        - {field: attributes.failure_reason, op: eq, value: not_in_sudoers}
+    mitre:
+      - technique: T1548.003
+        reason: An attempt to gain elevated privileges through sudo by a user not permitted to.
+  - id: root_shell
+    name: Interactive root shell through sudo
+    match:
+      all:
+        - {field: event_outcome, op: eq, value: success}
+        - {field: target_username, op: eq, value: root}
+        # The command is a shell or su, optionally with a login flag: sudo su, sudo -i
+        # (logged as the shell), sudo -s, sudo bash.
+        - field: command_line
+          op: matches
+          value: '^(?:/usr)?(?:/s?bin/)?(?:su|bash|sh|zsh|dash|ksh)(?: -| -l| --login| -i)?$'
+    mitre:
+      - technique: T1548.003
+        reason: sudo used to obtain an unrestricted root shell instead of running one command.
+group_by: [host, username]
+tunable:
+  threshold: null
+  time_window: null
+mitre: []
+explanation: >-
+  $indicator_name: "$username" on $host ran "$command_line" as $target_username at
+  $first_seen.
+investigation:
+  - Check whether "$username" is expected to administer $host and whether a change was
+    planned at $first_seen.
+  - Review the commands run in the root shell after $first_seen.
+  - Check how "$username" logged on to $host before this.
+response:
+  - If the elevation was not authorized, follow your containment procedure for $host.
+  - Review the sudoers configuration of $host.

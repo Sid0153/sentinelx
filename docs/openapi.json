@@ -2587,6 +2587,628 @@
           }
         }
       }
+    },
+    "/api/detections/runs": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "List Runs",
+        "operationId": "list_runs_api_detections_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trigger",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunTrigger"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trigger"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunSummary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/detections/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Get Run",
+        "description": "One run: per-rule outcome and every detection with its explanation and evidence.",
+        "operationId": "get_run_api_detections_runs__run_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/detections/run": {
+      "post": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Run Detection",
+        "description": "Run every enabled rule over `from`\u2013`to` (at most 31 days). Audited.",
+        "operationId": "run_detection_api_detections_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/detections": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "List Rules",
+        "operationId": "list_rules_api_detections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RuleSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Rules Api Detections Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/detections/{rule_id}": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Get Detection Rule",
+        "description": "The effective definition, what admins changed, what may be changed, and ATT&CK.",
+        "operationId": "get_detection_rule_api_detections__rule_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}-\\d{3}$",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Tune Rule",
+        "description": "Change tunable values only (threshold, time window, severity, confidence, enabled,\nexclusions), within the rule's bounds, with a reason. Creates a version; audited.",
+        "operationId": "tune_rule_api_detections__rule_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}-\\d{3}$",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/detections/{rule_id}/versions": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "List Versions",
+        "operationId": "list_versions_api_detections__rule_id__versions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}-\\d{3}$",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RuleVersionPublic"
+                  },
+                  "title": "Response List Versions Api Detections  Rule Id  Versions Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mitre/techniques": {
+      "get": {
+        "tags": [
+          "mitre"
+        ],
+        "summary": "List Techniques",
+        "description": "The ATT&CK techniques SentinelX's rules map to (implemented coverage only).",
+        "operationId": "list_techniques_api_mitre_techniques_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TechniquePublic"
+                  },
+                  "type": "array",
+                  "title": "Response List Techniques Api Mitre Techniques Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2888,7 +3510,12 @@
           "IDENTITY_UPDATED",
           "SOURCE_CREATED",
           "SOURCE_UPDATED",
-          "INGEST_REJECTED"
+          "INGEST_REJECTED",
+          "RULE_ADDED",
+          "RULE_LIBRARY_UPDATED",
+          "RULE_RETIRED",
+          "RULE_UPDATED",
+          "DETECTION_RUN_REQUESTED"
         ],
         "title": "AuditAction"
       },
@@ -3097,6 +3724,10 @@
             "type": "integer",
             "title": "Rejected Count"
           },
+          "detection_count": {
+            "type": "integer",
+            "title": "Detection Count"
+          },
           "issues": {
             "items": {
               "$ref": "#/components/schemas/BatchIssue"
@@ -3151,6 +3782,7 @@
           "failed_count",
           "duplicate_count",
           "rejected_count",
+          "detection_count",
           "issues",
           "first_event_at",
           "last_event_at",
@@ -3162,7 +3794,10 @@
       "BatchStatus": {
         "type": "string",
         "enum": [
-          "STORED"
+          "STORED",
+          "PROCESSED",
+          "PROCESSED_WITH_ERRORS",
+          "DETECTION_FAILED"
         ],
         "title": "BatchStatus"
       },
@@ -3187,6 +3822,15 @@
         ],
         "title": "ChangePasswordRequest"
       },
+      "Confidence": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "title": "Confidence"
+      },
       "Criticality": {
         "type": "string",
         "enum": [
@@ -3204,7 +3848,9 @@
           "ROUTE",
           "ASSET",
           "IDENTITY",
-          "LOG_SOURCE"
+          "LOG_SOURCE",
+          "DETECTION_RULE",
+          "DETECTION_RUN"
         ],
         "title": "EntityType"
       },
@@ -4017,6 +4663,46 @@
         ],
         "title": "EventPublic"
       },
+      "Exclusion": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "source_ip",
+              "username",
+              "target_username",
+              "host"
+            ],
+            "title": "Field"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "value"
+        ],
+        "title": "Exclusion",
+        "description": "Events matching an exclusion are ignored by the rule (an allowlist entry)."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4458,6 +5144,37 @@
         ],
         "title": "Page[RawRecordPublic]"
       },
+      "Page_RunSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[RunSummary]"
+      },
       "Page_SourcePublic_": {
         "properties": {
           "items": {
@@ -4658,6 +5375,593 @@
         ],
         "title": "Role"
       },
+      "RuleChanges": {
+        "properties": {
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "time_window": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Window"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Confidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "exclusions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Exclusion"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusions"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "RuleChanges",
+        "description": "What an admin may send. Only fields the rule declares tunable are accepted."
+      },
+      "RuleDetail": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "in_library": {
+            "type": "boolean",
+            "title": "In Library"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "techniques": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Techniques"
+          },
+          "match_count": {
+            "type": "integer",
+            "title": "Match Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_match_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Match At"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Overrides"
+          },
+          "tunable": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tunable"
+          },
+          "mitre": {
+            "items": {
+              "$ref": "#/components/schemas/TechniqueRef"
+            },
+            "type": "array",
+            "title": "Mitre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "category",
+          "kind",
+          "severity",
+          "confidence",
+          "enabled",
+          "in_library",
+          "version",
+          "techniques",
+          "match_count",
+          "error_count",
+          "last_run_at",
+          "last_match_at",
+          "description",
+          "definition",
+          "overrides",
+          "tunable",
+          "mitre"
+        ],
+        "title": "RuleDetail"
+      },
+      "RuleSummary": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "in_library": {
+            "type": "boolean",
+            "title": "In Library"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "techniques": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Techniques"
+          },
+          "match_count": {
+            "type": "integer",
+            "title": "Match Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_match_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Match At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "category",
+          "kind",
+          "severity",
+          "confidence",
+          "enabled",
+          "in_library",
+          "version",
+          "techniques",
+          "match_count",
+          "error_count",
+          "last_run_at",
+          "last_match_at"
+        ],
+        "title": "RuleSummary"
+      },
+      "RuleVersionPublic": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "changed_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "overrides": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Overrides"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "source",
+          "changed_by",
+          "change_reason",
+          "overrides",
+          "definition",
+          "created_at"
+        ],
+        "title": "RuleVersionPublic"
+      },
+      "RunDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/RunTrigger"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "range_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Range Start"
+          },
+          "range_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Range End"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "detection_count": {
+            "type": "integer",
+            "title": "Detection Count"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "rule_results": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Rule Results"
+          },
+          "detections": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Detections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trigger",
+          "batch_id",
+          "requested_by",
+          "range_start",
+          "range_end",
+          "status",
+          "detection_count",
+          "duration_ms",
+          "started_at",
+          "rule_results",
+          "detections"
+        ],
+        "title": "RunDetail"
+      },
+      "RunRequest": {
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "RunRequest"
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "COMPLETED",
+          "COMPLETED_WITH_ERRORS"
+        ],
+        "title": "RunStatus"
+      },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/RunTrigger"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "range_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Range Start"
+          },
+          "range_end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Range End"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "detection_count": {
+            "type": "integer",
+            "title": "Detection Count"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trigger",
+          "batch_id",
+          "requested_by",
+          "range_start",
+          "range_end",
+          "status",
+          "detection_count",
+          "duration_ms",
+          "started_at"
+        ],
+        "title": "RunSummary"
+      },
+      "RunTrigger": {
+        "type": "string",
+        "enum": [
+          "batch",
+          "manual"
+        ],
+        "title": "RunTrigger"
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "title": "Severity"
+      },
       "SourceCreate": {
         "properties": {
           "name": {
@@ -4856,6 +6160,98 @@
         "type": "object",
         "title": "SourceUpdate",
         "description": "The source type cannot change: records already stored were parsed as that type.\nTo parse a different format, create a new source."
+      },
+      "TechniquePublic": {
+        "properties": {
+          "technique_id": {
+            "type": "string",
+            "title": "Technique Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "attack_version": {
+            "type": "string",
+            "title": "Attack Version"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "technique_id",
+          "name",
+          "tactics",
+          "attack_version",
+          "url",
+          "rules"
+        ],
+        "title": "TechniquePublic"
+      },
+      "TechniqueRef": {
+        "properties": {
+          "technique_id": {
+            "type": "string",
+            "title": "Technique Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "indicator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "technique_id",
+          "name",
+          "tactics",
+          "url",
+          "reason",
+          "indicator"
+        ],
+        "title": "TechniqueRef"
       },
       "TokenResponse": {
         "properties": {
@@ -5064,6 +6460,14 @@
     {
       "name": "events",
       "description": "Normalized events, with the raw record each came from."
+    },
+    {
+      "name": "detections",
+      "description": "Detection rules (read; ADMIN tunes) and runs."
+    },
+    {
+      "name": "mitre",
+      "description": "ATT&CK techniques SentinelX's rules map to."
     }
   ]
 }

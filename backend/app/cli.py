@@ -5,6 +5,9 @@
     python -m app.cli create-admin --email you@example.com
     python -m app.cli create-source --name web-01-auth --type linux_auth [--timezone UTC]
     python -m app.cli ingest-file --source web-01-auth --file /var/log/auth.log
+    python -m app.cli seed-rules       # load the rule library (run by docker-entrypoint.sh)
+    python -m app.cli reconcile-batches  # mark batches a crash left undetected (entrypoint)
+    python -m app.cli run-detection --from 2026-09-25T00:00:00Z --to 2026-09-26T00:00:00Z
     python -m app.cli demo-scenarios   # SIMULATED scenarios and the options each accepts
     python -m app.cli demo-ingest --scenario brute_force --source web-01-auth \
         [--host web-01] [--user root] [--source-ip 203.0.113.45] [--count 12] [--interval 3]
@@ -165,7 +168,8 @@ def _ingest(source_name: str, records: list[bytes], channel: str, simulated: boo
         print(
             f"Batch {batch.id}: received {batch.received_count}, parsed {batch.parsed_count}, "
             f"skipped {batch.skipped_count}, failed {batch.failed_count}, "
-            f"duplicates {batch.duplicate_count}, rejected {batch.rejected_count}"
+            f"duplicates {batch.duplicate_count}, rejected {batch.rejected_count}; "
+            f"{batch.status}, {batch.detection_count} detections"
         )
     return 0
 
@@ -209,6 +213,62 @@ def _demo_ingest(args: argparse.Namespace) -> int:
     return _ingest(args.source, [line.encode() for line in lines], "demo", simulated=True)
 
 
+def _reconcile_batches() -> int:
+    from app.database.session import get_session_factory
+    from app.detection.engine import reconcile_batches
+
+    with get_session_factory()() as db:
+        count = reconcile_batches(db)
+    print(f"{count} batches left without detection marked DETECTION_FAILED")
+    return 0
+
+
+def _seed_rules() -> int:
+    from app.database.session import get_session_factory
+    from app.detection.library import LibraryError, load_library
+    from app.detection.storage import seed
+
+    try:
+        library = load_library()
+    except LibraryError as exc:
+        print(f"Rule library invalid: {exc}", file=sys.stderr)
+        return 1
+    with get_session_factory()() as db:
+        changes = seed(db, library)
+    print(
+        f"Rule library {len(library.rules)} rules (ATT&CK {library.attack.attack_version}): "
+        + (", ".join(changes) if changes else "no changes")
+    )
+    return 0
+
+
+def _run_detection(start: str, end: str) -> int:
+    from datetime import datetime
+
+    from app.core.errors import AppError
+    from app.database.session import get_session_factory
+    from app.detection.service import run_manual
+
+    try:
+        range_start, range_end = datetime.fromisoformat(start), datetime.fromisoformat(end)
+    except ValueError:
+        print("--from and --to must be ISO 8601 times with a zone", file=sys.stderr)
+        return 1
+    with get_session_factory()() as db:
+        try:
+            detection_run = run_manual(db, range_start, range_end, requested_by=None)
+        except AppError as exc:
+            print(exc.message, file=sys.stderr)
+            return 1
+        print(
+            f"Run {detection_run.id} ({detection_run.status}): "
+            f"{detection_run.detection_count} detections in {detection_run.duration_ms} ms"
+        )
+        for detection in detection_run.detections:
+            print(f"  {detection['rule_id']} [{detection['severity']}] {detection['explanation']}")
+    return 0
+
+
 def _list_scenarios() -> int:
     from app.demo.scenarios import SCENARIOS
 
@@ -244,6 +304,11 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--count", type=int, help="size of the scenario (see demo-scenarios)")
     demo.add_argument("--interval", type=int, help="seconds between attempts")
     subcommands.add_parser("demo-scenarios", help="List SIMULATED scenarios and their options")
+    subcommands.add_parser("seed-rules", help="Load the shipped rule library into the database")
+    subcommands.add_parser("reconcile-batches", help="Mark batches a crash left without detection")
+    detect = subcommands.add_parser("run-detection", help="Run the enabled rules over a range")
+    detect.add_argument("--from", dest="start", required=True, help="ISO 8601 with a zone")
+    detect.add_argument("--to", dest="end", required=True, help="ISO 8601 with a zone")
     args = parser.parse_args(argv)
     if args.command == "check-config":
         return _check_config()
@@ -257,6 +322,12 @@ def main(argv: list[str] | None = None) -> int:
         return _demo_ingest(args)
     if args.command == "demo-scenarios":
         return _list_scenarios()
+    if args.command == "seed-rules":
+        return _seed_rules()
+    if args.command == "reconcile-batches":
+        return _reconcile_batches()
+    if args.command == "run-detection":
+        return _run_detection(args.start, args.end)
     return _create_admin(args.email)
 
 

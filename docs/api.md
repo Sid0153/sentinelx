@@ -1,7 +1,7 @@
 # API plan
 
 > Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
-> identities). Everything else is planned in the phase shown. OpenAPI is served at
+> identities, sources, ingestion, events, detections, ATT&CK techniques). Everything else is planned in the phase shown. OpenAPI is served at
 > `/api/docs` (disabled in production unless enabled explicitly) and exported to
 > `docs/openapi.json`. A test fails if the export is stale.
 
@@ -40,20 +40,22 @@ with every role plus an unauthenticated call.
 | GET `/api/sources` · GET `/api/sources/{source_id}` | V | 5 ✅ | Log sources (paged) |
 | POST `/api/sources` · PATCH `/api/sources/{source_id}` | AD | 5 ✅ | Create (409 on a duplicate name), change name / description / default host / time zone (IANA) / enabled. The source type is fixed after creation. Audited |
 | POST `/api/ingest/{source_id}` | A (Phase 13: or a per-source ingest key) | 5 ✅ | `application/json` `{"records": ["<raw line or JSON text>", ...]}` or `text/plain` (one record per line; CRLF and blank lines handled). Limits: 5 MB, 5,000 records, 64 KiB per record. Returns the batch report (201). 404 unknown source, 409 disabled source, 413 over a limit, 415 other content types, 422 malformed JSON body; every refusal is audited as `INGEST_REJECTED` |
-| GET `/api/ingest/batches` · `/api/ingest/batches/{batch_id}` | V | 5 ✅ | Batch reports, newest first (`source_id` filter): per-outcome counts, the first 50 issues, event-time span |
+| GET `/api/ingest/batches` · `/api/ingest/batches/{batch_id}` | V | 5 ✅ | Batch reports, newest first (`source_id` filter): per-outcome counts, the first 50 issues, event-time span. Since Phase 6 also `status` (`PROCESSED`, `PROCESSED_WITH_ERRORS`, `DETECTION_FAILED`) and `detection_count` |
 | GET `/api/ingest/batches/{batch_id}/records` | V | 5 ✅ | The batch's raw records (`parse_status` filter), shown as text (undecodable bytes as U+FFFD, at most 4,096 characters) |
 | GET `/api/events` | V | 5 ✅ | Normalized events, newest first, keyset-paged (`next_cursor` → `cursor`, no total). `from`/`to` (default: last 24 h, at most 31 days), `source_id`, `batch_id`, `category`, `action`, `outcome`, `host`, `username`, `source_ip`. 400 for a bad range, cursor or IP |
 | GET `/api/events/{event_id}` | V | 5 ✅ | One event with its raw record and source name (alerts citing it: Phase 7) |
-| GET `/api/detections` · `/{rule_id}` · `/{rule_id}/versions` | V | 6 | Rules, effective config, history |
-| PATCH `/api/detections/{rule_id}` | AD | 6 | Tunable fields only; `change_reason` required |
-| POST `/api/detections/run` | AD | 6 | Re-run detection over a time range (idempotent) |
+| GET `/api/detections` · `/api/detections/{rule_id}` · `/api/detections/{rule_id}/versions` | V | 6 ✅ | Rules with state and statistics; one rule's effective definition, admin overrides, tunable bounds and ATT&CK mapping (per indicator); its versions, newest first. Rule IDs must look like `AUTH-001` (422 otherwise), 404 unknown |
+| PATCH `/api/detections/{rule_id}` | AD | 6 ✅ | Tunable fields only (`threshold`, `time_window`, `severity`, `confidence`, `enabled`, `exclusions`), within the rule's bounds (400), `reason` required (5–500 characters). Anything else → 422. Creates a version; audited as `RULE_UPDATED` with from/to values. 409 for a rule retired from the library |
+| GET `/api/detections/runs` · `/api/detections/runs/{run_id}` | V | 6 ✅ | Detection runs, newest first (`trigger` = `batch` / `manual`); one run with the per-rule outcome and every detection (explanation, facts, evidence event IDs, ATT&CK) |
+| POST `/api/detections/run` | AD | 6 ✅ | `{"from", "to"}` with time zones, at most 31 days (400 otherwise). Runs every enabled rule over the range; deterministic, so repeating it gives the same detections. Audited as `DETECTION_RUN_REQUESTED`. Returns the run (201) |
 | POST `/api/detections/{rule_id}/test` | A | 12 | Playground: evaluate supplied sample events, nothing stored |
 | GET `/api/alerts` · `/{id}` · `/{id}/events` · `/{id}/related` | V | 7 | Queue and investigation |
 | POST `/api/alerts/{id}/transition` | A | 7 | Status change (+ disposition/reason) |
 | POST `/api/alerts/{id}/escalate` | A | 8 | Create incident from alert |
 | GET `/api/incidents` · `/{id}` · `/{id}/timeline` · `/{id}/activity` | V | 8 | Workspace data |
 | POST `/api/incidents/{id}/transition` · `/assign` · `/notes` · `/evidence` · `/alerts` (link/unlink) · PATCH title | A | 8 | Analyst actions |
-| GET `/api/mitre/techniques` · `/api/mitre/coverage` | V | 6/11 | Reference data, implemented coverage |
+| GET `/api/mitre/techniques` | V | 6 ✅ | The ATT&CK techniques (pinned v19.2) SentinelX rules map to, with the rules mapped to each. Implemented coverage only, not all of ATT&CK |
+| GET `/api/mitre/coverage` | V | 11 | Coverage view (tactics × techniques) |
 | GET `/api/dashboard/summary` · `/api/dashboard/trends` | V | 9 | SOC dashboard aggregates |
 | POST `/api/hunt/query` | V | 10 | Structured query → events page |
 | GET `/api/hunt/templates` · POST `/api/hunt/templates/{id}/run` | V | 10 | Parameterized hunts |

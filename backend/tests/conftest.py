@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.database.migrations import alembic_config  # noqa: E402
 from app.database.session import get_db  # noqa: E402
+from app.detection.library import Library, get_library  # noqa: E402
+from app.detection.storage import seed  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 
@@ -106,3 +108,11 @@ def db_client(app: FastAPI, db_session: Session) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = _get_db
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def seeded_rules(db_session: Session) -> Library:
+    """The shipped rule library loaded into the (rolled-back) test database."""
+    library = get_library()
+    seed(db_session, library)
+    return library
