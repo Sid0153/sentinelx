@@ -12,7 +12,7 @@ starts only on "Proceed to Phase N".
 | 4 | Assets, identities, `raw_events`/`events` tables, indexes, append-only triggers | Migrations up/down tested; constraints tested | **Done**, green in CI |
 | 5 | Log sources, 5 parsers, normalization, enrichment, ingestion service and API, batch reports, dedup | Table-driven cases per source; malformed/duplicate tests | **Done**, green in CI |
 | 6 | Rule schema, condition language, 5 evaluators, rule storage and versions, ATT&CK reference file, 9-rule library (8 + AUTH-005), explanations, detection runs | Positive/negative fixtures for every rule; order/split/idempotence tests | **Done**, green in CI |
-| 7 | Alerts: dedup, evidence, priority, workflow, alert API and UI | Dedup and transition tests; UI tests | **Done** (see CLAUDE.md for CI status) |
+| 7 | Alerts: dedup, evidence, priority, workflow, alert API and UI | Dedup and transition tests; UI tests | **Done**, green in CI |
 | 8 | Correlation, incidents, state machine, notes, evidence pins, assignment, activity, timeline, settings | Chain → one incident; window edges; concurrency test | Not started |
 | 9 | SOC dashboard, alert and incident workspaces, event explorer, asset and identity views | All numbers from the DB; empty states; visual check desktop + phone | Not started |
 | 10 | Threat hunting: structured queries, templates, pivots, saved hunts, `pg_trgm` | Query compiler tests (incl. injection attempts); pagination tests | Not started |

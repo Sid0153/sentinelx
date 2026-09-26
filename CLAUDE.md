@@ -19,7 +19,7 @@ its rules always apply:
 | 4 Assets, identities, event model | Done, green in CI (311 backend tests, 97.8% coverage; 39 frontend tests; migration 0003 applied on the Compose stack) |
 | 5 Ingestion and parsing | Done, green in CI (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts in the Compose job) |
 | 6 Detection engine | Done, green in CI (9 rules; 735 backend tests, 98% coverage; 39 frontend tests; every scenario triggers exactly its rules on the live stack; detection checked in the Compose smoke test) |
-| 7 Alerts | Done locally (857 backend tests incl. real-concurrency tests, 98% coverage; 47 frontend tests; alerts created, deduplicated and triaged on the live stack; alert pages checked at desktop and phone widths). Not yet pushed |
+| 7 Alerts | Done, green in CI (857 backend tests incl. real-concurrency tests, 98% coverage; 47 frontend tests; alerts checked in the Compose smoke test; alert pages checked at desktop and phone widths) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
