@@ -47,6 +47,8 @@ OPENAPI_TAGS = [
     {"name": "detections", "description": "Detection rules (read; ADMIN tunes) and runs."},
     {"name": "mitre", "description": "ATT&CK techniques SentinelX's rules map to."},
     {"name": "alerts", "description": "Alert queue, investigation data, status changes."},
+    {"name": "incidents", "description": "Correlated incidents: workspace, timeline, actions."},
+    {"name": "settings", "description": "Correlation settings (ADMIN)."},
 ]
 
 

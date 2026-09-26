@@ -171,6 +171,7 @@ export interface AlertDetail extends AlertSummary {
   activity: AlertActivity[];
   related: RelatedAlert[];
   incident_id: string | null;
+  incident_number: number | null;
 }
 
 export interface EvidenceEvent {
@@ -199,4 +200,143 @@ export interface TransitionRequest {
   status: AlertStatus;
   disposition?: Disposition;
   reason?: string;
+}
+
+// ---------- incidents (mirror backend/app/schemas/incident.py) ----------
+
+export type IncidentStatus =
+  | "OPEN"
+  | "TRIAGED"
+  | "INVESTIGATING"
+  | "CONTAINED"
+  | "RESOLVED"
+  | "CLOSED";
+export type IncidentDisposition = "confirmed_malicious" | "benign_expected" | "false_positive";
+export type EvidenceTag = "initial_access" | "privilege" | "persistence" | "benign" | "needs_review";
+
+export interface UserRef {
+  id: string;
+  email: string;
+}
+
+export interface IncidentSummary {
+  id: string;
+  number: number;
+  title: string;
+  status: IncidentStatus;
+  severity: Level;
+  risk_score: number;
+  risk_band: Level;
+  alert_count: number;
+  hosts: string[];
+  usernames: string[];
+  source_ips: string[];
+  tactics: string[];
+  first_activity_at: string;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+  simulated: boolean;
+  assigned_to: UserRef | null;
+}
+
+export interface LinkedAlert {
+  alert: AlertSummary;
+  link_strength: "STRONG" | "MEDIUM" | "WEAK" | "MANUAL" | "ORIGIN";
+  shared_entities: string[];
+  reason: string;
+  link_source: "engine" | "analyst";
+  linked_at: string;
+}
+
+export interface NotePublic {
+  id: string;
+  author: string | null;
+  body: string;
+  created_at: string;
+}
+
+export interface PinPublic {
+  id: string;
+  event_id: string | null;
+  alert_id: string | null;
+  label: string;
+  tag: EvidenceTag;
+  comment: string | null;
+  pinned_by: string | null;
+  pinned_at: string;
+}
+
+export interface IncidentActivityEntry {
+  at: string;
+  actor: string | null;
+  kind: string;
+  details: Record<string, unknown>;
+}
+
+export interface IncidentTechnique {
+  technique: string;
+  name: string;
+  tactics: string[];
+  attack_version: string;
+  url: string;
+  rules: string[];
+  reasons: string[];
+}
+
+export interface IncidentDetail extends IncidentSummary {
+  summary: string;
+  created_reason: string;
+  risk_breakdown: PriorityFactor[];
+  risk_model_version: string;
+  techniques: string[];
+  disposition: IncidentDisposition | null;
+  resolution: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  closed_at: string | null;
+  title_edited: boolean;
+  related_incident: { id: string; number: number; title: string; status: IncidentStatus } | null;
+  alerts: LinkedAlert[];
+  notes: NotePublic[];
+  evidence: PinPublic[];
+  activity: IncidentActivityEntry[];
+  mitre: IncidentTechnique[];
+  response: { rule_id: string; title: string; steps: string[] }[];
+  allowed_transitions: IncidentStatus[];
+}
+
+export interface TimelineEvent {
+  category: string;
+  action: string;
+  outcome: string;
+  host: string | null;
+  username: string | null;
+  target_username: string | null;
+  source_ip: string | null;
+  process_name: string | null;
+  command_line: string | null;
+  raw_text: string;
+  rules: string[];
+  simulated: boolean;
+}
+
+export interface TimelineEntry {
+  at: string;
+  kind: "event" | "alert" | "activity";
+  id: string;
+  event: TimelineEvent | null;
+  alert: { rule_id: string; title: string; severity: Level; priority_score: number; status: AlertStatus } | null;
+  activity: { kind: string; actor: string | null; details: Record<string, unknown> } | null;
+}
+
+export interface TimelinePage {
+  items: TimelineEntry[];
+  next_cursor: string | null;
+  limit: number;
+}
+
+export interface CorrelationSettings {
+  correlation_window_minutes: number;
+  sequence_window_minutes: number;
 }

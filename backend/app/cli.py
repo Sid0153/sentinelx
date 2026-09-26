@@ -170,7 +170,8 @@ def _ingest(source_name: str, records: list[bytes], channel: str, simulated: boo
             f"skipped {batch.skipped_count}, failed {batch.failed_count}, "
             f"duplicates {batch.duplicate_count}, rejected {batch.rejected_count}; "
             f"{batch.status}, {batch.detection_count} detections, "
-            f"{batch.alerts_created or 0} new alerts, {batch.alerts_updated or 0} updated"
+            f"{batch.alerts_created or 0} new alerts, {batch.alerts_updated or 0} updated, "
+            f"{batch.incidents_created or 0} new incidents, {batch.incidents_updated or 0} updated"
         )
     return 0
 

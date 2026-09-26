@@ -1,7 +1,8 @@
 # API plan
 
 > Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
-> identities, sources, ingestion, events, detections, ATT&CK techniques, alerts). Everything else is planned in the phase shown. OpenAPI is served at
+> identities, sources, ingestion, events, detections, ATT&CK techniques, alerts, incidents,
+> settings). Everything else is planned in the phase shown. OpenAPI is served at
 > `/api/docs` (disabled in production unless enabled explicitly) and exported to
 > `docs/openapi.json`. A test fails if the export is stale.
 
@@ -53,16 +54,21 @@ with every role plus an unauthenticated call.
 | GET `/api/alerts/{alert_id}` | V | 7 ✅ | One alert: explanation and facts, priority breakdown, entities with inventory context, ATT&CK (with links), investigation and response steps, merged detections, status history (from the audit log), related alerts (sharing host, user or source within 24 h), previous alert, `allowed_transitions`, `incident_id` (Phase 8) |
 | GET `/api/alerts/{alert_id}/events` | V | 7 ✅ | The evidence events in time order, each with its raw record as text (at most 4,096 characters) |
 | POST `/api/alerts/{alert_id}/transition` | A | 7 ✅ | `{status, disposition?, reason?}`. RESOLVED needs a disposition; FALSE_POSITIVE and reopening need a reason (400); changes the workflow does not allow are 409. Audited as `ALERT_STATUS_CHANGED` |
-| POST `/api/alerts/{id}/escalate` | A | 8 | Create incident from alert |
-| GET `/api/incidents` · `/{id}` · `/{id}/timeline` · `/{id}/activity` | V | 8 | Workspace data |
-| POST `/api/incidents/{id}/transition` · `/assign` · `/notes` · `/evidence` · `/alerts` (link/unlink) · PATCH title | A | 8 | Analyst actions |
+| POST `/api/alerts/{alert_id}/escalate` | A | 8 ✅ | `{reason}`: open an incident from a standalone alert (409 if it already belongs to one). Audited as `INCIDENT_CREATED` |
+| GET `/api/incidents` | V | 8 ✅ | The queue, by risk then latest activity (`sort=recent`). Filters: `status`, `severity` (repeatable), `assigned` (`me` or `unassigned`), `host`, `username`, `source_ip` (affected entities) |
+| GET `/api/incidents/assignees` | A | 8 ✅ | Active analysts and admins (who incidents can be assigned to) |
+| GET `/api/incidents/{incident_id}` | V | 8 ✅ | The workspace: summary, reason it was opened, risk breakdown, linked alerts with strength and reason, notes, current pins, activity, ATT&CK (with rules and links), grouped response, related incident, `allowed_transitions` |
+| GET `/api/incidents/{incident_id}/timeline` | V | 8 ✅ | Evidence events (each once, with citing rules and raw text), alerts and activity, oldest first; `limit` ≤ 200, keyset `cursor` |
+| POST `/api/incidents/{incident_id}/transition` | A | 8 ✅ | `{status, disposition?, resolution?, reason?}`: RESOLVED needs disposition + resolution, reopening a reason (400); not allowed 409; CLOSED final |
+| POST `/api/incidents/{incident_id}/assign` · `/notes` · `/evidence` | A | 8 ✅ | Assign (analysts/admins only, `null` unassigns); append-only note (1–10,000 characters; 201); pin/unpin an event or alert with a tag and comment. 409 on a closed incident |
+| POST `/api/incidents/{incident_id}/alerts` · `/alerts/{alert_id}/unlink` · PATCH `/api/incidents/{incident_id}` | A | 8 ✅ | Link an alert by hand, unlink it (both with a reason; an unlinked alert is never linked back by the engine), rename (the title then stays) |
 | GET `/api/mitre/techniques` | V | 6 ✅ | The ATT&CK techniques (pinned v19.2) SentinelX rules map to, with the rules mapped to each. Implemented coverage only, not all of ATT&CK |
 | GET `/api/mitre/coverage` | V | 11 | Coverage view (tactics × techniques) |
 | GET `/api/dashboard/summary` · `/api/dashboard/trends` | V | 9 | SOC dashboard aggregates |
 | POST `/api/hunt/query` | V | 10 | Structured query → events page |
 | GET `/api/hunt/templates` · POST `/api/hunt/templates/{id}/run` | V | 10 | Parameterized hunts |
 | GET/POST/DELETE `/api/hunt/saved…` | A (own) | 10 | Saved hunts |
-| GET/PATCH `/api/settings` | AD | 8 | Correlation window, internal networks |
+| GET/PATCH `/api/settings` | AD | 8 ✅ | Correlation window (15–1,440 min) and sequence window (5–240 min, not longer). Audited as `SETTINGS_CHANGED`. Internal networks stay environment configuration (reviewed with deployments) |
 | GET `/api/demo/scenarios` · POST `/api/demo/run` · POST `/api/demo/reset` | AD, only when `DEMO_ENABLED` | 16 | Simulated data |
 
 Open decision for Phase 16: whether VIEWER may run demo scenarios on a public demo instance.

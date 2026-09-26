@@ -26,6 +26,7 @@ from sqlalchemy import ColumnElement, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.alerts import service as alerts
+from app.correlation import service as correlation
 from app.detection.evaluate import evaluate
 from app.detection.evaluators.common import group_key
 from app.detection.events import DetectionEvent
@@ -158,6 +159,12 @@ def run(
     ]
     created = sum(o.action == "created" for o in outcomes)
     updated = sum(o.action == "updated" for o in outcomes)
+    # Then correlation: the touched alerts join incidents (same transaction again).
+    touched = [o.alert_id for o in outcomes if o.alert_id and o.action != "unchanged"]
+    if trigger == RunTrigger.MANUAL:
+        # A manual run also correlates the open standalone alerts in its range (backfill).
+        touched = list(dict.fromkeys([*touched, *correlation.standalone_in(db, start, end)]))
+    correlated = correlation.correlate(db, touched, started_at)
     detection_run = DetectionRun(
         id=run_id,
         trigger=trigger,
@@ -171,6 +178,8 @@ def run(
         detection_count=len(detections),
         alerts_created=created,
         alerts_updated=updated,
+        incidents_created=len(correlated.created),
+        incidents_updated=len(correlated.updated),
         duration_ms=round((time.perf_counter() - started) * 1000),
         started_at=started_at,
     )
@@ -181,6 +190,8 @@ def run(
         batch.detection_count = len(detections)
         batch.alerts_created = created
         batch.alerts_updated = updated
+        batch.incidents_created = len(correlated.created)
+        batch.incidents_updated = len(correlated.updated)
     db.commit()
     logger.info(
         "detection.run_completed",
@@ -192,6 +203,8 @@ def run(
                 "detections": len(detections),
                 "alerts_created": created,
                 "alerts_updated": updated,
+                "incidents_created": len(correlated.created),
+                "incidents_updated": len(correlated.updated),
                 "failed_rules": failed,
                 "duration_ms": detection_run.duration_ms,
             }
@@ -225,6 +238,7 @@ def run_for_batch(db: Session, batch: IngestionBatch) -> DetectionRun | None:
         batch.status = BatchStatus.PROCESSED
         batch.detection_count = 0
         batch.alerts_created = batch.alerts_updated = 0
+        batch.incidents_created = batch.incidents_updated = 0
         db.commit()
         return None
     batch_id = batch.id
@@ -237,6 +251,7 @@ def run_for_batch(db: Session, batch: IngestionBatch) -> DetectionRun | None:
         logger.error(
             "detection.batch_failed",
             extra={"fields": {"batch_id": str(batch_id), "error": type(exc).__name__}},
+            exc_info=True,
         )
         failed = db.get(IngestionBatch, batch_id)
         if failed is not None:

@@ -79,8 +79,10 @@ backend/app/
   alerts/           (Phase 7) dedup.py, workflow.py (pure), service.py (the only writer of
                     alerts), queries.py
   risk/             (Phase 7) priority.py: the SentinelX priority score (pure)
-  correlation/      (Phase 8) alert → incident linking (pure scoring + persistence)
-  incidents/        (Phase 8) lifecycle, notes, evidence pins, activity, timeline assembly
+  correlation/      (Phase 8) scoring.py (pure link strength), service.py (runs in the
+                    detection transaction)
+  incidents/        (Phase 8) records.py (writes), workflow.py (pure), service.py (analyst
+                    actions), queries.py (queue, workspace, timeline), settings.py
   risk/             (Phases 7, 11) priority/risk model (pure, versioned)
   mitre/            (Phases 6, 11) ATT&CK reference data (pinned version) and coverage
   hunting/          (Phase 10) structured query compiler, hunt templates, saved hunts
@@ -110,8 +112,8 @@ Rules we will enforce with tests or review:
 [ADR-008](decisions/0008-synchronous-bounded-pipeline.md) has the full reasoning. Summary:
 
 Implemented: steps 1–4 (Phase 5), in one transaction per batch, and step 5 plus the batch's
-detection states and the startup reconciler (Phase 6), and step 6, alerts (Phase 7). Step 7
-arrives with correlation (Phase 8). Files are sent as
+detection states and the startup reconciler (Phase 6), step 6, alerts (Phase 7), and step 7,
+correlation (Phase 8). Files are sent as
 `text/plain` to the same endpoint, so there is no separate upload route (and no multipart
 dependency).
 
@@ -135,7 +137,7 @@ POST /api/ingest/{source}  (JSON records or text/plain lines; also CLI ingest-fi
      widened by the rule's window, run the evaluator → detections that include at least
      one of the batch's events; store the run                           [Phase 6 ✅]
   6. alerts: dedup / create / extend, link evidence, compute priority     [Phase 7 ✅]
-  7. correlation: link alerts to incidents or create incidents            [Phase 8]
+  7. correlation: link alerts to incidents or create incidents            [Phase 8 ✅]
   8. batch → PROCESSED / PROCESSED_WITH_ERRORS, detection_count          [Phase 6 ✅]
   ── commit ─────────────────────────────────────────────────────────────────────
   9. respond 201 with the batch report

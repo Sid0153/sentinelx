@@ -11,7 +11,7 @@ from app.risk.priority import AssetContext, IdentityContext, alert_priority, ban
 # The weights each model version stands for. Changing a weight without bumping
 # RISK_MODEL_VERSION (and adding its fingerprint here) fails the test below: old scores are
 # stored with their version and must stay explainable.
-WEIGHTS_BY_VERSION = {"1": "8ed872d86dc7"}
+WEIGHTS_BY_VERSION = {"1": "8ed872d86dc7", "2": "8cbc82b4385e"}
 
 
 def fingerprint() -> str:

@@ -3749,10 +3749,1470 @@
           }
         }
       }
+    },
+    "/api/alerts/{alert_id}/escalate": {
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Escalate",
+        "description": "Open an incident from an alert the engine left standalone. Audited.",
+        "operationId": "escalate_api_alerts__alert_id__escalate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "List Incidents",
+        "description": "The incident queue: by risk, then latest activity (`sort=recent`: latest activity).\nFilters: `status` and `severity` (repeatable), `assigned` (`me` or `unassigned`), and an\naffected host, user or source address.",
+        "operationId": "list_incidents_api_incidents_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/IncidentStatus"
+              },
+              "maxItems": 6,
+              "default": [],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "default": [],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "assigned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "me",
+                    "unassigned"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assigned"
+            }
+          },
+          {
+            "name": "host",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "source_ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 45
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Ip"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "risk",
+                "recent"
+              ],
+              "type": "string",
+              "default": "risk",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_IncidentSummary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/assignees": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "List Assignees",
+        "description": "Who incidents can be assigned to (active analysts and admins).",
+        "operationId": "list_assignees_api_incidents_assignees_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserRef"
+                  },
+                  "type": "array",
+                  "title": "Response List Assignees Api Incidents Assignees Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/incidents/{incident_id}": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Get Incident",
+        "description": "The workspace: summary, risk breakdown, linked alerts with the reason for each link,\nnotes, pinned evidence, activity, ATT&CK, recommended response, related incident.",
+        "operationId": "get_incident_api_incidents__incident_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Rename",
+        "description": "Rename. A renamed incident keeps its title when new alerts join.",
+        "operationId": "rename_api_incidents__incident_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/timeline": {
+      "get": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Get Timeline",
+        "description": "Oldest first, from stored rows: the linked alerts' evidence events (each once, with the\nrules that cite it and its raw record, up to 1,024 characters), the alerts, and the\nincident's activity. Pass `next_cursor` back as `cursor` for the next page.",
+        "operationId": "get_timeline_api_incidents__incident_id__timeline_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelinePage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/transition": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Transition",
+        "description": "Change the status. RESOLVED needs a `disposition` and a `resolution`; reopening needs a\n`reason`. CLOSED is final. Changes the workflow does not allow are 409.",
+        "operationId": "transition_api_incidents__incident_id__transition_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentTransition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/assign": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Assign",
+        "operationId": "assign_api_incidents__incident_id__assign_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/notes": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Add Note",
+        "description": "Notes are append-only: they cannot be edited or deleted. A correction is a new note.",
+        "operationId": "add_note_api_incidents__incident_id__notes_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/evidence": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Change Evidence",
+        "description": "Pin (or unpin) an event or an alert as evidence, with a tag and a comment. Unpinning\nadds a row; nothing is deleted.",
+        "operationId": "change_evidence_api_incidents__incident_id__evidence_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/alerts": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Link Alert",
+        "description": "Add an alert by hand (with a reason). An alert belongs to one incident at most.",
+        "operationId": "link_alert_api_incidents__incident_id__alerts_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/incidents/{incident_id}/alerts/{alert_id}/unlink": {
+      "post": {
+        "tags": [
+          "incidents"
+        ],
+        "summary": "Unlink Alert",
+        "description": "Take an alert out (with a reason). The engine never links it back to this incident.",
+        "operationId": "unlink_alert_api_incidents__incident_id__alerts__alert_id__unlink_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "incident_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Incident Id"
+            }
+          },
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Settings Values",
+        "operationId": "get_settings_values_api_settings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Update Settings",
+        "description": "Correlation window (15\u20131,440 min) and sequence window (5\u2013240 min, not longer than the\ncorrelation window). Audited as SETTINGS_CHANGED; applies to the next detection run.",
+        "operationId": "update_settings_api_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActivityPublic": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "actor",
+          "kind",
+          "details"
+        ],
+        "title": "ActivityPublic"
+      },
       "AlertActivity": {
         "properties": {
           "at": {
@@ -4203,6 +5663,17 @@
               }
             ],
             "title": "Incident Id"
+          },
+          "incident_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Number"
           }
         },
         "type": "object",
@@ -4771,6 +6242,28 @@
         "title": "AssetUpdate",
         "description": "Hostname is the asset's identity for enrichment, so it cannot change: retire the asset\nand register the new name instead."
       },
+      "AssignRequest": {
+        "properties": {
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "assignee_id"
+        ],
+        "title": "AssignRequest"
+      },
       "AuditAction": {
         "type": "string",
         "enum": [
@@ -4798,7 +6291,16 @@
           "RULE_RETIRED",
           "RULE_UPDATED",
           "DETECTION_RUN_REQUESTED",
-          "ALERT_STATUS_CHANGED"
+          "ALERT_STATUS_CHANGED",
+          "INCIDENT_CREATED",
+          "INCIDENT_STATUS_CHANGED",
+          "INCIDENT_ASSIGNED",
+          "INCIDENT_NOTE_ADDED",
+          "INCIDENT_EVIDENCE_CHANGED",
+          "INCIDENT_ALERT_LINKED",
+          "INCIDENT_ALERT_UNLINKED",
+          "INCIDENT_RENAMED",
+          "SETTINGS_CHANGED"
         ],
         "title": "AuditAction"
       },
@@ -5040,6 +6542,28 @@
             ],
             "title": "Alerts Updated"
           },
+          "incidents_created": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidents Created"
+          },
+          "incidents_updated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidents Updated"
+          },
           "issues": {
             "items": {
               "$ref": "#/components/schemas/BatchIssue"
@@ -5097,6 +6621,8 @@
           "detection_count",
           "alerts_created",
           "alerts_updated",
+          "incidents_created",
+          "incidents_updated",
           "issues",
           "first_event_at",
           "last_event_at",
@@ -5174,7 +6700,9 @@
           "LOG_SOURCE",
           "DETECTION_RULE",
           "DETECTION_RUN",
-          "ALERT"
+          "ALERT",
+          "INCIDENT",
+          "SETTINGS"
         ],
         "title": "EntityType"
       },
@@ -5995,6 +7523,14 @@
         ],
         "title": "EventPublic"
       },
+      "EvidenceAction": {
+        "type": "string",
+        "enum": [
+          "PIN",
+          "UNPIN"
+        ],
+        "title": "EvidenceAction"
+      },
       "EvidenceEvent": {
         "properties": {
           "id": {
@@ -6327,6 +7863,68 @@
         ],
         "title": "EvidenceEvent"
       },
+      "EvidenceRequest": {
+        "properties": {
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "alert_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Id"
+          },
+          "action": {
+            "$ref": "#/components/schemas/EvidenceAction",
+            "default": "PIN"
+          },
+          "tag": {
+            "$ref": "#/components/schemas/EvidenceTag",
+            "default": "needs_review"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EvidenceRequest"
+      },
+      "EvidenceTag": {
+        "type": "string",
+        "enum": [
+          "initial_access",
+          "privilege",
+          "persistence",
+          "benign",
+          "needs_review"
+        ],
+        "title": "EvidenceTag"
+      },
       "Exclusion": {
         "properties": {
           "field": {
@@ -6631,6 +8229,593 @@
         "type": "object",
         "title": "IdentityUpdate"
       },
+      "IncidentDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "risk_score": {
+            "type": "integer",
+            "title": "Risk Score"
+          },
+          "risk_band": {
+            "type": "string",
+            "title": "Risk Band"
+          },
+          "alert_count": {
+            "type": "integer",
+            "title": "Alert Count"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hosts"
+          },
+          "usernames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Usernames"
+          },
+          "source_ips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ips"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "first_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Activity At"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Activity At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated"
+          },
+          "assigned_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "created_reason": {
+            "type": "string",
+            "title": "Created Reason"
+          },
+          "risk_breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/PriorityFactor"
+            },
+            "type": "array",
+            "title": "Risk Breakdown"
+          },
+          "risk_model_version": {
+            "type": "string",
+            "title": "Risk Model Version"
+          },
+          "techniques": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Techniques"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncidentDisposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved By"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "title_edited": {
+            "type": "boolean",
+            "title": "Title Edited"
+          },
+          "related_incident": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelatedIncident"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedAlert"
+            },
+            "type": "array",
+            "title": "Alerts"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NotePublic"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/PinPublic"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "activity": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityPublic"
+            },
+            "type": "array",
+            "title": "Activity"
+          },
+          "mitre": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentTechnique"
+            },
+            "type": "array",
+            "title": "Mitre"
+          },
+          "response": {
+            "items": {
+              "$ref": "#/components/schemas/ResponseGroup"
+            },
+            "type": "array",
+            "title": "Response"
+          },
+          "allowed_transitions": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentStatus"
+            },
+            "type": "array",
+            "title": "Allowed Transitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "status",
+          "severity",
+          "risk_score",
+          "risk_band",
+          "alert_count",
+          "hosts",
+          "usernames",
+          "source_ips",
+          "tactics",
+          "first_activity_at",
+          "last_activity_at",
+          "created_at",
+          "updated_at",
+          "simulated",
+          "summary",
+          "created_reason",
+          "risk_breakdown",
+          "risk_model_version",
+          "techniques",
+          "disposition",
+          "resolution",
+          "resolved_at",
+          "resolved_by",
+          "closed_at",
+          "title_edited",
+          "related_incident",
+          "alerts",
+          "notes",
+          "evidence",
+          "activity",
+          "mitre",
+          "response",
+          "allowed_transitions"
+        ],
+        "title": "IncidentDetail"
+      },
+      "IncidentDisposition": {
+        "type": "string",
+        "enum": [
+          "confirmed_malicious",
+          "benign_expected",
+          "false_positive"
+        ],
+        "title": "IncidentDisposition"
+      },
+      "IncidentStatus": {
+        "type": "string",
+        "enum": [
+          "OPEN",
+          "TRIAGED",
+          "INVESTIGATING",
+          "CONTAINED",
+          "RESOLVED",
+          "CLOSED"
+        ],
+        "title": "IncidentStatus"
+      },
+      "IncidentSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "risk_score": {
+            "type": "integer",
+            "title": "Risk Score"
+          },
+          "risk_band": {
+            "type": "string",
+            "title": "Risk Band"
+          },
+          "alert_count": {
+            "type": "integer",
+            "title": "Alert Count"
+          },
+          "hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Hosts"
+          },
+          "usernames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Usernames"
+          },
+          "source_ips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ips"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "first_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Activity At"
+          },
+          "last_activity_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Activity At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated"
+          },
+          "assigned_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "status",
+          "severity",
+          "risk_score",
+          "risk_band",
+          "alert_count",
+          "hosts",
+          "usernames",
+          "source_ips",
+          "tactics",
+          "first_activity_at",
+          "last_activity_at",
+          "created_at",
+          "updated_at",
+          "simulated"
+        ],
+        "title": "IncidentSummary"
+      },
+      "IncidentTechnique": {
+        "properties": {
+          "technique": {
+            "type": "string",
+            "title": "Technique"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "attack_version": {
+            "type": "string",
+            "title": "Attack Version"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "technique",
+          "name",
+          "tactics",
+          "attack_version",
+          "url",
+          "rules",
+          "reasons"
+        ],
+        "title": "IncidentTechnique"
+      },
+      "IncidentTransition": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncidentDisposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "IncidentTransition"
+      },
+      "LinkRequest": {
+        "properties": {
+          "alert_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Alert Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "alert_id",
+          "reason"
+        ],
+        "title": "LinkRequest"
+      },
+      "LinkedAlert": {
+        "properties": {
+          "alert": {
+            "$ref": "#/components/schemas/AlertSummary"
+          },
+          "link_strength": {
+            "type": "string",
+            "title": "Link Strength"
+          },
+          "shared_entities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared Entities"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "link_source": {
+            "type": "string",
+            "title": "Link Source"
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Linked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alert",
+          "link_strength",
+          "shared_entities",
+          "reason",
+          "link_source",
+          "linked_at"
+        ],
+        "title": "LinkedAlert"
+      },
       "LoginRequest": {
         "properties": {
           "email": {
@@ -6652,6 +8837,59 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "NotePublic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "author",
+          "body",
+          "created_at"
+        ],
+        "title": "NotePublic"
+      },
+      "NoteRequest": {
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Body"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "body"
+        ],
+        "title": "NoteRequest"
       },
       "Page_AlertSummary_": {
         "properties": {
@@ -6839,6 +9077,37 @@
         ],
         "title": "Page[IdentityPublic]"
       },
+      "Page_IncidentSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[IncidentSummary]"
+      },
       "Page_RawRecordPublic_": {
         "properties": {
           "items": {
@@ -6971,6 +9240,85 @@
           "FAILED"
         ],
         "title": "ParseStatus"
+      },
+      "PinPublic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "alert_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "tag": {
+            "$ref": "#/components/schemas/EvidenceTag"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "pinned_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned By"
+          },
+          "pinned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Pinned At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "event_id",
+          "alert_id",
+          "label",
+          "tag",
+          "comment",
+          "pinned_by",
+          "pinned_at"
+        ],
+        "title": "PinPublic"
       },
       "PriorityFactor": {
         "properties": {
@@ -7115,6 +9463,22 @@
         ],
         "title": "ReadinessResponse"
       },
+      "ReasonRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 400,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "ReasonRequest"
+      },
       "RelatedAlert": {
         "properties": {
           "id": {
@@ -7166,6 +9530,76 @@
           "shared"
         ],
         "title": "RelatedAlert"
+      },
+      "RelatedIncident": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IncidentStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "title",
+          "status"
+        ],
+        "title": "RelatedIncident"
+      },
+      "RenameRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "RenameRequest"
+      },
+      "ResponseGroup": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "title",
+          "steps"
+        ],
+        "title": "ResponseGroup"
       },
       "Role": {
         "type": "string",
@@ -7608,6 +10042,14 @@
             "type": "integer",
             "title": "Alerts Updated"
           },
+          "incidents_created": {
+            "type": "integer",
+            "title": "Incidents Created"
+          },
+          "incidents_updated": {
+            "type": "integer",
+            "title": "Incidents Updated"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms"
@@ -7643,6 +10085,8 @@
           "detection_count",
           "alerts_created",
           "alerts_updated",
+          "incidents_created",
+          "incidents_updated",
           "duration_ms",
           "started_at",
           "rule_results",
@@ -7738,6 +10182,14 @@
             "type": "integer",
             "title": "Alerts Updated"
           },
+          "incidents_created": {
+            "type": "integer",
+            "title": "Incidents Created"
+          },
+          "incidents_updated": {
+            "type": "integer",
+            "title": "Incidents Updated"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms"
@@ -7760,6 +10212,8 @@
           "detection_count",
           "alerts_created",
           "alerts_updated",
+          "incidents_created",
+          "incidents_updated",
           "duration_ms",
           "started_at"
         ],
@@ -7772,6 +10226,57 @@
           "manual"
         ],
         "title": "RunTrigger"
+      },
+      "SettingsPublic": {
+        "properties": {
+          "correlation_window_minutes": {
+            "type": "integer",
+            "title": "Correlation Window Minutes"
+          },
+          "sequence_window_minutes": {
+            "type": "integer",
+            "title": "Sequence Window Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correlation_window_minutes",
+          "sequence_window_minutes"
+        ],
+        "title": "SettingsPublic"
+      },
+      "SettingsUpdate": {
+        "properties": {
+          "correlation_window_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1440.0,
+                "minimum": 15.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Window Minutes"
+          },
+          "sequence_window_minutes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 240.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence Window Minutes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SettingsUpdate"
       },
       "Severity": {
         "type": "string",
@@ -8074,6 +10579,100 @@
         ],
         "title": "TechniqueRef"
       },
+      "TimelineEntry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "alert": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert"
+          },
+          "activity": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "kind",
+          "id"
+        ],
+        "title": "TimelineEntry"
+      },
+      "TimelinePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "limit"
+        ],
+        "title": "TimelinePage"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -8205,6 +10804,25 @@
         "title": "UserPublic",
         "description": "What the API ever reveals about a user. There is deliberately no password field."
       },
+      "UserRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email"
+        ],
+        "title": "UserRef"
+      },
       "UserUpdate": {
         "properties": {
           "role": {
@@ -8329,6 +10947,14 @@
     {
       "name": "alerts",
       "description": "Alert queue, investigation data, status changes."
+    },
+    {
+      "name": "incidents",
+      "description": "Correlated incidents: workspace, timeline, actions."
+    },
+    {
+      "name": "settings",
+      "description": "Correlation settings (ADMIN)."
     }
   ]
 }

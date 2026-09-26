@@ -9,30 +9,24 @@ import {
   SimulatedTag,
   StatusText,
 } from "../components/alerts";
+import { incidentRef } from "../components/incidents";
 import {
   Button,
   ErrorMessage,
   Field,
   Pagination,
+  Panel,
   formatUtc,
   inputClass,
   selectClass,
 } from "../components/ui";
 import { useApi } from "../hooks/useApi";
 import { getAlert, listEvidence, transitionAlert } from "../services/alerts";
+import { escalateAlert } from "../services/incidents";
 import { ApiError } from "../services/http";
 import type { AlertDetail, AlertStatus, Disposition, EvidenceEvent } from "../types/api";
 
 const EVIDENCE_PAGE = 25;
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4">
-      <h2 className="mb-2 text-sm font-semibold text-slate-200">{title}</h2>
-      {children}
-    </section>
-  );
-}
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -328,6 +322,74 @@ function Actions({ alert, onChanged }: { alert: AlertDetail; onChanged: () => vo
   );
 }
 
+function IncidentPanel({
+  alert,
+  canAct,
+  onChanged,
+}: {
+  alert: AlertDetail;
+  canAct: boolean;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  if (alert.incident_id && alert.incident_number !== null) {
+    return (
+      <Panel title="Incident">
+        <p className="text-sm text-slate-300">
+          Part of{" "}
+          <Link to={`/incidents/${alert.incident_id}`} className="text-sky-300">
+            {incidentRef(alert.incident_number)}
+          </Link>
+          .
+        </p>
+      </Panel>
+    );
+  }
+  return (
+    <Panel title="Incident">
+      <p className="text-sm text-slate-400">
+        Not part of an incident: correlation found nothing it belongs with, and on its own it does
+        not open one.
+      </p>
+      {canAct &&
+        (open ? (
+          <form
+            aria-label="Escalate to incident"
+            className="mt-2 space-y-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setError(null);
+              escalateAlert(alert.id, reason.trim())
+                .then(() => onChanged())
+                .catch((caught: unknown) =>
+                  setError(caught instanceof ApiError ? caught.message : "Could not escalate."),
+                );
+            }}
+          >
+            <Field label="Why it needs an incident">
+              <input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={400}
+                className={inputClass}
+              />
+            </Field>
+            {error && <ErrorMessage>{error}</ErrorMessage>}
+            <Button type="submit" disabled={reason.trim().length < 3}>
+              Open incident
+            </Button>
+          </form>
+        ) : (
+          <Button variant="secondary" className="mt-2" onClick={() => setOpen(true)}>
+            Escalate to incident…
+          </Button>
+        ))}
+    </Panel>
+  );
+}
+
 export function AlertDetailPage() {
   const { alertId = "" } = useParams();
   const user = useCurrentUser();
@@ -473,11 +535,7 @@ export function AlertDetailPage() {
               </p>
             )}
           </Panel>
-          <Panel title="Incident">
-            <p className="text-sm text-slate-400">
-              {alert.incident_id ? `Part of incident ${alert.incident_id}.` : "Not part of an incident."}
-            </p>
-          </Panel>
+          <IncidentPanel alert={alert} canAct={hasRole(user, "ANALYST")} onChanged={reload} />
         </div>
       </div>
     </section>

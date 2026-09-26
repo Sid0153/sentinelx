@@ -65,6 +65,20 @@ EXPECTED_ACCESS: dict[Route, Role] = {
     ("GET", "/api/alerts/{alert_id}"): Role.VIEWER,
     ("GET", "/api/alerts/{alert_id}/events"): Role.VIEWER,
     ("POST", "/api/alerts/{alert_id}/transition"): Role.ANALYST,
+    ("POST", "/api/alerts/{alert_id}/escalate"): Role.ANALYST,
+    ("GET", "/api/incidents"): Role.VIEWER,
+    ("GET", "/api/incidents/assignees"): Role.ANALYST,
+    ("GET", "/api/incidents/{incident_id}"): Role.VIEWER,
+    ("GET", "/api/incidents/{incident_id}/timeline"): Role.VIEWER,
+    ("POST", "/api/incidents/{incident_id}/transition"): Role.ANALYST,
+    ("POST", "/api/incidents/{incident_id}/assign"): Role.ANALYST,
+    ("POST", "/api/incidents/{incident_id}/notes"): Role.ANALYST,
+    ("POST", "/api/incidents/{incident_id}/evidence"): Role.ANALYST,
+    ("POST", "/api/incidents/{incident_id}/alerts"): Role.ANALYST,
+    ("POST", "/api/incidents/{incident_id}/alerts/{alert_id}/unlink"): Role.ANALYST,
+    ("PATCH", "/api/incidents/{incident_id}"): Role.ANALYST,
+    ("GET", "/api/settings"): Role.ADMIN,
+    ("PATCH", "/api/settings"): Role.ADMIN,
 }
 
 _HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}

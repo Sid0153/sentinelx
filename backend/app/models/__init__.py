@@ -11,12 +11,21 @@ from app.models.detection import (
     MitreTechnique,
 )
 from app.models.event import Event, IngestionBatch, LogSource, RawEvent
+from app.models.incident import (
+    AppSetting,
+    Incident,
+    IncidentActivity,
+    IncidentAlert,
+    IncidentEvidence,
+    IncidentNote,
+)
 from app.models.refresh_token import RefreshToken
 from app.models.user import Role, User
 
 __all__ = [
     "Alert",
     "AlertEvent",
+    "AppSetting",
     "Asset",
     "DetectionRule",
     "DetectionRuleTechnique",
@@ -25,6 +34,11 @@ __all__ = [
     "AuditLog",
     "Event",
     "Identity",
+    "Incident",
+    "IncidentActivity",
+    "IncidentAlert",
+    "IncidentEvidence",
+    "IncidentNote",
     "IngestionBatch",
     "LogSource",
     "MitreTechnique",

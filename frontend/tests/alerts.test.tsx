@@ -106,6 +106,7 @@ function detail(overrides: Partial<AlertDetail> = {}): AlertDetail {
       },
     ],
     incident_id: null,
+    incident_number: null,
     ...overrides,
   };
 }
@@ -191,7 +192,7 @@ describe("Alert page", () => {
       "https://attack.mitre.org/techniques/T1110/",
     );
     expect(screen.getByText(/shares host web-01, source 203.0.113.45/)).toBeInTheDocument();
-    expect(screen.getByText("Not part of an incident.")).toBeInTheDocument();
+    expect(screen.getByText(/Not part of an incident/)).toBeInTheDocument();
     // Viewers see no workflow buttons.
     expect(screen.getByText("Analysts and admins can change the status.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Triage" })).not.toBeInTheDocument();

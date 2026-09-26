@@ -137,11 +137,11 @@ def test_an_alert_explains_itself(
     assert (alert["asset_hostname"], alert["identity_username"]) == ("web-01", "root")
     # A priority anyone can recompute.
     assert sum(f["points"] for f in alert["priority_breakdown"]) == alert["priority_score"]
-    assert alert["risk_model_version"] == "1"
+    assert alert["risk_model_version"] == "2"
     # ATT&CK, with links.
     assert {m["technique"] for m in alert["mitre"]} == {"T1110", "T1078"}
     assert all(m["url"].startswith("https://attack.mitre.org/techniques/") for m in alert["mitre"])
-    # Workflow state, related activity, correlation (Phase 8).
+    # Workflow state, related activity, correlation.
     assert alert["status"] == "NEW"
     assert alert["allowed_transitions"] == ["TRIAGED", "IN_PROGRESS", "FALSE_POSITIVE"]
     assert [r["rule_id"] for r in alert["related"]] == ["AUTH-001"]
@@ -150,7 +150,9 @@ def test_an_alert_explains_itself(
         "user root",
         "source 203.0.113.45",
     }
-    assert alert["incident_id"] is None and alert["activity"] == []
+    # High severity: correlation opened an incident for it (Phase 8).
+    assert alert["incident_id"] is not None and alert["incident_number"] is not None
+    assert alert["activity"] == []
 
 
 def test_evidence_comes_with_its_raw_records(

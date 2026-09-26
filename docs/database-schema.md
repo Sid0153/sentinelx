@@ -1,6 +1,6 @@
 # Database design
 
-> Status: tables marked ✅ exist (migrations 0001–0006) and are tested; the rest are design and
+> Status: tables marked ✅ exist (migrations 0001–0007) and are tested; the rest are design and
 > are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
 > unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
 > models with the migrated database and fails on any difference.
@@ -51,13 +51,13 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `detection_runs` ✅ | 6 | trigger (check: batch/manual), batch_id (FK), requested_by (FK users), range_start ≤ range_end (check), status (check: COMPLETED / COMPLETED_WITH_ERRORS), rule_results JSONB (per rule: version, candidates, detections, error code, ms), detections JSONB (each with explanation, facts, evidence IDs, ATT&CK), detection_count, alerts_created / alerts_updated (Phase 7; each stored detection also names its alert and whether it was created, updated or unchanged), duration_ms, started_at (indexed) |
 | `alerts` ✅ | 7 | see [detection-engine.md](detection-engine.md#alert-record-alerts-alert_events). Checks: status, severity, confidence, band, disposition values; disposition present exactly when RESOLVED; score 0–100; event_count ≥ 1; first ≤ last event. **Partial unique index on dedup_key WHERE status is open** (one open alert per activity, tested). FKs to rules, assets, identities, users, previous alert, all without cascade |
 | `alert_events` ✅ | 7 | alert_id, event_id (both FK, no cascade: an alert holds its evidence in place), linked_at; PK (alert_id, event_id), so evidence cannot be linked twice; index on event_id (alerts citing an event) |
-| `incidents` | 8 | see [correlation.md](correlation.md#incident-record) |
-| `incident_alerts` | 8 | incident_id, alert_id (**unique**: an alert belongs to at most one incident), link_strength, shared_entities JSONB, reason, link_source (engine/analyst), linked_by, linked_at |
-| `incident_notes` | 8 | incident_id, author_id, body (≤ 10 KB), created_at. Append-only |
-| `incident_evidence` | 8 | incident_id, event_id or alert_id, tag, comment, action (PIN/UNPIN), actor, created_at. Append-only |
-| `incident_activity` | 8 | incident_id, actor, kind (STATUS/ASSIGN/NOTE/EVIDENCE/LINK/RENAME/CREATED), from/to JSONB, created_at. Append-only |
+| `incidents` ✅ | 8 | see [correlation.md](correlation.md#incident-record-incidents); `number` (identity, unique, shown as INC-n); arrays hosts / usernames / source_ips (GIN), tactics, techniques. Checks: status, severity, band, disposition values; disposition and resolution present exactly when RESOLVED or CLOSED; risk 0–100; first ≤ last activity |
+| `incident_alerts` ✅ | 8 | PK (incident_id, alert_id), alert_id **unique** (an alert belongs to at most one incident), link_strength (check: STRONG/MEDIUM/WEAK/MANUAL/ORIGIN), shared_entities JSONB, reason, link_source (engine/analyst), linked_by, linked_at |
+| `incident_notes` ✅ | 8 | incident_id, author_id, body (check: 1–10,000 characters), created_at. **Append-only** |
+| `incident_evidence` ✅ | 8 | incident_id, event_id or alert_id (check: exactly one), tag, comment, action (PIN/UNPIN), actor_id, created_at. **Append-only** |
+| `incident_activity` ✅ | 8 | incident_id, seq (identity: insertion order), actor_id (null: the engine), kind (CREATED/LINK/UNLINK/STATUS/ASSIGN/NOTE/EVIDENCE/RENAME), details JSONB, created_at. **Append-only** |
 | `saved_hunts` | 10 | owner_id, name, definition JSONB (validated structured query), shared bool |
-| `app_settings` | 8 | key/value for admin configuration (correlation window, internal networks); changes audited |
+| `app_settings` ✅ | 8 | key, value JSONB, updated_at, updated_by: the correlation and sequence windows; changes audited |
 
 `log_sources` moved from Phase 5 to Phase 4: every event references its source, so the event
 store cannot exist without it. The batches that group records per ingest request stay in
@@ -73,7 +73,7 @@ Phase 5.
   log. The only cascade is refresh tokens with their user. Alerts will hold events in place
   the same way (Phase 7).
 - **Append-only triggers** reject UPDATE and DELETE (per row) and TRUNCATE (per statement) on
-  `audit_logs`, `raw_events`, `events` and `detection_rule_versions` (✅), later on `incident_notes`,
+  `audit_logs`, `raw_events`, `events`, `detection_rule_versions`, `incident_notes`,
   `incident_evidence` and `incident_activity`. They share one trigger function,
   `reject_modification()`. How the demo is reset (Phase 16) will be designed without
   weakening this ([ADR-0010](decisions/0010-evidence-storage.md)).
@@ -102,7 +102,8 @@ Phase 5.
 | ✅ `alerts (dedup_key) WHERE status IN (open)` unique | Deduplication |
 | ✅ `alert_events (event_id)` | Alerts citing an event |
 | `alerts (created_at)` | Trends |
-| `incidents (status, last_activity_at)` | Correlation candidates, queue |
+| ✅ `incidents (status, risk_score DESC)`, `(last_activity_at)` | Queue |
+| ✅ `incidents USING gin (hosts)`, `(usernames)`, `(source_ips)` | Correlation candidates (array overlap) |
 
 Composite indexes lead with the equality column and end with `timestamp`, because almost every
 query is "value X within time range T".

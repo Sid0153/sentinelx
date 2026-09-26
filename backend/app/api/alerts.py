@@ -12,6 +12,7 @@ from app.api.deps import DbSession
 from app.auth.deps import AnalystUser, CurrentUser
 from app.core.errors import AppError
 from app.events.queries import DISPLAY_LIMIT
+from app.incidents.queries import alert_incident
 from app.ingestion.normalize import optional_ip
 from app.models.alert import Alert, AlertStatus
 from app.models.context import Asset, Identity
@@ -82,6 +83,8 @@ def _detail(db: DbSession, alert: Alert) -> AlertDetail:
         status_note=alert.status_note,
         allowed_transitions=workflow.allowed(AlertStatus(alert.status)),
         activity=[AlertActivity(**a) for a in queries.activity(db, alert.id)],
+        incident_id=incident.id if (incident := alert_incident(db, alert.id)) else None,
+        incident_number=incident.number if incident else None,
         related=[
             RelatedAlert(
                 id=other.id,

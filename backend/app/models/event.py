@@ -122,6 +122,8 @@ class IngestionBatch(Base):
     detection_count: Mapped[int | None] = mapped_column(sa.Integer)  # None until detection ran
     alerts_created: Mapped[int | None] = mapped_column(sa.Integer)
     alerts_updated: Mapped[int | None] = mapped_column(sa.Integer)
+    incidents_created: Mapped[int | None] = mapped_column(sa.Integer)
+    incidents_updated: Mapped[int | None] = mapped_column(sa.Integer)
     # Event-time span of the parsed events: detection re-reads this window.
     first_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     last_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))

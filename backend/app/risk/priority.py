@@ -11,7 +11,8 @@ The version is stored with every score, so old scores stay explainable.
 from dataclasses import dataclass
 from typing import Any
 
-RISK_MODEL_VERSION = "1"
+# 1: alert priority (Phase 7). 2: adds incident risk (Phase 8); alert weights unchanged.
+RISK_MODEL_VERSION = "2"
 
 SEVERITY_POINTS = {"low": 10, "medium": 25, "high": 40, "critical": 55}
 CONFIDENCE_POINTS = {"low": 0, "medium": 8, "high": 15}
@@ -20,6 +21,11 @@ UNKNOWN_ASSET_POINTS = 5  # not in the inventory: neither reassuring nor alarmin
 PRIVILEGED_IDENTITY_POINTS = 10
 VOLUME_POINTS = 5  # evidence at least VOLUME_FACTOR times the rule's threshold
 VOLUME_FACTOR = 2
+# Incident risk: the highest alert priority, plus these.
+CHAIN_POINTS_PER_STAGE = 5  # each kind of finding beyond the first: a longer attack chain
+CHAIN_MAX = 15
+BREADTH_HOSTS_POINTS = 5  # more than one host affected
+BREADTH_PRIVILEGED_POINTS = 5  # a privileged identity involved, not already in the top alert
 MAX_SCORE = 100
 # Lowest score of each band, highest band first.
 BANDS = (("critical", 75), ("high", 50), ("medium", 25), ("low", 0))
@@ -114,6 +120,47 @@ def weights() -> dict[str, Any]:
         "unknown_asset": UNKNOWN_ASSET_POINTS,
         "privileged_identity": PRIVILEGED_IDENTITY_POINTS,
         "volume": [VOLUME_POINTS, VOLUME_FACTOR],
+        "incident": [
+            CHAIN_POINTS_PER_STAGE,
+            CHAIN_MAX,
+            BREADTH_HOSTS_POINTS,
+            BREADTH_PRIVILEGED_POINTS,
+        ],
         "max": MAX_SCORE,
         "bands": BANDS,
     }
+
+
+def incident_risk(
+    *,
+    top_alert_score: int,
+    top_alert_title: str,
+    top_alert_has_privileged: bool,
+    stages: list[str],
+    host_count: int,
+    privileged_identity: str | None,
+) -> Priority:
+    """Incident risk (docs/risk-model.md): the highest priority among its alerts, plus a
+    bonus for each additional kind of finding (`stages`: distinct rules and indicators; a
+    multi-stage chain is worse than three alerts of one kind) and for breadth.
+    `privileged_identity` names a privileged account involved in any alert; it only adds
+    points if the top alert did not already count it."""
+    factors = [
+        Factor("highest alert", f"{top_alert_score} ({top_alert_title[:80]})", top_alert_score)
+    ]
+    distinct = sorted(set(stages))
+    if len(distinct) > 1:
+        points = min(CHAIN_MAX, CHAIN_POINTS_PER_STAGE * (len(distinct) - 1))
+        factors.append(
+            Factor(
+                "attack stages", f"{len(distinct)} kinds of finding: {', '.join(distinct)}", points
+            )
+        )
+    if host_count > 1:
+        factors.append(Factor("hosts", f"{host_count} hosts affected", BREADTH_HOSTS_POINTS))
+    if privileged_identity and not top_alert_has_privileged:
+        factors.append(
+            Factor("identity", f"{privileged_identity} privileged", BREADTH_PRIVILEGED_POINTS)
+        )
+    score = min(MAX_SCORE, sum(f.points for f in factors))
+    return Priority(score=score, band=band(score), factors=tuple(factors))

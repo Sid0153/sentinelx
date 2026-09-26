@@ -111,7 +111,8 @@ class AlertDetail(AlertSummary):
     allowed_transitions: list[AlertStatus]
     activity: list[AlertActivity]
     related: list[RelatedAlert]
-    incident_id: uuid.UUID | None = None  # correlation: Phase 8
+    incident_id: uuid.UUID | None = None
+    incident_number: int | None = None
 
 
 class EvidenceEvent(EventPublic):

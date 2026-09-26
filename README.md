@@ -2,12 +2,13 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 7 (alerts) complete.** Sign-in and roles, the audit log, the asset and
-> identity inventory, ingestion of five log formats into an append-only event store, detection
-> (9 rules mapped to ATT&CK v19.2, after every batch and on demand), and **alerts**:
-> deduplicated, prioritized with a documented score, each with its explanation, evidence and
-> raw records, worked through a status workflow in the UI (`/alerts`). **Not yet:** incidents
-> and correlation (Phase 8), the dashboard and event pages (Phase 9), hunting (Phase 10).
+> **Status: Phase 8 (correlation and incidents) complete.** Sign-in and roles, the audit log,
+> the asset and identity inventory, ingestion of five log formats into an append-only event
+> store, detection (9 rules mapped to ATT&CK v19.2), alerts (deduplicated, prioritized,
+> explained), and **incidents**: related alerts correlated into one investigation with a
+> stated reason for every link, a timeline rebuilt from stored events, notes, pinned evidence,
+> assignment and a status workflow (`/incidents`). **Not yet:** the dashboard and event pages
+> (Phase 9), hunting (Phase 10).
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:

@@ -16,3 +16,4 @@ When a decision changes, a new ADR supersedes the old one. Old ADRs are not rewr
 | [0009](0009-entity-based-incident-correlation.md) | Entity-overlap correlation of alerts into incidents | Accepted (Phase 1) |
 | [0010](0010-evidence-storage.md) | Evidence storage: exact bytes, append-only including TRUNCATE | Accepted (Phase 4) |
 | [0011](0011-alert-deduplication.md) | Alert deduplication: one open alert per activity, evidence decides | Accepted (Phase 7) |
+| [0012](0012-correlation-by-finding.md) | Correlation links new kinds of finding on the same host; stages are findings, not tactics | Accepted (Phase 8) |

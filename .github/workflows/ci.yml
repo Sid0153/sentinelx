@@ -144,7 +144,7 @@ jobs:
           echo "$admin_password" > /tmp/admin_password
           docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend             python -m app.cli create-admin --email admin@ci.example
           python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$admin_password"
-      - name: Ingestion and detection work end to end (API through nginx, a scenario via CLI)
+      - name: Ingestion, detection, alerts and incidents work end to end (API through nginx, scenarios via CLI)
         run: |
           python3 scripts/ingest_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
           docker compose exec -T backend python -m app.cli create-source --name ci-auth --type linux_auth
@@ -152,6 +152,10 @@ jobs:
             | tee /tmp/demo.txt
           grep -q "parsed 12, skipped 12, failed 0" /tmp/demo.txt
           grep -q "PROCESSED, 1 detections, 1 new alerts" /tmp/demo.txt  # AUTH-001 → one alert
+          grep -q "0 new incidents" /tmp/demo.txt  # a lone medium alert opens no incident
+          docker compose exec -T backend python -m app.cli demo-ingest --scenario multi_stage_attack \
+            --source ci-auth --host ci-web-02 --source-ip 198.51.100.200 | tee /tmp/chain.txt
+          grep -q "1 new incidents" /tmp/chain.txt  # the whole chain is one story
       - name: A forged X-Forwarded-For does not escape the login rate limit
         run: |
           for path in 8081 8001; do  # through nginx, and straight to the backend port

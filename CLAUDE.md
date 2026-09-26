@@ -20,6 +20,7 @@ its rules always apply:
 | 5 Ingestion and parsing | Done, green in CI (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts in the Compose job) |
 | 6 Detection engine | Done, green in CI (9 rules; 735 backend tests, 98% coverage; 39 frontend tests; every scenario triggers exactly its rules on the live stack; detection checked in the Compose smoke test) |
 | 7 Alerts | Done, green in CI (857 backend tests incl. real-concurrency tests, 98% coverage; 47 frontend tests; alerts checked in the Compose smoke test; alert pages checked at desktop and phone widths) |
+| 8 Correlation and incidents | Done locally (1007 backend tests incl. real-concurrency tests, 98% coverage; 56 frontend tests; the brief chain is one incident on the live stack; pages checked at desktop and phone widths). Not yet pushed |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -144,6 +145,12 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
   before their commit.
 - Tests that need real concurrent transactions use a throwaway database (see
   `tests/integration/test_alert_concurrency.py`); never commit into the shared test database.
+- Correlation and incidents (ADR-0009, ADR-0012): `correlation/scoring.py` is pure (link strength
+  and reason); `correlation/service.py` runs inside the detection run's transaction; only
+  `incidents/records.py` and `incidents/service.py` write incidents. Every analyst action writes an
+  `incident_activity` row and an audit entry in the same transaction; notes, evidence and activity
+  are append-only. Sessions do not autoflush: flush after a write that later lookups in the same
+  pass must see (a missing flush once opened two incidents for one alert).
 - Frontend layout: grid and flex children holding tables or long text need `min-w-0`, or the
   page scrolls sideways on phones (found live in Phase 7).
 - Doc edits: check that they applied. A chained command that fails before a doc edit leaves the

@@ -297,6 +297,35 @@ def privileged_account_creation(
     ]
 
 
+def multi_stage_attack(
+    start: datetime,
+    *,
+    host: str = "web-01",
+    username: str = "deploy",
+    source_ip: str = "203.0.113.45",
+    account: str = "svc-backup2",
+) -> list[str]:
+    """The brief's correlation example as log records, one stage after the other on one host:
+    a brute force against an existing account from an outside address that ends in a
+    successful logon, a root shell through sudo half a minute later, and a new local account
+    added to the sudo group a minute after that. Four rules fire (AUTH-001, AUTH-002,
+    PRIV-001, ACCT-001); correlation should make them one incident."""
+    attack = brute_force_success(start, host=host, username=username, source_ip=source_ip)
+    success_at = start + timedelta(seconds=12 * 3)
+    shell = [
+        _line(
+            success_at + timedelta(seconds=30),
+            host,
+            "sudo",
+            f"  {username} : TTY=pts/0 ; PWD=/home/{username} ; USER=root ; COMMAND=/bin/bash",
+        )
+    ]
+    persistence = privileged_account_creation(
+        success_at + timedelta(minutes=1, seconds=30), host=host, account=account
+    )
+    return attack + shell + persistence
+
+
 def _windows_event(
     moment: datetime, host: str, record_id: int, event_id: int, data: dict[str, str]
 ) -> str:
@@ -438,6 +467,13 @@ SCENARIOS: dict[str, Scenario] = {
         },
         "attacking sources",
         expected_rules=("AUTH-005",),
+    ),
+    "multi_stage_attack": Scenario(
+        "multi_stage_attack",
+        "Brute force, successful logon, root shell, new privileged account: one incident",
+        multi_stage_attack,
+        {"host": "host", "user": "username", "source_ip": "source_ip"},
+        expected_rules=("AUTH-001", "AUTH-002", "PRIV-001", "ACCT-001"),
     ),
     "benign": Scenario(
         "benign",

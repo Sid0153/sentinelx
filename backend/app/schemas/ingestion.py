@@ -135,6 +135,8 @@ class BatchPublic(BaseModel):
     detection_count: int | None  # detections the batch's events took part in (Phase 6)
     alerts_created: int | None  # new alerts, and open alerts extended (Phase 7)
     alerts_updated: int | None
+    incidents_created: int | None  # correlation (Phase 8)
+    incidents_updated: int | None
     issues: list[BatchIssue]
     first_event_at: datetime | None
     last_event_at: datetime | None

@@ -137,5 +137,8 @@ class DetectionRun(Base):
     # What the detections did to alerts (Phase 7): new alerts, and open alerts they extended.
     alerts_created: Mapped[int] = mapped_column(default=0, server_default="0")
     alerts_updated: Mapped[int] = mapped_column(default=0, server_default="0")
+    # What correlation did with those alerts (Phase 8).
+    incidents_created: Mapped[int] = mapped_column(default=0, server_default="0")
+    incidents_updated: Mapped[int] = mapped_column(default=0, server_default="0")
     duration_ms: Mapped[int]
     started_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))

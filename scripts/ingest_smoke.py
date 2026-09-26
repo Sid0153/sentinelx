@@ -8,6 +8,7 @@ line and the first failure exits non-zero. All records are synthetic (RFC 5737 a
 """
 
 import json
+import secrets
 import sys
 import urllib.error
 import urllib.request
@@ -110,11 +111,16 @@ def main(base: str, email: str, password: str) -> None:
     status, runs = client.call("GET", "/api/detections/runs?trigger=manual")
     check(status == 200 and runs["items"][0]["id"] == run["id"], "the run is listed")
 
-    # Alerts (Phase 7): a brute force on a host of its own, so reruns never share an alert.
+    # Alerts (Phase 7): a brute force on a host of its own, so reruns never share an alert. The
+    # outside address differs per run too: the same outside source is one campaign, and a rerun
+    # would rightly join the previous run's incident.
     host = f"smoke-{uuid.uuid4().hex[:8]}"
+    attacker = f"192.0.2.{secrets.randbelow(254) + 1}"  # a documentation range demos rarely use
+    account = f"smoke{secrets.token_hex(3)}"  # nor the account: many sources against one account
+    # within minutes is a distributed attack (AUTH-005), and would tie the runs together
     attack = [
         f"{(now - timedelta(seconds=60 - i * 5)).isoformat()} {host} sshd[{2000 + i}]: "
-        f"Failed password for root from 203.0.113.77 port {51000 + i} ssh2"
+        f"Failed password for {account} from {attacker} port {51000 + i} ssh2"
         for i in range(6)
     ]
     status, batch = client.call("POST", path, "\n".join(attack).encode(), "text/plain")
@@ -131,6 +137,39 @@ def main(base: str, email: str, password: str) -> None:
     )
     check(status == 200 and moved["status"] == "TRIAGED", "an alert can be triaged")
     check(moved["activity"][-1]["to_status"] == "TRIAGED", "and the change is recorded")
+
+    # Incidents (Phase 8): the same brute force ending in a successful logon is high severity
+    # and opens an incident, which the earlier failures join.
+    logon = (
+        f"{(now - timedelta(seconds=25)).isoformat()} {host} sshd[2100]: "
+        f"Accepted password for {account} from {attacker} port 51099 ssh2"
+    )
+    status, batch = client.call("POST", path, logon.encode(), "text/plain")
+    # In a fresh database (CI) this opens an incident. In a busy one the same outside source
+    # may already be in an open incident: joining it as the same campaign is also correct.
+    correlated = batch["incidents_created"] + batch["incidents_updated"]
+    check(status == 201 and correlated == 1, "a successful logon is correlated into an incident")
+    status, incidents = client.call("GET", f"/api/incidents?host={host}")
+    check(status == 200 and incidents["total"] == 1, "the incident is in the queue")
+    incident_id = incidents["items"][0]["id"]
+    status, incident = client.call("GET", f"/api/incidents/{incident_id}")
+    rules = sorted(a["alert"]["rule_id"] for a in incident["alerts"] if a["alert"]["host"] == host)
+    check(
+        rules == ["AUTH-001", "AUTH-002"], "the brute force and the logon are one incident", rules
+    )
+    check(all(a["reason"] for a in incident["alerts"]), "every link says why")
+    status, timeline = client.call("GET", f"/api/incidents/{incident_id}/timeline")
+    check(status == 200 and len(timeline["items"]) >= 7, "the timeline is rebuilt from events")
+    status, note = client.json(
+        "POST", f"/api/incidents/{incident_id}/notes", {"body": "Smoke test note."}
+    )
+    check(status == 201, "an analyst note is added")
+    target = "TRIAGED" if incident["status"] == "OPEN" else "RESOLVED"
+    body = {"status": target}
+    if target == "RESOLVED":
+        body.update(disposition="benign_expected", resolution="Smoke test (simulated records)")
+    status, moved = client.json("POST", f"/api/incidents/{incident_id}/transition", body)
+    check(status == 200 and moved["status"] == target, f"the incident can be moved to {target}")
 
 
 if __name__ == "__main__":

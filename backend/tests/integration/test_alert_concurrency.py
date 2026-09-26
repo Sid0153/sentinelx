@@ -10,124 +10,25 @@ The interleaving is forced, not hoped for: one side holds a lock, and the test w
 PostgreSQL reports the other side blocked on it (pg_stat_activity) before letting go.
 """
 
-import threading
-import time
 import uuid
-from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import pytest
-from alembic import command
-from sqlalchemy import create_engine, select, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.alerts import service
 from app.core.config import get_settings
-from app.database.migrations import alembic_config
-from app.detection.library import get_library
-from app.detection.storage import seed
 from app.ingestion.service import IngestRequest, ingest
 from app.models.alert import Alert, AlertStatus
 from app.models.event import BatchChannel, BatchStatus, IngestionBatch, LogSource
 from app.models.user import Role, User
-from tests.conftest import _TEST_DATABASE_URL
+from tests.concurrency import WAIT_SECONDS, Factory, Pause, Worker, wait_until_blocked
 from tests.helpers import make_user
 
 pytestmark = pytest.mark.integration
 
 START = (datetime.now(UTC) - timedelta(hours=1)).replace(microsecond=0)
-WAIT_SECONDS = 15
-
-Factory = sessionmaker[Session]
-
-
-@pytest.fixture(scope="module")
-def scratch() -> Iterator[Factory]:
-    if not _TEST_DATABASE_URL:
-        pytest.skip("TEST_DATABASE_URL not set")
-    base = make_url(_TEST_DATABASE_URL)
-    name = f"sx_concurrency_{uuid.uuid4().hex[:8]}"
-    admin = create_engine(base, isolation_level="AUTOCOMMIT")
-    with admin.connect() as connection:
-        connection.execute(text(f'CREATE DATABASE "{name}"'))
-    settings = get_settings()
-    original = settings.database_url
-    url = base.set(database=name).render_as_string(hide_password=False)
-    try:
-        settings.database_url = url  # alembic/env.py migrates the configured database
-        command.upgrade(alembic_config(), "head")
-    finally:
-        settings.database_url = original
-    engine = create_engine(url)
-    # The same settings as the application's sessions (app/database/session.py).
-    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
-    with factory() as db:
-        seed(db, get_library())
-    try:
-        yield factory
-    finally:
-        engine.dispose()
-        with admin.connect() as connection:
-            connection.execute(text(f'DROP DATABASE "{name}" WITH (FORCE)'))
-        admin.dispose()
-
-
-class Pause:
-    """Makes the next detection run stop after alerting, before it commits, so it still holds
-    its locks (the detection advisory lock and the alert rows it extended)."""
-
-    def __init__(self) -> None:
-        self.armed = False
-        self.reached = threading.Event()
-        self.release = threading.Event()
-
-    def arm(self) -> None:
-        self.armed = True
-        self.reached.clear()
-        self.release.clear()
-
-
-@pytest.fixture
-def pause(monkeypatch: pytest.MonkeyPatch) -> Iterator[Pause]:
-    control = Pause()
-    original = service.apply
-
-    def apply(*args: Any, **kwargs: Any) -> Any:
-        result = original(*args, **kwargs)
-        if control.armed:
-            control.armed = False
-            control.reached.set()
-            control.release.wait(WAIT_SECONDS)
-        return result
-
-    monkeypatch.setattr(service, "apply", apply)
-    yield control
-    control.release.set()
-
-
-class Worker(threading.Thread):
-    """Runs `work` in a thread and keeps its result or exception for the test."""
-
-    def __init__(self, work: Callable[[], Any]) -> None:
-        super().__init__(daemon=True)
-        self.work = work
-        self.result: Any = None
-        self.error: BaseException | None = None
-
-    def run(self) -> None:
-        try:
-            self.result = self.work()
-        except BaseException as exc:  # reported by finish()
-            self.error = exc
-
-    def finish(self) -> Any:
-        self.join(WAIT_SECONDS)
-        assert not self.is_alive(), "the worker did not finish"
-        if self.error is not None:
-            raise self.error
-        return self.result
 
 
 def failures(start: datetime, host: str) -> list[bytes]:
@@ -173,24 +74,6 @@ def change(
     actor = db.get(User, analyst_id)
     assert actor is not None
     return service.transition(db, alert_id, target, None, reason, actor, datetime.now(UTC))
-
-
-def wait_until_blocked(factory: Factory) -> None:
-    """Until another session of this database waits on a lock (row or advisory)."""
-    deadline = time.monotonic() + WAIT_SECONDS
-    with factory() as probe:
-        while time.monotonic() < deadline:
-            waiting = probe.execute(
-                text(
-                    "SELECT count(*) FROM pg_stat_activity "
-                    "WHERE datname = current_database() AND wait_event_type = 'Lock'"
-                )
-            ).scalar_one()
-            if waiting:
-                return
-            probe.rollback()  # a fresh snapshot for the next look
-            time.sleep(0.02)
-    raise AssertionError("the other transaction never blocked on the lock")
 
 
 def test_a_run_waiting_on_an_alert_the_analyst_closes_opens_a_new_one(scratch: Factory) -> None:

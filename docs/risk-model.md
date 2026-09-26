@@ -1,7 +1,8 @@
 # Priority and risk model
 
 > Status: alert priority **IMPLEMENTED and TESTED (Phase 7)**, `app/risk/priority.py`, model
-> version 1. Incident risk and context: Phase 11.
+> version 1; incident risk **IMPLEMENTED and TESTED (Phase 8)**, model version 2 (alert
+> weights unchanged). Context display and rule metrics: Phase 11.
 > See [ADR-005](decisions/0005-explainable-risk-model.md).
 
 This is a **SentinelX-specific** scoring model. It is **not** an industry-standard score (not
@@ -44,11 +45,17 @@ not recomputing; removing the recompute or the host lookup makes a test fail.
 
 `risk = min(100, max(alert priority) + chain bonus + breadth bonus)`
 
-- **Chain bonus**: +5 for each distinct ATT&CK tactic beyond the first across linked alerts,
-  up to +15. Credential Access → Privilege Escalation → Persistence is worse than three
-  alerts from one tactic.
+- **Chain bonus**: +5 for each distinct **kind of finding** (rule and indicator) beyond the
+  first, up to +15. A brute force, a successful logon, a root shell and a new admin account
+  are worse than four alerts of one kind. Tactics were the Phase 1 plan, but one technique can
+  span several (T1078 is listed under four), so a single alert would already have scored as a
+  chain (ADR-0012).
 - **Breadth bonus**: +5 if more than one host is affected, +5 if a privileged identity is
-  affected (only if not already counted in the top alert).
+  involved in any alert (only if the top alert did not already count it).
+
+Recomputed whenever an incident's alerts change (a link, an unlink, an extended alert). The
+brief's chain on web-01 scores the highest alert plus +15 (tested); every factor, the cap and
+the no-double-counting rule are pinned by unit tests.
 
 The same bands and the same breakdown display apply.
 

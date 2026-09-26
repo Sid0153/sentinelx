@@ -113,6 +113,17 @@ export function Pagination({
   );
 }
 
+/** A titled box on detail pages. `min-w-0` keeps wide content (tables, logs) from widening
+ * the page on phones. */
+export function Panel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <h2 className="mb-2 text-sm font-semibold text-slate-200">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
 /** Timestamps are shown in UTC everywhere, so analysts compare times without conversion. */
 export function formatUtc(iso: string | null): string {
   if (!iso) return "—";

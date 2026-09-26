@@ -96,16 +96,19 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
   shown as text (an `<img onerror>` payload creates no element), resolving with a
   disposition, false positive needs a reason, server refusals shown.
 
-**Incidents** (Phase 8)
-- The full chain gives one incident with the correct alert set and timeline order.
-- Medium-only unrelated alerts create no incident. A MEDIUM external-IP link across hosts
-  links.
-- Window edges.
-- A closed incident is not extended.
-- Concurrent batches give one incident.
-- Notes and evidence are append-only (the DB rejects `UPDATE`).
-- Assignment is audited.
-- VIEWER attempting incident modification gets `403` and an `ACCESS_DENIED` audit row.
+**Incidents** ✅ (Phase 8; details in [correlation.md](correlation.md#testing))
+- The full chain gives one incident with the correct alerts, links and reasons, in one batch
+  and in four; the timeline is in order and pages identically by keyset.
+- Unrelated medium alerts create no incident; one outside source against two hosts does.
+- Window edges (pure and on stored alerts), a narrowed window, resolved incidents not extended
+  (with the back-link), unlinked alerts not re-linked.
+- Real concurrency (own database): an incident resolved while a run waits; two batches of one
+  chain at once make one incident.
+- Notes, evidence and activity are append-only (UPDATE and DELETE rejected); a closed
+  incident refuses changes; every action is audited; VIEWER gets `403` on every action (RBAC
+  matrix).
+- Mutation-checked: partners, the unlink guard, the new-finding link and the incident row lock
+  each have a test that fails without them.
 
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
