@@ -195,7 +195,6 @@ class Rule(_Strict):
     value_transform: Literal["ip_network"] | None = None
     lookback: timedelta | None = None
     min_history: int | None = Field(default=None, ge=1, le=10_000)
-    dedup_window: timedelta = timedelta(hours=1)
 
     tunable: Tunables = Tunables()
     exclusions: list[Exclusion] = Field(default_factory=list, max_length=100)
@@ -204,7 +203,7 @@ class Rule(_Strict):
     investigation: list[str] = Field(min_length=1, max_length=12)
     response: list[str] = Field(min_length=1, max_length=12)
 
-    @field_validator("time_window", "max_gap", "lookback", "dedup_window", mode="before")
+    @field_validator("time_window", "max_gap", "lookback", mode="before")
     @classmethod
     def _durations(cls, value: Any) -> Any:
         return parse_duration(value)

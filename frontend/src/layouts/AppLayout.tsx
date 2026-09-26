@@ -7,6 +7,7 @@ import type { Role } from "../types/api";
 // Only pages that exist are listed, and only for roles that can use them. Each phase adds its
 // own entries. Hiding a link is a convenience; the API enforces access (ADR-0007).
 const NAV_ITEMS: { to: string; label: string; minimum: Role }[] = [
+  { to: "/alerts", label: "Alerts", minimum: "VIEWER" },
   { to: "/status", label: "Status", minimum: "VIEWER" },
   { to: "/users", label: "Users", minimum: "ADMIN" },
   { to: "/audit", label: "Audit log", minimum: "ADMIN" },

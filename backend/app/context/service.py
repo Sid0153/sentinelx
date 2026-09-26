@@ -10,6 +10,7 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.alerts import service as alerts
 from app.audit.events import AuditAction, EntityType
 from app.audit.service import record
 from app.core.errors import AppError
@@ -93,13 +94,18 @@ def create_asset(db: Session, data: AssetCreate, actor: User) -> Asset:
     asset = Asset(**data.model_dump())
     db.add(asset)
     db.flush()
+    reprioritized = alerts.reprioritize_for_asset(db, asset)
     record(
         db,
         AuditAction.ASSET_CREATED,
         actor=actor,
         entity_type=EntityType.ASSET,
         entity_id=asset.id,
-        details={"hostname": asset.hostname, "criticality": asset.criticality},
+        details={
+            "hostname": asset.hostname,
+            "criticality": asset.criticality,
+            "open_alerts_reprioritized": reprioritized,
+        },
     )
     try:
         db.commit()
@@ -111,15 +117,26 @@ def create_asset(db: Session, data: AssetCreate, actor: User) -> Asset:
 
 def update_asset(db: Session, asset_id: uuid.UUID, data: AssetUpdate, actor: User) -> Asset:
     asset = get_asset(db, asset_id)
+    old_ips = list(asset.ip_addresses)
     changes = _changes(asset, data)
     if changes:
+        # Criticality and addresses decide alert priority: open alerts follow at once.
+        reprioritized = (
+            alerts.reprioritize_for_asset(db, asset, old_ips)
+            if {"criticality", "ip_addresses"} & set(changes)
+            else 0
+        )
         record(
             db,
             AuditAction.ASSET_UPDATED,
             actor=actor,
             entity_type=EntityType.ASSET,
             entity_id=asset.id,
-            details={"hostname": asset.hostname, "changes": changes},
+            details={
+                "hostname": asset.hostname,
+                "changes": changes,
+                "open_alerts_reprioritized": reprioritized,
+            },
         )
         db.commit()
         db.refresh(asset)
@@ -172,13 +189,18 @@ def create_identity(db: Session, data: IdentityCreate, actor: User) -> Identity:
     identity = Identity(**data.model_dump())
     db.add(identity)
     db.flush()
+    reprioritized = alerts.reprioritize_for_identity(db, identity)
     record(
         db,
         AuditAction.IDENTITY_CREATED,
         actor=actor,
         entity_type=EntityType.IDENTITY,
         entity_id=identity.id,
-        details={"username": identity.username, "privilege_level": identity.privilege_level},
+        details={
+            "username": identity.username,
+            "privilege_level": identity.privilege_level,
+            "open_alerts_reprioritized": reprioritized,
+        },
     )
     try:
         db.commit()
@@ -194,13 +216,20 @@ def update_identity(
     identity = get_identity(db, identity_id)
     changes = _changes(identity, data)
     if changes:
+        reprioritized = (
+            alerts.reprioritize_for_identity(db, identity) if "privilege_level" in changes else 0
+        )
         record(
             db,
             AuditAction.IDENTITY_UPDATED,
             actor=actor,
             entity_type=EntityType.IDENTITY,
             entity_id=identity.id,
-            details={"username": identity.username, "changes": changes},
+            details={
+                "username": identity.username,
+                "changes": changes,
+                "open_alerts_reprioritized": reprioritized,
+            },
         )
         db.commit()
         db.refresh(identity)

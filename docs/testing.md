@@ -57,8 +57,8 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
 - new_value: no history → none (cold start); known /24 → none; new /24 → AUTH-004.
 - Order independence: shuffled input gives the same detections. Batch split: failures in one
   batch and the success in the next still give AUTH-002, with evidence from both batches.
-- Idempotence: repeating a manual run over the same range gives the same detections (alerts:
-  Phase 7).
+- Idempotence: repeating a manual run over the same range gives the same detections and
+  changes no alert.
 - Benign scenario → zero detections; each scenario → exactly its rules (in memory, in
   PostgreSQL, live).
 - Condition language: over 500 conditions on stored events with awkward values, the SQL
@@ -74,12 +74,27 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
 - AUTH-004 uses history stored in PostgreSQL (new network → detection; known network or
   too little history → none).
 
-**Alerts** (Phase 7)
-- Dedup extends an active alert. A resolved alert is not reopened, and a new alert gets
-  `previous_alert_id`.
-- Priority breakdown values and band edges.
-- Every legal transition succeeds and every illegal one returns `409`. The reason is required
-  where specified.
+**Alerts** ✅ (Phase 7; `tests/unit/test_priority.py`, `test_alert_rules.py`,
+`tests/integration/test_alerts.py`, `tests/api/test_alerts.py`, `frontend/tests/alerts.test.tsx`)
+- Dedup: continuing activity extends the open alert; re-running detection changes nothing,
+  also after the alert was closed; new activity after closing opens a new alert with
+  `previous_alert_id` and leaves the closed one alone; different indicators are different
+  alerts; the database refuses a second open alert for a key. Mutation-checked (removing the
+  evidence check or the extension makes tests fail).
+- Priority: every factor, band edges 24/25, 49/50, 74/75, the cap, the documented example,
+  inventory context from the current records; a weight change without a version bump fails.
+  Open alerts are re-scored when the inventory changes (also for assets added after the
+  events), closed alerts are not.
+- Concurrency, with real concurrent transactions in a throwaway database
+  (`test_alert_concurrency.py`): analyst closing vs a run extending, in both orders, and two
+  batches of the same activity at once. Each lock was removed once to prove a test fails.
+- Workflow: all 25 status pairs (allowed ones pass, the rest are refused); disposition and
+  reason rules; `409` for changes the workflow does not allow, `400` for missing input;
+  reopening blocked by a newer open alert; audit entries and timestamps; VIEWER `403`.
+- Evidence cap, simulated flag, alerting failure → batch `DETECTION_FAILED` with records kept.
+- UI: queue order and filters in the query, empty state, alert page content, raw evidence
+  shown as text (an `<img onerror>` payload creates no element), resolving with a
+  disposition, false positive needs a reason, server refusals shown.
 
 **Incidents** (Phase 8)
 - The full chain gives one incident with the correct alert set and timeline order.

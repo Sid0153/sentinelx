@@ -76,7 +76,9 @@ backend/app/
   detection/        (Phase 6) conditions.py, events.py, model.py, evaluators/, evaluate.py,
                     explain.py, library/ (YAML rules + pinned ATT&CK file), storage.py,
                     engine.py, service.py
-  alerts/           (Phase 7) dedup, persistence, workflow, prioritization
+  alerts/           (Phase 7) dedup.py, workflow.py (pure), service.py (the only writer of
+                    alerts), queries.py
+  risk/             (Phase 7) priority.py: the SentinelX priority score (pure)
   correlation/      (Phase 8) alert → incident linking (pure scoring + persistence)
   incidents/        (Phase 8) lifecycle, notes, evidence pins, activity, timeline assembly
   risk/             (Phases 7, 11) priority/risk model (pure, versioned)
@@ -108,9 +110,8 @@ Rules we will enforce with tests or review:
 [ADR-008](decisions/0008-synchronous-bounded-pipeline.md) has the full reasoning. Summary:
 
 Implemented: steps 1–4 (Phase 5), in one transaction per batch, and step 5 plus the batch's
-detection states and the startup reconciler (Phase 6). Steps 6–7 arrive with alerts (Phase 7)
-and correlation (Phase 8); until then step 8 marks the batch PROCESSED after detection alone,
-and the detections are stored in a `detection_runs` row. Files are sent as
+detection states and the startup reconciler (Phase 6), and step 6, alerts (Phase 7). Step 7
+arrives with correlation (Phase 8). Files are sent as
 `text/plain` to the same endpoint, so there is no separate upload route (and no multipart
 dependency).
 
@@ -133,7 +134,7 @@ POST /api/ingest/{source}  (JSON records or text/plain lines; also CLI ingest-fi
   5. detection: for each enabled rule, load candidate events for the batch's time span
      widened by the rule's window, run the evaluator → detections that include at least
      one of the batch's events; store the run                           [Phase 6 ✅]
-  6. alerts: dedup / create / extend, link evidence, compute priority     [Phase 7]
+  6. alerts: dedup / create / extend, link evidence, compute priority     [Phase 7 ✅]
   7. correlation: link alerts to incidents or create incidents            [Phase 8]
   8. batch → PROCESSED / PROCESSED_WITH_ERRORS, detection_count          [Phase 6 ✅]
   ── commit ─────────────────────────────────────────────────────────────────────
@@ -144,9 +145,10 @@ Design points:
 - **Events are committed before detection runs.** If detection fails, no evidence is lost. The
   batch is marked `DETECTION_FAILED` and an admin can re-run detection over a time range
   (`POST /api/detections/run`, the CLI `run-detection`).
-- **Detection is idempotent.** Evidence links are unique on `(alert_id, event_id)` and alerts
-  deduplicate on a key. Re-running over the same events changes nothing, so a retry after a
-  crash is always safe.
+- **Detection is idempotent.** A detection whose evidence is already linked to an alert with
+  its key (open or closed) changes nothing, and evidence links are unique on
+  `(alert_id, event_id)`. Re-running over the same events changes nothing, so a retry after a
+  crash is always safe (tested; [ADR-0011](decisions/0011-alert-deduplication.md)).
 - **Stateless detection.** Window state is not kept in memory. Every run re-reads the relevant
   window from PostgreSQL. This handles late and out-of-order events (a late failure still
   completes a threshold) and survives restarts. The cost is repeated reads, bounded by the

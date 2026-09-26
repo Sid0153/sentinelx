@@ -151,7 +151,7 @@ jobs:
           docker compose exec -T backend python -m app.cli demo-ingest --scenario brute_force --source ci-auth \
             | tee /tmp/demo.txt
           grep -q "parsed 12, skipped 12, failed 0" /tmp/demo.txt
-          grep -q "PROCESSED, 1 detections" /tmp/demo.txt  # AUTH-001 fired on the brute force
+          grep -q "PROCESSED, 1 detections, 1 new alerts" /tmp/demo.txt  # AUTH-001 → one alert
       - name: A forged X-Forwarded-For does not escape the login rate limit
         run: |
           for path in 8081 8001; do  # through nginx, and straight to the backend port

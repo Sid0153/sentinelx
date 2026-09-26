@@ -1,8 +1,8 @@
 # Detection engine and alerts
 
 > Status: engine, rule storage and the 9-rule library **IMPLEMENTED and TESTED (Phase 6)**.
-> Its output is a stored **detection run** (`detection_runs`); turning detections into alerts
-> (dedup, workflow, priority) is **NOT IMPLEMENTED** yet (Phase 7, sections marked below).
+> Each run is stored (`detection_runs`) and its detections become **alerts** (dedup, evidence,
+> priority, workflow: **IMPLEMENTED and TESTED, Phase 7**, [ADR-0011](decisions/0011-alert-deduplication.md)).
 > See [ADR-004](decisions/0004-declarative-rule-engine.md).
 
 ## Principles
@@ -38,7 +38,6 @@ match:                           # safe condition language
 group_by: [source_ip, host, username]
 threshold: 5
 time_window: 5m
-dedup_window: 1h
 tunable:                         # the only fields an admin may change, with bounds
   threshold:   {min: 2, max: 1000}
   time_window: {min: 1m, max: 24h}
@@ -212,48 +211,79 @@ false positives (noise), some are misses (gaps):
 - NET-001 thresholds depend on the environment (vulnerability scanners and monitoring
   systems must be allowlisted), and a slow scan stays under them.
 
-## Detection → alert (Phase 7, NOT IMPLEMENTED)
+## Detection → alert (Phase 7)
 
-### Deduplication
+Code: `app/alerts/` (`dedup.py` and `workflow.py` pure; `service.py` the only writer of
+alerts; `queries.py`). Alerts are created **in the detection run's transaction**, under its
+advisory lock, so a run and its alerts are stored together or not at all. If alerting fails,
+the run fails and the batch is `DETECTION_FAILED` (the records stay; tested).
 
-`dedup_key = sha256(rule_id ‖ group_by values)`.
+### Deduplication ([ADR-0011](decisions/0011-alert-deduplication.md))
 
-1. If an **active** alert (`NEW`, `TRIAGED`, `IN_PROGRESS`) with that key exists and its
-   `last_event_at` is within `dedup_window` of the new detection's first event, the detection
-   **extends** it. New evidence is linked, `event_count` and `last_event_at` are updated,
-   `occurrence_count += 1`, and the priority is recomputed.
-2. Otherwise a new alert is created. If a closed alert (`RESOLVED`/`FALSE_POSITIVE`) exists
-   for the key, the new alert shows it as `previous_alert_id`, so analysts see recurrence.
-   Closed alerts are **never reopened** by the engine, which respects the analyst's decision.
-3. Evidence links are unique on `(alert_id, event_id)`, which makes re-running detection a
-   no-op.
+`dedup_key = sha256(rule ID ‖ indicator ‖ grouped values as JSON)`. The indicator separates
+findings of one rule that are different activity (PRIV-001's root shell and refused sudo).
 
-Evidence stored per alert is capped at the first 50 plus the last 50 events. `event_count`
-stays exact and the full set is reachable through a hunt on the alert's key and time span.
+1. A detection whose evidence is **already linked to an alert with the same key** (open or
+   closed) changes nothing. Re-running detection is a no-op, including after an analyst closed
+   the alert (a closed alert is never re-created by a re-run).
+2. With new evidence, the **open** alert for the key (`NEW`, `TRIAGED`, `IN_PROGRESS`) is
+   extended: the new evidence is linked, times and counts follow the linked evidence, the
+   explanation, facts and guidance follow the latest detection, the detection is added to the
+   alert's `history`, and the priority is recomputed.
+3. With no open alert, a new alert is created. It points to the latest closed alert for the key
+   (`previous_alert_id`), so recurrence is visible. The engine **never reopens** a closed
+   alert: that is the analyst's decision.
+4. "One open alert per key" is a database guarantee: a partial unique index
+   `alerts(dedup_key) WHERE status IN ('NEW','TRIAGED','IN_PROGRESS')` (tested).
 
-### Alert record
+The Phase 1 design's per-rule `dedup_window` was dropped: with one open alert per key it had
+no remaining job (ADR-0011).
 
-`id, rule_id, rule_version, title, severity, confidence, status, priority_score,
-priority_band, priority_breakdown, dedup_key, group_values, source_ip, destination_ip, host,
-username, target_username, asset_id, identity_id, first_event_at, last_event_at, event_count,
-occurrence_count, explanation (what / why / facts), investigation_steps, response_steps,
-mitre (snapshot of technique ID, name, tactics, reason), created_at, updated_at, triaged_at,
-resolved_at, resolved_by, disposition, resolution_note, previous_alert_id, simulated`.
+Evidence: a detection lists its first 50 and last 50 events; an alert links up to 1,000
+distinct events. `event_count` is the number linked; `evidence_truncated` says when more
+matched than are linked (the count is then a lower bound, and the UI says so).
 
-Title, explanation and guidance are **snapshotted** at creation, so later rule edits do not
-rewrite history. The alert records the `rule_version` it came from.
+### Alert record (`alerts`, `alert_events`)
 
-### Workflow
+The brief's fields (§8) and where they are: `alert_id` = `id`, `rule_id`, `title` (rule name,
+indicator and grouped values), `description` (what the rule looks for), `severity`,
+`confidence`, `status`, `created_at`, `updated_at`, `source_ip`, `destination_ip`, `host`,
+`username`, `event_count`, evidence = `alert_events` (and `GET /api/alerts/{id}/events`, with
+raw records), `detection_reason` = `explanation` + `facts`, `mitre_techniques` = `mitre`
+(snapshot: ID, name, tactics, reason, ATT&CK version), `recommended_actions` = `response`
+(plus `investigation`). Also: priority score, band, breakdown and model version; the asset
+and identity from the inventory; first/last event time; `peak_count`; `detection_count` and
+`history` (each merged detection); `previous_alert_id`; `simulated`; triage and resolution
+times and actors; `disposition`; `status_note`.
 
-```
-NEW → TRIAGED → IN_PROGRESS → RESOLVED (disposition: confirmed_malicious | benign_expected)
-  └──────┴──────────┴──────→ FALSE_POSITIVE (reason required)
-RESOLVED / FALSE_POSITIVE → TRIAGED   (reopen; reason required)
-```
+### Workflow (`app/alerts/workflow.py`)
 
-- Only ANALYST or ADMIN can change status. Every change is audited with old status → new
-  status, and the actor and timestamp are stored.
-- These fields feed per-rule false-positive counts and time-to-resolve (Phase 11/12).
+| From | Allowed to |
+|---|---|
+| NEW | TRIAGED, IN_PROGRESS, FALSE_POSITIVE |
+| TRIAGED | IN_PROGRESS, RESOLVED, FALSE_POSITIVE |
+| IN_PROGRESS | TRIAGED (put back), RESOLVED, FALSE_POSITIVE |
+| RESOLVED, FALSE_POSITIVE | TRIAGED (reopen) |
+
+- RESOLVED needs a disposition: `confirmed_malicious` or `benign_expected` (brief §45:
+  confirmed / resolved). FALSE_POSITIVE and reopening need a reason. NEW cannot go straight
+  to RESOLVED: closing an alert as handled means someone looked at it first.
+- A change the workflow does not allow is `409`; a missing disposition or reason is `400`.
+  Reopening is refused (`409`, naming the newer alert) when newer activity already has its
+  own open alert.
+- Only ANALYST or ADMIN can change status (VIEWER: `403`). Every change is audited
+  (`ALERT_STATUS_CHANGED`: from, to, disposition, reason, actor, client IP) in the same
+  transaction, and the alert keeps `triaged_at` (first time), `resolved_at`, `resolved_by`,
+  `status_changed_at/by` and the latest note. The alert page's status history is read from
+  the audit log, the one record of who did what.
+- The alert row is locked (`SELECT … FOR UPDATE`) during a change, and the engine locks an open
+  alert before extending it, so an analyst closing an alert and a run extending it cannot
+  interleave; two runs are serialized by the detection advisory lock. Tested with real
+  concurrent transactions (`tests/integration/test_alert_concurrency.py`, in a throwaway
+  database): a run blocked on an alert the analyst closes opens a new alert instead of
+  extending the closed one; an analyst blocked on a run's extension keeps it; two batches of
+  the same activity at once make one alert. Removing either lock makes a test fail.
+- These fields feed per-rule false-positive counts and time-to-resolve (shown in Phase 11).
 - There is no machine-learning feedback: false-positive rates are shown to people who tune
   rules. They do not tune anything automatically.
 

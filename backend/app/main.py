@@ -46,6 +46,7 @@ OPENAPI_TAGS = [
     {"name": "events", "description": "Normalized events, with the raw record each came from."},
     {"name": "detections", "description": "Detection rules (read; ADMIN tunes) and runs."},
     {"name": "mitre", "description": "ATT&CK techniques SentinelX's rules map to."},
+    {"name": "alerts", "description": "Alert queue, investigation data, status changes."},
 ]
 
 

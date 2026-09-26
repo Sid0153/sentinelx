@@ -110,6 +110,28 @@ def main(base: str, email: str, password: str) -> None:
     status, runs = client.call("GET", "/api/detections/runs?trigger=manual")
     check(status == 200 and runs["items"][0]["id"] == run["id"], "the run is listed")
 
+    # Alerts (Phase 7): a brute force on a host of its own, so reruns never share an alert.
+    host = f"smoke-{uuid.uuid4().hex[:8]}"
+    attack = [
+        f"{(now - timedelta(seconds=60 - i * 5)).isoformat()} {host} sshd[{2000 + i}]: "
+        f"Failed password for root from 203.0.113.77 port {51000 + i} ssh2"
+        for i in range(6)
+    ]
+    status, batch = client.call("POST", path, "\n".join(attack).encode(), "text/plain")
+    check(status == 201 and batch["alerts_created"] == 1, "a brute force creates one alert")
+    status, alerts = client.call("GET", f"/api/alerts?host={host}")
+    check(status == 200 and alerts["total"] == 1, "the alert is in the queue")
+    alert = alerts["items"][0]
+    check(alert["rule_id"] == "AUTH-001" and alert["event_count"] == 6, "with its evidence")
+    status, again = client.call("POST", path, "\n".join(attack).encode(), "text/plain")
+    status, alerts = client.call("GET", f"/api/alerts?host={host}")
+    check(alerts["total"] == 1, "resending the same records creates no second alert")
+    status, moved = client.json(
+        "POST", f"/api/alerts/{alert['id']}/transition", {"status": "TRIAGED"}
+    )
+    check(status == 200 and moved["status"] == "TRIAGED", "an alert can be triaged")
+    check(moved["activity"][-1]["to_status"] == "TRIAGED", "and the change is recorded")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:

@@ -60,16 +60,24 @@ def test_query_shape_can_use_its_index(db_session: Session, query: str, index: s
     """The index fits the query: the planner can use it for the whole condition.
 
     On an empty table every plan costs about the same, so the planner may pick a sequential
-    scan, or the generic time index plus a filter. Both alternatives are taken away (inside
-    this test's transaction, which is rolled back): sequential scans are disabled and the
-    time index is dropped unless it is the one under test. The plan must then use `index`,
-    with the time range inside its index condition rather than as a separate filter. This
-    proves fit, not choice at every table size; Phase 14 checks real plans with EXPLAIN
-    ANALYZE on generated data.
+    scan, or any other index scanned in full with the time range as a filter (it did pick
+    ix_events_username_ts for a category query once). The alternatives are taken away inside
+    this test's transaction, which is rolled back: sequential scans are disabled and every
+    other index on the table is dropped. The plan must then use `index`, with the time range
+    inside its index condition rather than as a separate filter. This proves fit, not choice
+    at every table size; Phase 14 checks real plans with EXPLAIN ANALYZE on generated data.
     """
     db_session.execute(text("SET LOCAL enable_seqscan = off"))
-    if index != "ix_events_timestamp_id":
-        db_session.execute(text("DROP INDEX ix_events_timestamp_id"))
+    table = query.split(" FROM ", 1)[1].split()[0]
+    others = db_session.scalars(
+        text(
+            "SELECT indexname FROM pg_indexes WHERE tablename = :table AND indexname != :index "
+            "AND indexname NOT IN (SELECT conname FROM pg_constraint)"
+        ),
+        {"table": table, "index": index},
+    ).all()
+    for other in others:
+        db_session.execute(text(f'DROP INDEX "{other}"'))
     plan = "\n".join(row[0] for row in db_session.execute(text(f"EXPLAIN {query}")))
     assert index in plan, plan
     if "BETWEEN" in query:

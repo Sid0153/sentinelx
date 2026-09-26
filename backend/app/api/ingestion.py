@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
+from app.alerts.queries import alerts_citing
 from app.api.deps import DbSession, SettingsDep
 from app.auth.deps import AdminUser, AnalystUser, CurrentUser
 from app.core.errors import AppError
@@ -21,6 +22,7 @@ from app.ingestion.service import IngestRequest, ingest, reject
 from app.models.event import BatchChannel, IngestionBatch, ParseStatus, RawEvent
 from app.schemas.common import Page, error_responses
 from app.schemas.ingestion import (
+    AlertRef,
     BatchPublic,
     EventDetail,
     EventPage,
@@ -255,12 +257,17 @@ def list_events(
 
 @events.get("/{event_id}", response_model=EventDetail, responses=error_responses(404))
 def get_event(event_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> EventDetail:
-    """One event with the raw record it came from, as received."""
+    """One event with the raw record it came from, as received, and the alerts that cite
+    it as evidence."""
     event, raw, source = queries.get_event(db, event_id)
     return EventDetail.model_validate(
         {
             **EventPublic.model_validate(event).model_dump(),
             "raw": raw_record(raw),
             "source_name": source.name,
+            "alerts": [
+                AlertRef(id=a.id, title=a.title, status=a.status, priority_band=a.priority_band)
+                for a in alerts_citing(db, event.id)
+            ],
         }
     )

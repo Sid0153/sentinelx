@@ -134,5 +134,8 @@ class DetectionRun(Base):
     rule_results: Mapped[dict[str, Any]] = mapped_column(JSONB)
     detections: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     detection_count: Mapped[int]
+    # What the detections did to alerts (Phase 7): new alerts, and open alerts they extended.
+    alerts_created: Mapped[int] = mapped_column(default=0, server_default="0")
+    alerts_updated: Mapped[int] = mapped_column(default=0, server_default="0")
     duration_ms: Mapped[int]
     started_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))

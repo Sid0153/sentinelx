@@ -25,10 +25,12 @@ from typing import Any
 from sqlalchemy import ColumnElement, func, or_, select, true
 from sqlalchemy.orm import Session
 
+from app.alerts import service as alerts
 from app.detection.evaluate import evaluate
 from app.detection.evaluators.common import group_key
 from app.detection.events import DetectionEvent
 from app.detection.explain import build
+from app.detection.library import get_library
 from app.detection.model import Detection, Rule
 from app.detection.storage import enabled_rules
 from app.models.detection import DetectionRule, DetectionRun, RunStatus, RunTrigger
@@ -147,7 +149,17 @@ def run(
         results[rule.id] = outcome
 
     failed = [rule_id for rule_id, r in results.items() if r["error"]]
+    run_id = uuid.uuid4()
+    # Alerts are created or extended in the same transaction as the run that found them.
+    outcomes = alerts.apply(db, detections, run_id, get_library(), started_at)
+    serialized = [
+        {**_serialize(d), "alert_id": str(o.alert_id) if o.alert_id else None, "alert": o.action}
+        for d, o in zip(detections, outcomes, strict=True)
+    ]
+    created = sum(o.action == "created" for o in outcomes)
+    updated = sum(o.action == "updated" for o in outcomes)
     detection_run = DetectionRun(
+        id=run_id,
         trigger=trigger,
         batch_id=batch.id if batch else None,
         requested_by=requested_by.id if requested_by else None,
@@ -155,8 +167,10 @@ def run(
         range_end=end,
         status=RunStatus.COMPLETED_WITH_ERRORS if failed else RunStatus.COMPLETED,
         rule_results=results,
-        detections=[_serialize(d) for d in detections],
+        detections=serialized,
         detection_count=len(detections),
+        alerts_created=created,
+        alerts_updated=updated,
         duration_ms=round((time.perf_counter() - started) * 1000),
         started_at=started_at,
     )
@@ -165,6 +179,8 @@ def run(
     if batch is not None:  # the batch's state changes in the same transaction as its run
         batch.status = BatchStatus.PROCESSED_WITH_ERRORS if failed else BatchStatus.PROCESSED
         batch.detection_count = len(detections)
+        batch.alerts_created = created
+        batch.alerts_updated = updated
     db.commit()
     logger.info(
         "detection.run_completed",
@@ -174,6 +190,8 @@ def run(
                 "trigger": str(trigger),
                 "rules": len(results),
                 "detections": len(detections),
+                "alerts_created": created,
+                "alerts_updated": updated,
                 "failed_rules": failed,
                 "duration_ms": detection_run.duration_ms,
             }
@@ -206,6 +224,7 @@ def run_for_batch(db: Session, batch: IngestionBatch) -> DetectionRun | None:
     if batch.first_event_at is None or batch.last_event_at is None:
         batch.status = BatchStatus.PROCESSED
         batch.detection_count = 0
+        batch.alerts_created = batch.alerts_updated = 0
         db.commit()
         return None
     batch_id = batch.id

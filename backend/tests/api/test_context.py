@@ -55,7 +55,11 @@ def test_asset_creation_is_audited(
     asset = create(db_client, admin, "/api/assets", WEB)
     (entry,) = audit_entries(db_session, "ASSET_CREATED")
     assert entry.entity_type == "ASSET" and entry.entity_id == asset["id"]
-    assert entry.details == {"hostname": "web-01.corp.example", "criticality": "critical"}
+    assert entry.details == {
+        "hostname": "web-01.corp.example",
+        "criticality": "critical",
+        "open_alerts_reprioritized": 0,
+    }
 
 
 def test_duplicate_hostname_is_a_conflict(db_client: TestClient, admin: dict[str, str]) -> None:
@@ -213,7 +217,11 @@ def test_identity_lifecycle_is_audited(
     assert response.status_code == 200
     (created,) = audit_entries(db_session, "IDENTITY_CREATED")
     (updated,) = audit_entries(db_session, "IDENTITY_UPDATED")
-    assert created.details == {"username": "alice", "privilege_level": "privileged"}
+    assert created.details == {
+        "username": "alice",
+        "privilege_level": "privileged",
+        "open_alerts_reprioritized": 0,
+    }
     assert updated.details["changes"]["privilege_level"] == {"from": "privileged", "to": "standard"}
     assert updated.details["changes"]["title"] == {"from": "DBA", "to": None}
 

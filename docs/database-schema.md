@@ -1,6 +1,6 @@
 # Database design
 
-> Status: tables marked ✅ exist (migrations 0001–0005) and are tested; the rest are design and
+> Status: tables marked ✅ exist (migrations 0001–0006) and are tested; the rest are design and
 > are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
 > unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
 > models with the migrated database and fails on any difference.
@@ -41,16 +41,16 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `assets` ✅ | 4 | hostname (unique; check: lowercase), ip_addresses inet[] (GIN), asset_type, environment, criticality (low/medium/high/critical), owner, description, tags, status (active/retired), created_at, updated_at |
 | `identities` ✅ | 4 | username (unique; check: lowercase), display_name, department, title, privilege_level (standard/privileged/service), status (active/disabled), tags, created_at, updated_at |
 | `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled. `ingest_key_hash` arrives in Phase 13 |
-| `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (check: STORED → PROCESSED / PROCESSED_WITH_ERRORS / DETECTION_FAILED), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), detection_count (Phase 6), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: detection moves it through its states |
+| `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (check: STORED → PROCESSED / PROCESSED_WITH_ERRORS / DETECTION_FAILED), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), detection_count (Phase 6), alerts_created / alerts_updated (Phase 7), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: detection moves it through its states |
 | `raw_events` ✅ | 4, 5 | source_id (FK), batch_id (FK, Phase 5), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED / SKIPPED / FAILED; check: parse_detail present ⇔ not PARSED), parse_detail (short reason code; `parse_error` until migration 0004), simulated. **Append-only** |
 | `events` ✅ | 4 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id (unique FK), source_id (FK), asset_id / identity_id (FK, restrict). Checks: category, outcome, action format, port ranges, lowercase host/user, IP scope, criticality, sizes. **Append-only** |
 | `detection_rules` ✅ | 6 | rule_id (PK text, e.g. AUTH-001), name, category, kind, library_definition JSONB, library_hash, overrides JSONB (admin changes to tunable fields only), version, enabled, in_library (false once removed from the shipped library: kept, never run), last_run_at, last_match_at, match_count, error_count, created_at, updated_at |
 | `detection_rule_versions` ✅ | 6 | rule_id (FK), version, definition JSONB (the full effective definition), overrides, library_hash, source (check: library/admin), changed_by (FK users), change_reason, created_at; unique (rule_id, version). **Append-only** |
 | `mitre_techniques` ✅ | 6 | technique_id (PK), name, tactics text[], attack_version. Loaded from the checked-in, pinned reference file; the page URL is derived from the ID |
 | `detection_rule_techniques` ✅ | 6 | PK (rule_id, technique_id, indicator); indicator is `""` for the rule as a whole, or an indicator ID (PROC-001, PRIV-001); reason |
-| `detection_runs` ✅ | 6 | trigger (check: batch/manual), batch_id (FK), requested_by (FK users), range_start ≤ range_end (check), status (check: COMPLETED / COMPLETED_WITH_ERRORS), rule_results JSONB (per rule: version, candidates, detections, error code, ms), detections JSONB (each with explanation, facts, evidence IDs, ATT&CK), detection_count, duration_ms, started_at (indexed). Phase 7 turns detections into alerts |
-| `alerts` | 7 | see [detection-engine.md](detection-engine.md#alert-record); unique partial index on dedup_key WHERE status is active |
-| `alert_events` | 7 | alert_id, event_id, PK (alert_id, event_id), role (e.g. `step:failure`, `step:success`) |
+| `detection_runs` ✅ | 6 | trigger (check: batch/manual), batch_id (FK), requested_by (FK users), range_start ≤ range_end (check), status (check: COMPLETED / COMPLETED_WITH_ERRORS), rule_results JSONB (per rule: version, candidates, detections, error code, ms), detections JSONB (each with explanation, facts, evidence IDs, ATT&CK), detection_count, alerts_created / alerts_updated (Phase 7; each stored detection also names its alert and whether it was created, updated or unchanged), duration_ms, started_at (indexed) |
+| `alerts` ✅ | 7 | see [detection-engine.md](detection-engine.md#alert-record-alerts-alert_events). Checks: status, severity, confidence, band, disposition values; disposition present exactly when RESOLVED; score 0–100; event_count ≥ 1; first ≤ last event. **Partial unique index on dedup_key WHERE status is open** (one open alert per activity, tested). FKs to rules, assets, identities, users, previous alert, all without cascade |
+| `alert_events` ✅ | 7 | alert_id, event_id (both FK, no cascade: an alert holds its evidence in place), linked_at; PK (alert_id, event_id), so evidence cannot be linked twice; index on event_id (alerts citing an event) |
 | `incidents` | 8 | see [correlation.md](correlation.md#incident-record) |
 | `incident_alerts` | 8 | incident_id, alert_id (**unique**: an alert belongs to at most one incident), link_strength, shared_entities JSONB, reason, link_source (engine/analyst), linked_by, linked_at |
 | `incident_notes` | 8 | incident_id, author_id, body (≤ 10 KB), created_at. Append-only |
@@ -96,8 +96,11 @@ Phase 5.
 | ✅ `raw_events (fingerprint)` unique | Duplicate detection |
 | ✅ `assets USING gin (ip_addresses)` | Enrichment: which asset owns this IP |
 | ✅ `audit_logs (occurred_at)`, `(entity_type, entity_id)`, `(action)`, `(actor_id)` | Audit views, incident history |
-| `alerts (status, priority_score DESC)` | Alert queue |
-| `alerts (rule_id, created_at)` | Rule metrics, coverage |
+| ✅ `alerts (status, priority_score DESC)` | Alert queue |
+| ✅ `alerts (rule_id, created_at)` | Rule metrics, coverage |
+| ✅ `alerts (last_event_at)`, `(host)`, `(username)`, `(source_ip)`, `(asset_id)`, `(identity_id)` | Queue by recent activity, filters, related alerts |
+| ✅ `alerts (dedup_key) WHERE status IN (open)` unique | Deduplication |
+| ✅ `alert_events (event_id)` | Alerts citing an event |
 | `alerts (created_at)` | Trends |
 | `incidents (status, last_activity_at)` | Correlation candidates, queue |
 

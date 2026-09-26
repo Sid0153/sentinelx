@@ -71,6 +71,8 @@ class RunSummary(BaseModel):
     range_end: datetime
     status: RunStatus
     detection_count: int
+    alerts_created: int
+    alerts_updated: int
     duration_ms: int
     started_at: datetime
 

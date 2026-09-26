@@ -19,6 +19,7 @@ its rules always apply:
 | 4 Assets, identities, event model | Done, green in CI (311 backend tests, 97.8% coverage; 39 frontend tests; migration 0003 applied on the Compose stack) |
 | 5 Ingestion and parsing | Done, green in CI (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts in the Compose job) |
 | 6 Detection engine | Done, green in CI (9 rules; 735 backend tests, 98% coverage; 39 frontend tests; every scenario triggers exactly its rules on the live stack; detection checked in the Compose smoke test) |
+| 7 Alerts | Done locally (857 backend tests incl. real-concurrency tests, 98% coverage; 47 frontend tests; alerts created, deduplicated and triaged on the live stack; alert pages checked at desktop and phone widths). Not yet pushed |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -133,5 +134,17 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
   Compare text with `fold()` (ASCII only), never `casefold()`/`lower()`; a column may skip
   folding in SQL only if listed in `LOWERCASE_COLUMNS`. `test_condition_sql.py` must stay
   green: add awkward values there when adding an operator or field.
+- Alerts (`app/alerts/`): `service.py` is the only writer of alerts and runs inside the
+  detection run's transaction. Dedup rules are in ADR-0011: evidence already linked to an
+  alert with the key means "unchanged"; one open alert per key is a partial unique index.
+  Status changes go through `workflow.check()` and are audited; the alert page's history
+  comes from the audit log. Priority is `app/risk/priority.py`: changing a weight means
+  bumping `RISK_MODEL_VERSION` and recording the new fingerprint in `tests/unit/test_priority.py`.
+  Inventory changes that can affect priority must call `alerts.reprioritize_for_asset/identity`
+  before their commit.
+- Tests that need real concurrent transactions use a throwaway database (see
+  `tests/integration/test_alert_concurrency.py`); never commit into the shared test database.
+- Frontend layout: grid and flex children holding tables or long text need `min-w-0`, or the
+  page scrolls sideways on phones (found live in Phase 7).
 - Doc edits: check that they applied. A chained command that fails before a doc edit leaves the
   docs stale without an error (this happened in Phase 3).

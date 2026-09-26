@@ -2515,7 +2515,7 @@
           "events"
         ],
         "summary": "Get Event",
-        "description": "One event with the raw record it came from, as received.",
+        "description": "One event with the raw record it came from, as received, and the alerts that cite\nit as evidence.",
         "operationId": "get_event_api_events__event_id__get",
         "security": [
           {
@@ -3209,10 +3209,1292 @@
           }
         ]
       }
+    },
+    "/api/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Alerts",
+        "description": "The alert queue. Default order: priority score, then most recent activity. Filters:\n`status`, `severity` and `band` (each repeatable), rule, host, user, source address, and\n`since` / `until` on the alert's event times.",
+        "operationId": "list_alerts_api_alerts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AlertStatus"
+              },
+              "maxItems": 5,
+              "default": [],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "default": [],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "band",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "default": [],
+              "title": "Band"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3,5}-\\d{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "source_ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 45
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Ip"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "priority",
+                "recent"
+              ],
+              "type": "string",
+              "default": "priority",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AlertSummary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/{alert_id}": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get Alert",
+        "description": "Everything to investigate one alert: what and why (explanation, facts), the priority\nbreakdown, entities and their inventory context, ATT&CK, next steps, the detections it\nmerges, status history, related alerts, and the status changes allowed now.",
+        "operationId": "get_alert_api_alerts__alert_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/{alert_id}/events": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List Evidence",
+        "description": "The events the alert rests on, in time order: normalized, with the raw record each\ncame from (as text, at most 4,096 characters).",
+        "operationId": "list_evidence_api_alerts__alert_id__events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EvidenceEvent_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/{alert_id}/transition": {
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Transition Alert",
+        "description": "Change the status. RESOLVED needs a `disposition`; FALSE_POSITIVE and reopening need\na `reason`. Changes the workflow does not allow are 409 (the alert's\n`allowed_transitions` lists what is possible now); a missing disposition or reason is 400.\nAudited as ALERT_STATUS_CHANGED.",
+        "operationId": "transition_alert_api_alerts__alert_id__transition_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alert_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Alert Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AlertActivity": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "from_status": {
+            "type": "string",
+            "title": "From Status"
+          },
+          "to_status": {
+            "type": "string",
+            "title": "To Status"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disposition"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "actor",
+          "from_status",
+          "to_status",
+          "disposition",
+          "reason"
+        ],
+        "title": "AlertActivity",
+        "description": "A status change, from the audit log."
+      },
+      "AlertDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Disposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority_score": {
+            "type": "integer",
+            "title": "Priority Score"
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "source_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip"
+          },
+          "destination_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ip"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "evidence_truncated": {
+            "type": "boolean",
+            "title": "Evidence Truncated"
+          },
+          "detection_count": {
+            "type": "integer",
+            "title": "Detection Count"
+          },
+          "first_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Event At"
+          },
+          "last_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Event At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated"
+          },
+          "rule_version": {
+            "type": "integer",
+            "title": "Rule Version"
+          },
+          "indicator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "target_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Username"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "asset_hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Hostname"
+          },
+          "identity_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Id"
+          },
+          "identity_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Username"
+          },
+          "priority_breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/PriorityFactor"
+            },
+            "type": "array",
+            "title": "Priority Breakdown"
+          },
+          "risk_model_version": {
+            "type": "string",
+            "title": "Risk Model Version"
+          },
+          "group_values": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Group Values"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "facts": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Facts"
+          },
+          "entities": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Entities"
+          },
+          "investigation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Investigation"
+          },
+          "response": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Response"
+          },
+          "mitre": {
+            "items": {
+              "$ref": "#/components/schemas/AlertTechnique"
+            },
+            "type": "array",
+            "title": "Mitre"
+          },
+          "history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "peak_count": {
+            "type": "integer",
+            "title": "Peak Count"
+          },
+          "previous_alert_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Alert Id"
+          },
+          "triaged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triaged At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved By"
+          },
+          "status_changed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed At"
+          },
+          "status_changed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Changed By"
+          },
+          "status_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Note"
+          },
+          "allowed_transitions": {
+            "items": {
+              "$ref": "#/components/schemas/AlertStatus"
+            },
+            "type": "array",
+            "title": "Allowed Transitions"
+          },
+          "activity": {
+            "items": {
+              "$ref": "#/components/schemas/AlertActivity"
+            },
+            "type": "array",
+            "title": "Activity"
+          },
+          "related": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedAlert"
+            },
+            "type": "array",
+            "title": "Related"
+          },
+          "incident_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_id",
+          "title",
+          "severity",
+          "confidence",
+          "status",
+          "disposition",
+          "priority_score",
+          "priority_band",
+          "host",
+          "username",
+          "source_ip",
+          "destination_ip",
+          "event_count",
+          "evidence_truncated",
+          "detection_count",
+          "first_event_at",
+          "last_event_at",
+          "created_at",
+          "updated_at",
+          "simulated",
+          "rule_version",
+          "indicator",
+          "kind",
+          "category",
+          "description",
+          "target_username",
+          "asset_id",
+          "asset_hostname",
+          "identity_id",
+          "identity_username",
+          "priority_breakdown",
+          "risk_model_version",
+          "group_values",
+          "explanation",
+          "facts",
+          "entities",
+          "investigation",
+          "response",
+          "mitre",
+          "history",
+          "peak_count",
+          "previous_alert_id",
+          "triaged_at",
+          "resolved_at",
+          "resolved_by",
+          "status_changed_at",
+          "status_changed_by",
+          "status_note",
+          "allowed_transitions",
+          "activity",
+          "related"
+        ],
+        "title": "AlertDetail"
+      },
+      "AlertRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority_band"
+        ],
+        "title": "AlertRef"
+      },
+      "AlertStatus": {
+        "type": "string",
+        "enum": [
+          "NEW",
+          "TRIAGED",
+          "IN_PROGRESS",
+          "RESOLVED",
+          "FALSE_POSITIVE"
+        ],
+        "title": "AlertStatus"
+      },
+      "AlertSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Disposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority_score": {
+            "type": "integer",
+            "title": "Priority Score"
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "source_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip"
+          },
+          "destination_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ip"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "evidence_truncated": {
+            "type": "boolean",
+            "title": "Evidence Truncated"
+          },
+          "detection_count": {
+            "type": "integer",
+            "title": "Detection Count"
+          },
+          "first_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Event At"
+          },
+          "last_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Event At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_id",
+          "title",
+          "severity",
+          "confidence",
+          "status",
+          "disposition",
+          "priority_score",
+          "priority_band",
+          "host",
+          "username",
+          "source_ip",
+          "destination_ip",
+          "event_count",
+          "evidence_truncated",
+          "detection_count",
+          "first_event_at",
+          "last_event_at",
+          "created_at",
+          "updated_at",
+          "simulated"
+        ],
+        "title": "AlertSummary",
+        "description": "One row of the alert queue."
+      },
+      "AlertTechnique": {
+        "properties": {
+          "technique": {
+            "type": "string",
+            "title": "Technique"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "attack_version": {
+            "type": "string",
+            "title": "Attack Version"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "technique",
+          "name",
+          "tactics",
+          "reason",
+          "attack_version",
+          "url"
+        ],
+        "title": "AlertTechnique"
+      },
       "AssetCreate": {
         "properties": {
           "hostname": {
@@ -3515,7 +4797,8 @@
           "RULE_LIBRARY_UPDATED",
           "RULE_RETIRED",
           "RULE_UPDATED",
-          "DETECTION_RUN_REQUESTED"
+          "DETECTION_RUN_REQUESTED",
+          "ALERT_STATUS_CHANGED"
         ],
         "title": "AuditAction"
       },
@@ -3725,8 +5008,37 @@
             "title": "Rejected Count"
           },
           "detection_count": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Detection Count"
+          },
+          "alerts_created": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alerts Created"
+          },
+          "alerts_updated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alerts Updated"
           },
           "issues": {
             "items": {
@@ -3783,6 +5095,8 @@
           "duplicate_count",
           "rejected_count",
           "detection_count",
+          "alerts_created",
+          "alerts_updated",
           "issues",
           "first_event_at",
           "last_event_at",
@@ -3841,6 +5155,15 @@
         ],
         "title": "Criticality"
       },
+      "Disposition": {
+        "type": "string",
+        "enum": [
+          "confirmed_malicious",
+          "benign_expected"
+        ],
+        "title": "Disposition",
+        "description": "Why a RESOLVED alert was closed (brief \u00a745: confirmed / resolved)."
+      },
       "EntityType": {
         "type": "string",
         "enum": [
@@ -3850,7 +5173,8 @@
           "IDENTITY",
           "LOG_SOURCE",
           "DETECTION_RULE",
-          "DETECTION_RUN"
+          "DETECTION_RUN",
+          "ALERT"
         ],
         "title": "EntityType"
       },
@@ -4257,6 +5581,13 @@
           "source_name": {
             "type": "string",
             "title": "Source Name"
+          },
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertRef"
+            },
+            "type": "array",
+            "title": "Alerts"
           }
         },
         "type": "object",
@@ -4294,7 +5625,8 @@
           "identity_privileged",
           "simulated",
           "raw",
-          "source_name"
+          "source_name",
+          "alerts"
         ],
         "title": "EventDetail"
       },
@@ -4663,6 +5995,338 @@
         ],
         "title": "EventPublic"
       },
+      "EvidenceEvent": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "raw_event_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Raw Event Id"
+          },
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "ingested_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ingested At"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "host_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Ip"
+          },
+          "event_category": {
+            "type": "string",
+            "title": "Event Category"
+          },
+          "event_action": {
+            "type": "string",
+            "title": "Event Action"
+          },
+          "event_outcome": {
+            "type": "string",
+            "title": "Event Outcome"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "user_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Domain"
+          },
+          "target_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Username"
+          },
+          "source_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip"
+          },
+          "source_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Port"
+          },
+          "destination_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Ip"
+          },
+          "destination_port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Port"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "process_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Name"
+          },
+          "parent_process_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Process Name"
+          },
+          "command_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Line"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes"
+          },
+          "source_ip_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip Scope"
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "asset_criticality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Criticality"
+          },
+          "identity_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Id"
+          },
+          "identity_privileged": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Privileged"
+          },
+          "simulated": {
+            "type": "boolean",
+            "title": "Simulated"
+          },
+          "raw_text": {
+            "type": "string",
+            "title": "Raw Text"
+          },
+          "raw_truncated": {
+            "type": "boolean",
+            "title": "Raw Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "raw_event_id",
+          "source_id",
+          "source_type",
+          "timestamp",
+          "ingested_at",
+          "host",
+          "host_ip",
+          "event_category",
+          "event_action",
+          "event_outcome",
+          "username",
+          "user_domain",
+          "target_username",
+          "source_ip",
+          "source_port",
+          "destination_ip",
+          "destination_port",
+          "protocol",
+          "service",
+          "process_name",
+          "parent_process_name",
+          "command_line",
+          "session_id",
+          "message",
+          "attributes",
+          "source_ip_scope",
+          "asset_id",
+          "asset_criticality",
+          "identity_id",
+          "identity_privileged",
+          "simulated",
+          "raw_text",
+          "raw_truncated"
+        ],
+        "title": "EvidenceEvent"
+      },
       "Exclusion": {
         "properties": {
           "field": {
@@ -4989,6 +6653,37 @@
         ],
         "title": "LoginRequest"
       },
+      "Page_AlertSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[AlertSummary]"
+      },
       "Page_AssetPublic_": {
         "properties": {
           "items": {
@@ -5081,6 +6776,37 @@
           "offset"
         ],
         "title": "Page[BatchPublic]"
+      },
+      "Page_EvidenceEvent_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[EvidenceEvent]"
       },
       "Page_IdentityPublic_": {
         "properties": {
@@ -5246,6 +6972,29 @@
         ],
         "title": "ParseStatus"
       },
+      "PriorityFactor": {
+        "properties": {
+          "factor": {
+            "type": "string",
+            "title": "Factor"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "factor",
+          "value",
+          "points"
+        ],
+        "title": "PriorityFactor"
+      },
       "PrivilegeLevel": {
         "type": "string",
         "enum": [
@@ -5365,6 +7114,58 @@
           "checks"
         ],
         "title": "ReadinessResponse"
+      },
+      "RelatedAlert": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "priority_score": {
+            "type": "integer",
+            "title": "Priority Score"
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band"
+          },
+          "last_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Event At"
+          },
+          "shared": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Shared"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_id",
+          "title",
+          "status",
+          "priority_score",
+          "priority_band",
+          "last_event_at",
+          "shared"
+        ],
+        "title": "RelatedAlert"
       },
       "Role": {
         "type": "string",
@@ -5799,6 +7600,14 @@
             "type": "integer",
             "title": "Detection Count"
           },
+          "alerts_created": {
+            "type": "integer",
+            "title": "Alerts Created"
+          },
+          "alerts_updated": {
+            "type": "integer",
+            "title": "Alerts Updated"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms"
@@ -5832,6 +7641,8 @@
           "range_end",
           "status",
           "detection_count",
+          "alerts_created",
+          "alerts_updated",
           "duration_ms",
           "started_at",
           "rule_results",
@@ -5919,6 +7730,14 @@
             "type": "integer",
             "title": "Detection Count"
           },
+          "alerts_created": {
+            "type": "integer",
+            "title": "Alerts Created"
+          },
+          "alerts_updated": {
+            "type": "integer",
+            "title": "Alerts Updated"
+          },
           "duration_ms": {
             "type": "integer",
             "title": "Duration Ms"
@@ -5939,6 +7758,8 @@
           "range_end",
           "status",
           "detection_count",
+          "alerts_created",
+          "alerts_updated",
           "duration_ms",
           "started_at"
         ],
@@ -6275,6 +8096,42 @@
         ],
         "title": "TokenResponse"
       },
+      "TransitionRequest": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/AlertStatus"
+          },
+          "disposition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Disposition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "TransitionRequest"
+      },
       "UserCreate": {
         "properties": {
           "email": {
@@ -6468,6 +8325,10 @@
     {
       "name": "mitre",
       "description": "ATT&CK techniques SentinelX's rules map to."
+    },
+    {
+      "name": "alerts",
+      "description": "Alert queue, investigation data, status changes."
     }
   ]
 }

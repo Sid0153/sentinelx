@@ -5,7 +5,7 @@ Updated at the end of every phase; a phase is not done until its rows here are t
 
 ✅ done and tested · ◐ partly done (what is missing is named) · ⬜ planned (phase)
 
-Last updated: **Phase 6**.
+Last updated: **Phase 7**.
 
 ## Primary product capabilities (brief §"Primary product capabilities")
 
@@ -19,15 +19,15 @@ Last updated: **Phase 6**.
 | 6 | Rule-based detection | 6 | ✅ declarative YAML rules, safe condition language (Python authoritative, SQL prefilter proven a superset) |
 | 7 | Temporal detection | 6 | ✅ threshold, distinct, sequence (with max gap) and new-value windows on event time |
 | 8 | Event correlation | 8 | ⬜ entity-overlap correlation of alerts |
-| 9 | Alert generation | 7 | ⬜ |
-| 10 | Alert deduplication | 7 | ⬜ dedup key, partial unique index |
-| 11 | Alert prioritization | 7 | ⬜ documented priority score |
+| 9 | Alert generation | 7 | ✅ from every detection, in the run's transaction |
+| 10 | Alert deduplication | 7 | ✅ dedup key, evidence-based idempotence, one open alert per key enforced by the database (ADR-0011) |
+| 11 | Alert prioritization | 7 | ✅ SentinelX priority score with stored breakdown and model version (`risk-model.md`) |
 | 12 | Incident creation | 8 | ⬜ |
 | 13 | Incident investigation | 8, 9 | ⬜ |
 | 14 | Timeline reconstruction | 8 | ⬜ from stored events and actions |
 | 15 | Threat hunting | 10 | ⬜ structured queries, templates, pivots, saved hunts |
-| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7), incidents (8), coverage view (11) |
-| 17 | Evidence management | 7, 8 | ⬜ alert evidence links, incident evidence pins |
+| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts with links (7 ✅), incidents (8), coverage view (11) |
+| 17 | Evidence management | 7, 8 | ◐ alert evidence links with raw records, event → alerts citing it ✅; incident evidence pins: Phase 8 |
 | 18 | Analyst notes | 8 | ⬜ append-only |
 | 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection; grouped per incident: Phase 8 |
 | 20 | Detection-rule management | 6, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI: Phase 9/12 |
@@ -35,8 +35,8 @@ Last updated: **Phase 6**.
 | 22 | Security analytics | 9, 11 | ⬜ dashboard aggregates, rule metrics |
 | 23 | Risk/context scoring | 7, 11 | ⬜ |
 | 24 | RBAC | 3 | ✅ ADMIN / ANALYST / VIEWER enforced by the API; route × role matrix test |
-| 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); ◐ alert/incident actions arrive with their phases |
-| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques done; alerts, incidents, hunt, coverage, dashboard in their phases |
+| 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); alert status changes (7); ◐ incident actions: Phase 8 |
+| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts done; incidents, hunt, coverage, dashboard in their phases |
 | 27 | SOC dashboard | 9 | ⬜ |
 | 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
@@ -52,21 +52,21 @@ Last updated: **Phase 6**.
 | A single-event, B threshold, C temporal, D sequence, E aggregation | 6 | ✅ `single`, `threshold`, time windows, `sequence`, `distinct` (count of distinct values per group); plus `new_value` |
 | F cross-event correlation | 8 | ⬜ |
 | AUTH-001, AUTH-002, AUTH-003, AUTH-004, PRIV-001, ACCT-001, PROC-001, NET-001 | 6 | ✅ each fires on its scenario, in memory, in PostgreSQL and live; AUTH-004 with stored history. Plus AUTH-005 (distributed brute force), added to close a documented gap |
-| Explainable alerts (what, why, which events, entities, confidence, severity, next steps) from real evidence | 6, 7 | ◐ every detection has them, computed from its evidence; alerts carrying them: Phase 7 |
+| Explainable alerts (what, why, which events, entities, confidence, severity, next steps) from real evidence | 6, 7 | ✅ every alert: what (explanation), why (description, facts), which events (evidence with raw records), entities, confidence, severity, next steps; all from its evidence |
 
 ## Alerts, incidents, risk (brief §8–§12, §16, §22, §45)
 
 | Item | Phase | Status |
 |---|---|---|
-| Alert fields and statuses NEW / TRIAGED / IN_PROGRESS / RESOLVED / FALSE_POSITIVE | 7 | ⬜ |
-| Deduplication strategy documented | 1, 7 | ◐ documented; built in Phase 7 |
-| Transparent prioritization | 7 | ⬜ (`risk-model.md`) |
+| Alert fields and statuses NEW / TRIAGED / IN_PROGRESS / RESOLVED / FALSE_POSITIVE | 7 | ✅ every brief field (mapping in `detection-engine.md`); workflow tested over all 25 status pairs |
+| Deduplication strategy documented | 1, 7 | ✅ `detection-engine.md`, ADR-0011 |
+| Transparent prioritization | 7 | ✅ (`risk-model.md`; breakdown shown on every alert) |
 | Incident fields and statuses OPEN / TRIAGED / INVESTIGATING / CONTAINED / RESOLVED / CLOSED | 8 | ⬜ |
 | Correlation on source IP, host, user, time window, sequence, detection relationships | 8 | ⬜ (`correlation.md`) |
 | Timeline from stored events and actions | 8 | ⬜ |
-| Explainable risk level and score | 7, 11 | ⬜ |
-| Defensive response recommendations, never automatic actions | 6, 8 | ⬜ |
-| False-positive handling (confirmed / false positive / resolved, counts, resolution times) | 7, 11, 12 | ⬜ |
+| Explainable risk level and score | 7, 11 | ◐ alert priority ✅; incident risk: Phase 11 |
+| Defensive response recommendations, never automatic actions | 6, 8 | ◐ per alert ✅ (nothing is ever executed); per incident: Phase 8 |
+| False-positive handling (confirmed / false positive / resolved, counts, resolution times) | 7, 11, 12 | ◐ analyst actions tracked: disposition, false positive with reason, who and when, audit ✅; counts and resolution times shown: Phase 11. No machine-learning feedback (none claimed) |
 
 ## Context (brief §17–§18)
 
@@ -86,7 +86,7 @@ Last updated: **Phase 6**.
 | /events | 9 | ⬜ (API ready) |
 | /hunt | 10 | ⬜ |
 | /detections | 9, 11, 12 | ⬜ list, detail and enable/disable (9); coverage (11); versions and playground (12) |
-| /alerts, /alerts/:id | 7 | ⬜ |
+| /alerts, /alerts/:id | 7 | ✅ queue with filters; alert page with the brief's §20 content (incident association: Phase 8); checked on desktop and phone widths |
 | /incidents, /incidents/:id | 8, 9 | ⬜ |
 | /assets, /identities | 9 | ⬜ (API ready) |
 | /audit | 3 | ✅ |
@@ -101,7 +101,7 @@ Last updated: **Phase 6**.
 | /api/assets, /api/identities | ✅ (4) |
 | /api/events (+ /api/sources, /api/ingest) | ✅ (5) |
 | /api/detections, /api/mitre/techniques | ✅ (6); /api/mitre/coverage ⬜ (11) |
-| /api/alerts | ⬜ (7) |
+| /api/alerts | ✅ (7) |
 | /api/incidents | ⬜ (8) |
 | /api/dashboard | ⬜ (9) |
 | /api/hunt | ⬜ (10) |
@@ -121,7 +121,7 @@ incident trends, recent alerts and incidents.
 | User creation, role modification | 3 | ✅ (plus deactivate / reactivate) |
 | Configuration changes | 4, 5, 8 | ◐ assets, identities and log sources ✅; app settings (8) |
 | Rule modification | 6 | ✅ `RULE_UPDATED` with from/to values and reason; library add/update/retire; manual runs |
-| Alert status change | 7 | ⬜ |
+| Alert status change | 7 | ✅ `ALERT_STATUS_CHANGED` with from/to, disposition, reason |
 | Incident status change, assignment, note creation | 8 | ⬜ |
 
 ## Demo data system (brief §30)

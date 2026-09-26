@@ -87,17 +87,23 @@ def ip_scope(value: str | None, internal: tuple[Network, ...]) -> IpScope | None
     return IpScope.EXTERNAL
 
 
-def _asset_for(event: NormalizedEvent, snapshot: Snapshot) -> AssetRef | None:
-    if event.host:
-        if found := snapshot.assets_by_host.get(event.host):
+def asset_for(host: str | None, host_ip: str | None, snapshot: Snapshot) -> AssetRef | None:
+    """The inventory asset a host name or address belongs to (also used by alerts, so an
+    asset added after the events were stored is still found)."""
+    if host:
+        if found := snapshot.assets_by_host.get(host):
             return found
         # "web-01.corp.example" in a log, "web-01" in the inventory (or the other way round).
-        short = event.host.split(".", 1)[0]
+        short = host.split(".", 1)[0]
         if found := snapshot.assets_by_host.get(short) or snapshot.assets_by_short_name.get(short):
             return found
-    if event.host_ip:
-        return snapshot.assets_by_ip.get(event.host_ip)
+    if host_ip:
+        return snapshot.assets_by_ip.get(host_ip)
     return None
+
+
+def _asset_for(event: NormalizedEvent, snapshot: Snapshot) -> AssetRef | None:
+    return asset_for(event.host, event.host_ip, snapshot)
 
 
 def enrich(event: NormalizedEvent, snapshot: Snapshot) -> Enrichment:

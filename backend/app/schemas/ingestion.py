@@ -132,7 +132,9 @@ class BatchPublic(BaseModel):
     failed_count: int
     duplicate_count: int
     rejected_count: int
-    detection_count: int  # detections the batch's events took part in (Phase 6)
+    detection_count: int | None  # detections the batch's events took part in (Phase 6)
+    alerts_created: int | None  # new alerts, and open alerts extended (Phase 7)
+    alerts_updated: int | None
     issues: list[BatchIssue]
     first_event_at: datetime | None
     last_event_at: datetime | None
@@ -199,9 +201,17 @@ class EventPublic(BaseModel):
         return None if value is None else str(value)
 
 
+class AlertRef(BaseModel):
+    id: uuid.UUID
+    title: str
+    status: str
+    priority_band: str
+
+
 class EventDetail(EventPublic):
     raw: RawRecordPublic
     source_name: str
+    alerts: list[AlertRef]  # alerts citing this event as evidence
 
 
 class EventPage(BaseModel):

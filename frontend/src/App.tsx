@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { RequireAuth, RequireRole } from "./auth/guards";
 import { AppLayout } from "./layouts/AppLayout";
+import { AlertDetailPage } from "./pages/AlertDetailPage";
+import { AlertsPage } from "./pages/AlertsPage";
 import { AuditPage } from "./pages/AuditPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -17,6 +19,8 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/status" replace />} />
+          <Route path="alerts" element={<AlertsPage />} />
+          <Route path="alerts/:alertId" element={<AlertDetailPage />} />
           <Route path="status" element={<StatusPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route element={<RequireRole minimum="ADMIN" />}>

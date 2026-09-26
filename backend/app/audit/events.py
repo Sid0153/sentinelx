@@ -37,6 +37,8 @@ class AuditAction(enum.StrEnum):
     RULE_RETIRED = "RULE_RETIRED"
     RULE_UPDATED = "RULE_UPDATED"
     DETECTION_RUN_REQUESTED = "DETECTION_RUN_REQUESTED"
+    # Alerts (Phase 7)
+    ALERT_STATUS_CHANGED = "ALERT_STATUS_CHANGED"
 
 
 class AuditResult(enum.StrEnum):
@@ -53,3 +55,4 @@ class EntityType(enum.StrEnum):
     LOG_SOURCE = "LOG_SOURCE"
     DETECTION_RULE = "DETECTION_RULE"
     DETECTION_RUN = "DETECTION_RUN"
+    ALERT = "ALERT"
