@@ -37,6 +37,9 @@ _DESCRIPTIONS = {
     403: "Signed in, but the role does not allow this",
     404: "Not found",
     409: "Conflicts with existing data",
+    413: "Request body or record count over the limit",
+    415: "Unsupported content type",
+    422: "Request validation failed",
     429: "Too many requests; see Retry-After",
 }
 

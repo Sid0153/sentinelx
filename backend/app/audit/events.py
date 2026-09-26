@@ -26,6 +26,11 @@ class AuditAction(enum.StrEnum):
     ASSET_UPDATED = "ASSET_UPDATED"
     IDENTITY_CREATED = "IDENTITY_CREATED"
     IDENTITY_UPDATED = "IDENTITY_UPDATED"
+    # Ingestion: sources are configuration; refused requests are worth an admin's attention.
+    # Accepted batches are recorded in ingestion_batches (who, when, what), not here.
+    SOURCE_CREATED = "SOURCE_CREATED"
+    SOURCE_UPDATED = "SOURCE_UPDATED"
+    INGEST_REJECTED = "INGEST_REJECTED"
 
 
 class AuditResult(enum.StrEnum):
@@ -39,3 +44,4 @@ class EntityType(enum.StrEnum):
     ROUTE = "ROUTE"
     ASSET = "ASSET"
     IDENTITY = "IDENTITY"
+    LOG_SOURCE = "LOG_SOURCE"

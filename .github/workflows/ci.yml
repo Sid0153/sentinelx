@@ -144,6 +144,13 @@ jobs:
           echo "$admin_password" > /tmp/admin_password
           docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend             python -m app.cli create-admin --email admin@ci.example
           python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$admin_password"
+      - name: Ingestion works end to end (API through nginx, and a simulated scenario via CLI)
+        run: |
+          python3 scripts/ingest_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
+          docker compose exec -T backend python -m app.cli create-source --name ci-auth --type linux_auth
+          docker compose exec -T backend python -m app.cli demo-ingest --scenario brute_force --source ci-auth \
+            | tee /tmp/demo.txt
+          grep -q "parsed 12, skipped 12, failed 0" /tmp/demo.txt
       - name: A forged X-Forwarded-For does not escape the login rate limit
         run: |
           for path in 8081 8001; do  # through nginx, and straight to the backend port

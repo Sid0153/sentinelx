@@ -2,10 +2,11 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 4 (assets, identities, event model) complete.** Sign-in, three roles
-> enforced by the API, an append-only audit log, the asset and identity inventory (API), and
-> the append-only event store with its normalized schema exist and are tested. **Nothing
-> ingests or detects yet**: log parsing arrives in Phase 5, detection in Phase 6.
+> **Status: Phase 5 (ingestion and parsing) complete.** Sign-in and roles, the audit log,
+> the asset and identity inventory, and **ingestion**: five log formats parsed, normalized and
+> enriched into an append-only event store, with batch reports and an events API. **Nothing
+> detects yet**: detection arrives in Phase 6. The UI has no event or ingestion pages yet
+> (Phase 9); use the API or the CLI below.
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:
@@ -39,6 +40,14 @@ docker compose up -d --build --wait
 - App: http://localhost:8081 (sign in, then: system status, users, audit log, account)
 - API health: http://localhost:8081/api/health · readiness: http://localhost:8081/api/ready
 - API docs (development only): http://localhost:8001/api/docs
+- Ingest simulated activity (marked SIMULATED everywhere) or a real log file:
+
+  ```bash
+  docker compose exec backend python -m app.cli create-source --name web-01-auth --type linux_auth
+  docker compose exec backend python -m app.cli demo-scenarios
+  docker compose exec backend python -m app.cli demo-ingest --scenario brute_force_success       --source web-01-auth --host web-01 --user root --source-ip 203.0.113.45 --count 12
+  curl -X POST http://localhost:8081/api/ingest/<source-id> -H "Authorization: Bearer <token>"        -H "Content-Type: text/plain" --data-binary @auth.log
+  ```
 
 Every port is bound to 127.0.0.1. The host ports (5433, 8001, 8081) are chosen so the stack
 can run next to others that use the usual 5432, 8000 and 8080.
@@ -65,6 +74,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 
 | Document | Contents |
 |---|---|
+| [feature-coverage.md](docs/feature-coverage.md) | **Every feature of the brief, its phase and its status** |
 | [architecture.md](docs/architecture.md) | System shape, modules, pipeline, failure modes, frontend, observability, scale limits, extension plan |
 | [event-model.md](docs/event-model.md) | Normalized schema, supported sources, duplicates, enrichment |
 | [detection-engine.md](docs/detection-engine.md) | Rule format, evaluator kinds, the 8-rule library, alerts, dedup, workflow |

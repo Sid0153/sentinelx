@@ -86,8 +86,11 @@ ACTIONS: dict[EventCategory, frozenset[str]] = {
 }
 
 # RFC 1123 host labels, lowercase; single-label names ("web-01") and FQDNs are both valid.
+# Underscores are also accepted: Windows NetBIOS names ("WS_042") use them, and refusing a real
+# host's logs over a naming convention would lose evidence. Still no spaces, slashes or markup.
 _HOSTNAME = re.compile(
-    r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
+    r"^(?=.{1,253}$)[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?"
+    r"(?:\.[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?)*$"
 )
 _ATTRIBUTE_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 

@@ -37,11 +37,13 @@ with every role plus an unauthenticated call.
 | POST `/api/assets` · PATCH `/api/assets/{asset_id}` | AD | 4 ✅ | Create (409 on a duplicate hostname), change the fields sent. Hostname is fixed; retire with `status: retired`. Unknown fields → 422. Audited with before/after values |
 | GET `/api/identities` · GET `/api/identities/{identity_id}` | V | 4 ✅ | Filters: `privilege_level`, `status`, `tag`, `search` (username, display name, department) |
 | POST `/api/identities` · PATCH `/api/identities/{identity_id}` | AD | 4 ✅ | Same rules as assets; disable with `status: disabled` |
-| GET/POST/PATCH `/api/sources…` | V / AD | 5 | Log sources |
-| POST `/api/ingest/{source_id}` | A (Phase 13: or a per-source ingest key) | 5 | JSON `{records: [...]}` or `text/plain` lines |
-| POST `/api/ingest/{source_id}/upload` | A | 5 | Multipart file (same limits) |
-| GET `/api/ingest/batches` · `/{id}` | V | 5 | Batch reports |
-| GET `/api/events` · `/api/events/{id}` | V | 5/9 | Filtered list; detail with raw record, alerts citing it |
+| GET `/api/sources` · GET `/api/sources/{source_id}` | V | 5 ✅ | Log sources (paged) |
+| POST `/api/sources` · PATCH `/api/sources/{source_id}` | AD | 5 ✅ | Create (409 on a duplicate name), change name / description / default host / time zone (IANA) / enabled. The source type is fixed after creation. Audited |
+| POST `/api/ingest/{source_id}` | A (Phase 13: or a per-source ingest key) | 5 ✅ | `application/json` `{"records": ["<raw line or JSON text>", ...]}` or `text/plain` (one record per line; CRLF and blank lines handled). Limits: 5 MB, 5,000 records, 64 KiB per record. Returns the batch report (201). 404 unknown source, 409 disabled source, 413 over a limit, 415 other content types, 422 malformed JSON body; every refusal is audited as `INGEST_REJECTED` |
+| GET `/api/ingest/batches` · `/api/ingest/batches/{batch_id}` | V | 5 ✅ | Batch reports, newest first (`source_id` filter): per-outcome counts, the first 50 issues, event-time span |
+| GET `/api/ingest/batches/{batch_id}/records` | V | 5 ✅ | The batch's raw records (`parse_status` filter), shown as text (undecodable bytes as U+FFFD, at most 4,096 characters) |
+| GET `/api/events` | V | 5 ✅ | Normalized events, newest first, keyset-paged (`next_cursor` → `cursor`, no total). `from`/`to` (default: last 24 h, at most 31 days), `source_id`, `batch_id`, `category`, `action`, `outcome`, `host`, `username`, `source_ip`. 400 for a bad range, cursor or IP |
+| GET `/api/events/{event_id}` | V | 5 ✅ | One event with its raw record and source name (alerts citing it: Phase 7) |
 | GET `/api/detections` · `/{rule_id}` · `/{rule_id}/versions` | V | 6 | Rules, effective config, history |
 | PATCH `/api/detections/{rule_id}` | AD | 6 | Tunable fields only; `change_reason` required |
 | POST `/api/detections/run` | AD | 6 | Re-run detection over a time range (idempotent) |

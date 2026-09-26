@@ -40,6 +40,9 @@ OPENAPI_TAGS = [
         "name": "identities",
         "description": "Identities seen in logs: read for all, changes by ADMIN.",
     },
+    {"name": "sources", "description": "Log sources: where records come from, how to parse."},
+    {"name": "ingest", "description": "Send records (ANALYST+) and read batch reports."},
+    {"name": "events", "description": "Normalized events, with the raw record each came from."},
 ]
 
 

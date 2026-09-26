@@ -1,6 +1,6 @@
 # Database design
 
-> Status: tables marked ✅ exist (migrations 0001–0003) and are tested; the rest are design and
+> Status: tables marked ✅ exist (migrations 0001–0004) and are tested; the rest are design and
 > are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
 > unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
 > models with the migrated database and fails on any difference.
@@ -41,8 +41,8 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `assets` ✅ | 4 | hostname (unique; check: lowercase), ip_addresses inet[] (GIN), asset_type, environment, criticality (low/medium/high/critical), owner, description, tags, status (active/retired), created_at, updated_at |
 | `identities` ✅ | 4 | username (unique; check: lowercase), display_name, department, title, privilege_level (standard/privileged/service), status (active/disabled), tags, created_at, updated_at |
 | `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled. `ingest_key_hash` arrives in Phase 13 |
-| `ingestion_batches` | 5 | source_id, submitted_by, channel (api/upload/cli/demo), status, received/parsed/failed/duplicate counts, alert/incident counts, error, started/finished_at. Adds `raw_events.batch_id` |
-| `raw_events` ✅ | 4 | source_id (FK), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED/FAILED; check: FAILED ⇔ parse_error present), parse_error (short code), simulated. **Append-only** |
+| `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (STORED; detection states in Phase 6), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: Phase 6 moves it through detection states |
+| `raw_events` ✅ | 4, 5 | source_id (FK), batch_id (FK, Phase 5), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED / SKIPPED / FAILED; check: parse_detail present ⇔ not PARSED), parse_detail (short reason code; `parse_error` until migration 0004), simulated. **Append-only** |
 | `events` ✅ | 4 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id (unique FK), source_id (FK), asset_id / identity_id (FK, restrict). Checks: category, outcome, action format, port ranges, lowercase host/user, IP scope, criticality, sizes. **Append-only** |
 | `detection_rules` | 6 | rule_id (PK text, e.g. AUTH-001), library_definition JSONB, library_hash, overrides JSONB, current_version, enabled, last_run_at, last_match_at, error_count |
 | `detection_rule_versions` | 6 | rule_id, version, effective_definition JSONB, source (library/admin), changed_by, change_reason, created_at; unique (rule_id, version) |

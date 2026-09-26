@@ -1,5 +1,9 @@
 """Writes and reads of the event store. The only code that inserts raw_events and events
-(docs/architecture.md). Ingestion (Phase 5) calls these; nothing ever updates them.
+(docs/architecture.md). Ingestion calls these; nothing ever updates them.
+
+IDs are assigned here, in Python, and nothing is flushed: a batch adds thousands of rows and
+flushes once, so SQLAlchemy sends them as batched INSERTs instead of one round trip per row.
+Callers flush (or commit) when they need the rows in the database.
 """
 
 import hashlib
@@ -32,7 +36,7 @@ def fingerprint(source_id: uuid.UUID, raw: bytes | str) -> str:
 
 @dataclass(frozen=True)
 class Enrichment:
-    """Context attached at ingest time (Phase 5). Every field is optional: unknown stays None."""
+    """Context attached at ingest time. Every field is optional: unknown stays None."""
 
     source_ip_scope: IpScope | None = None
     asset_id: uuid.UUID | None = None
@@ -41,30 +45,40 @@ class Enrichment:
     identity_privileged: bool | None = None
 
 
-def find_raw_event(db: Session, source_id: uuid.UUID, raw: bytes | str) -> RawEvent | None:
-    return db.scalar(select(RawEvent).where(RawEvent.fingerprint == fingerprint(source_id, raw)))
+def existing_fingerprints(db: Session, fingerprints: list[str]) -> set[str]:
+    """Which of these records are already stored (checked in chunks to bound query size)."""
+    found: set[str] = set()
+    for start in range(0, len(fingerprints), 1000):
+        chunk = fingerprints[start : start + 1000]
+        found.update(
+            db.scalars(select(RawEvent.fingerprint).where(RawEvent.fingerprint.in_(chunk)))
+        )
+    return found
 
 
 def add_raw_event(
     db: Session,
-    source_id: uuid.UUID,
-    raw: bytes | str,
     *,
-    parse_error: str | None = None,
+    source_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    raw: bytes | str,
+    status: ParseStatus = ParseStatus.PARSED,
+    detail: str | None = None,
     simulated: bool = False,
 ) -> RawEvent:
-    """Stores the record exactly as received. The caller checks for duplicates first
-    (find_raw_event); the unique fingerprint index is the final guarantee."""
+    """Stores the record exactly as received. Duplicates are the caller's check
+    (existing_fingerprints); the unique fingerprint index is the final guarantee."""
     record = RawEvent(
+        id=uuid.uuid4(),
         source_id=source_id,
+        batch_id=batch_id,
         raw_data=as_bytes(raw),
         fingerprint=fingerprint(source_id, raw),
-        parse_status=ParseStatus.FAILED if parse_error else ParseStatus.PARSED,
-        parse_error=parse_error,
+        parse_status=status,
+        parse_detail=detail,
         simulated=simulated,
     )
     db.add(record)
-    db.flush()
     return record
 
 
@@ -75,6 +89,7 @@ def add_event(
         raise ValueError("only a parsed raw record can have a normalized event")
     context = enrichment or Enrichment()
     event = Event(
+        id=uuid.uuid4(),
         raw_event_id=raw.id,
         source_id=raw.source_id,
         simulated=raw.simulated,
@@ -86,5 +101,4 @@ def add_event(
         identity_privileged=context.identity_privileged,
     )
     db.add(event)
-    db.flush()
     return event

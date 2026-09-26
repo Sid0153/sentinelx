@@ -17,6 +17,11 @@ its rules always apply:
 | 2 Foundation | Done, green in CI (46 backend tests, 96% coverage; 12 frontend tests; Compose smoke test incl. DB outage). Repo: https://github.com/Sid0153/sentinelx (public) |
 | 3 Auth and RBAC | Done, green in CI (168 backend tests, 98% coverage; 39 frontend tests; auth smoke script and forged-XFF checks on both ports in the Compose job) |
 | 4 Assets, identities, event model | Done, green in CI (311 backend tests, 97.8% coverage; 39 frontend tests; migration 0003 applied on the Compose stack) |
+| 5 Ingestion and parsing | Done locally (497 backend tests, 97% coverage; 39 frontend tests; ingest and auth smoke scripts pass on the live stack). Not yet pushed |
+
+Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
+one to its phase and status; update it at the end of every phase (a phase is not done until
+its rows there are true), and never drop a feature silently.
 
 Design: `docs/architecture.md` is the entry point; decisions are in `docs/decisions/`; the phase
 plan and exit criteria are in `docs/roadmap.md`. When implementation diverges from a doc,
@@ -104,6 +109,14 @@ and update `docs/api.md`; a test fails if `docs/openapi.json` is stale.
   bytes (`raw_data`), never text. `raw_events`, `events` and `audit_logs` reject UPDATE, DELETE
   and TRUNCATE (ADR-0010): tests never clean them up.
 - Admin input schemas use `extra="forbid"`; PATCH schemas list nullable fields in `CLEARABLE`.
+- Ingestion: parsers are pure (`app/ingestion/parsers/`, registry in `__init__.py`); every
+  record ends PARSED / SKIPPED / FAILED with a fixed reason code, never record text. Regexes
+  must be anchored with bounded repetition (the linear-time test covers each parser). The
+  store never flushes: `ingestion/service.py` flushes raw records before adding events.
+- CLI tests use the `cli_sessions` fixture (CLI sessions become savepoints of the test
+  transaction); never let tests commit rows into append-only tables for real.
+- Sample and demo data is synthetic: RFC 5737 outside addresses, 10.0.0.0/8 inside,
+  `corp.example`; ingesting it through `demo-ingest` marks it simulated.
 - After changing a model: create a migration (`alembic revision --autogenerate`, then review);
   `tests/integration/test_schema.py` fails if models and migrations differ. Update
   `docs/database-schema.md`.

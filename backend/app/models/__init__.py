@@ -2,7 +2,7 @@
 
 from app.models.audit_log import AuditLog
 from app.models.context import Asset, Identity
-from app.models.event import Event, LogSource, RawEvent
+from app.models.event import Event, IngestionBatch, LogSource, RawEvent
 from app.models.refresh_token import RefreshToken
 from app.models.user import Role, User
 
@@ -11,6 +11,7 @@ __all__ = [
     "AuditLog",
     "Event",
     "Identity",
+    "IngestionBatch",
     "LogSource",
     "RawEvent",
     "RefreshToken",

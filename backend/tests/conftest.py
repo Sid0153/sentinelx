@@ -77,6 +77,26 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
+def cli_sessions(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> Session:
+    """CLI commands open (and commit) their own sessions. Bind those to the test's
+    connection as savepoints, so everything they write is rolled back with the test.
+    Without this, rows in append-only tables (audit log, events) would stay in the test
+    database for good."""
+    connection = db_session.connection()
+
+    def factory() -> Session:
+        return Session(
+            bind=connection,
+            join_transaction_mode="create_savepoint",
+            autoflush=False,
+            expire_on_commit=False,
+        )
+
+    monkeypatch.setattr("app.database.session.get_session_factory", lambda: factory)
+    return db_session
+
+
+@pytest.fixture
 def db_client(app: FastAPI, db_session: Session) -> Iterator[TestClient]:
     """A test client whose requests use the rolled-back test session."""
 

@@ -1,9 +1,9 @@
 # Event model, parsing and enrichment
 
-> Status: **Model and storage implemented and tested (Phase 4):** `NormalizedEvent`
-> (`app/events/schema.py`), the `log_sources` / `raw_events` / `events` tables, and the event
-> store functions (`app/events/store.py`). Parsers, normalization of source formats and
-> enrichment: Phase 5. See [ADR-003](decisions/0003-normalized-event-schema.md) and
+> Status: **Implemented and tested.** Model and storage (Phase 4): `NormalizedEvent`
+> (`app/events/schema.py`) and the event store (`app/events/store.py`). Ingestion (Phase 5):
+> five parsers (`app/ingestion/parsers/`), shared normalization, enrichment, and batches with
+> per-record outcomes (`app/ingestion/service.py`). See [ADR-003](decisions/0003-normalized-event-schema.md) and
 > [ADR-0010](decisions/0010-evidence-storage.md).
 
 ## Raw and normalized are stored separately
@@ -25,8 +25,9 @@ Both tables are append-only through database triggers that reject `UPDATE`, `DEL
 weakening this, for example by recreating the demo database.
 
 `log_sources` holds each configured origin: its name, `source_type` (which parser), a default
-host and a time zone for formats that lack them. It is created in Phase 4 because every
-event must name its source; its API and the ingestion batches arrive in Phase 5.
+host and a time zone for formats that lack them. `ingestion_batches` records each ingest
+request (who, which channel, and how many records ended in each outcome), and every raw record
+points to its batch.
 
 ## Canonical form (enforced by `NormalizedEvent` and database checks)
 
@@ -34,7 +35,8 @@ event must name its source; its API and the ingestion batches arrive in Phase 5.
   rejected: deciding the zone is the parser's job, from the log source's configuration.
 - `event_action` must belong to the category's controlled vocabulary (`ACTIONS` in
   `schema.py`); rules match on these words, so a parser cannot invent synonyms.
-- Hostnames are lowercase RFC 1123 labels without a trailing dot. IPs are in canonical text
+- Hostnames are lowercase RFC 1123 labels (plus `_`, for NetBIOS names) without a trailing
+  dot. IPs are in canonical text
   form, and IPv4-mapped IPv6 becomes plain IPv4. User names are lowercased and cannot contain
   control characters.
 - `attributes` holds at most 50 flat `snake_case` keys with scalar values of at most 1,024
@@ -95,34 +97,57 @@ Fields from the brief that were left out on purpose:
 - `metadata` is `attributes`.
 - `raw_event` lives in `raw_events`.
 
-### Normalization rules
+### Normalization rules (implemented in `ingestion/normalize.py` and each parser)
 
 - Usernames: trimmed, lowercased. `DOMAIN\user` and `user@domain` are split into `username` +
-  `user_domain`. Windows machine accounts (`HOST$`) and `-` are kept, with
-  `attributes.account_kind`. The original value stays in the raw record.
-- Hostnames: lowercased, trailing dot removed. Short name vs FQDN: stored as received. Asset
-  matching tries the exact value, then the first label.
-- IPs are parsed with `ipaddress`. Invalid values become null plus a parse warning, never a
-  crash. IPv4-mapped IPv6 is unmapped.
-- Timestamps become UTC. **Syslog RFC 3164 has no year and no zone.** The year and timezone come
-  from the log-source configuration. The year is inferred relative to the receive time, and a
-  December line received in January goes to the previous year. The high-precision rsyslog
-  format (RFC 3339) is also accepted and needs no inference.
+  `user_domain` (Windows supplies the domain in a separate field). Windows machine accounts
+  (`HOST$`) are kept and marked `attributes.account_kind = machine`. Placeholders (`-`,
+  empty) become null. The original value stays in the raw record.
+- Hostnames: lowercased, trailing dot removed, stored as received (short name or FQDN).
+  Underscores are accepted because Windows NetBIOS names use them. Asset matching tries the
+  exact value, then the first label.
+- IPs are parsed with `ipaddress`. An invalid value or a placeholder in an optional field
+  becomes null, never a crash. IPv4-mapped IPv6 is unmapped.
+- Timestamps become UTC. **Syslog RFC 3164 has no year and no zone.** The zone comes from the
+  log source. The year comes from the receive time, and a line more than a day in the future
+  is moved to the previous year (a December line received in January). RFC 3339 syslog, ISO
+  8601 JSON times and PowerShell 5's `/Date(ms)/` carry their own zone. A naive ISO timestamp
+  in a JSON record fails the record: guessing its zone would falsify evidence.
 
-## Supported source formats (initial)
+## Record outcomes
 
-All sample and demo data is synthetic. Parsers accept a documented subset of each format, and
-anything outside it becomes a `FAILED` raw event with a reason.
+Every record ends in exactly one outcome, stored on its raw record with a short fixed reason
+code (never text copied from the record):
+
+| Outcome | Meaning | Examples |
+|---|---|---|
+| `PARSED` | Became a normalized event | sshd `Failed password`, Windows 4625 |
+| `SKIPPED` | Understood, deliberately not normalized | sshd `Connection closed … [preauth]`; `Invalid user …` (the `Failed password` line that follows carries the attempt, so counting both would double-count); cron; Windows event IDs that are not modelled |
+| `FAILED` | Not understood | `unrecognized_format`, `invalid_json`, `not_utf8`, `invalid_timestamp`, `unknown_event_type`, `invalid_field`, `parser_error` |
+
+A parser bug never aborts a batch: the record fails with `parser_error`, and the log names only
+the exception type (its message could contain text from the record).
+
+## Supported source formats (implemented, Phase 5)
+
+All sample and demo data is synthetic. Parsers accept a documented subset of each format.
 
 | Source type | Input | Produces |
 |---|---|---|
-| `linux_auth` | auth.log lines (RFC 3164 or RFC 3339 timestamp) | sshd `Failed password`, `Accepted password/publickey`, `Invalid user`, `Connection closed ... [preauth]`; `sudo` commands and `NOT in sudoers` / `incorrect password attempts`; `su`; `useradd new user`, `usermod`/`gpasswd` group additions |
-| `windows_security` | JSON objects shaped like `Get-WinEvent \| ConvertTo-Json` / Winlogbeat subset: `EventID`, `TimeCreated`, `Computer`, `EventData{...}` | 4624, 4625 (logon success/failure), 4634 (logoff), 4672 (special privileges), 4688 (process creation with command line), 4720 (user created), 4732 (member added to local group) |
-| `http_access` | nginx/Apache combined log format | `web/http_request` with method, path, status, bytes, user agent; status 401/403 → outcome `failure` |
-| `app_json` | JSON lines from an application: `{"ts","level","event","user","ip","outcome",...}` with documented event names | login, logout, admin actions → `authentication` / `iam` / `application` |
-| `generic_json` | JSON already in SentinelX field names (validated by Pydantic) | Anything, including `process` and `network` events (used for PROC-001 / NET-001 sample data and future shippers) |
+| `linux_auth` | auth.log lines, RFC 3164 or RFC 3339 timestamps | **sshd**: `Failed`/`Accepted` for password, publickey and keyboard-interactive (including `invalid user`) → logon failure/success with `auth_method` and `invalid_user`; session closed → logoff. **sudo**: command → `privilege/sudo` (actor, target user, command, tty, cwd); `NOT in sudoers`, `N incorrect password attempts`, `command not allowed` → failure with `failure_reason`. **su**: success, or failure for `FAILED SU`. **useradd/usermod/gpasswd/userdel/passwd**: `user_created` (uid, shell), `group_member_added` (group_name, plus the actor for gpasswd), `user_deleted`, `password_changed`. Other programs → SKIPPED |
+| `windows_security` | One JSON object per event: `EventID`, `TimeCreated`, `Computer`, `EventRecordID`, `EventData{...}` | 4624/4625 logon (logon type and name, auth package, status/sub-status; RDP gives protocol `rdp`), 4634 logoff, 4672 special privileges, 4688 process start (process and parent names, command line, path), 4720 user created, 4732 member added to a group. 4720 and 4732 both carry `target_sid`, because 4732 usually has no member name for local accounts. Other IDs → SKIPPED |
+| `http_access` | nginx/Apache combined (or common) format | `web/http_request`: method, path and query (stored separately), version, status, bytes, referrer, user agent. 2xx/3xx → success; 4xx/5xx → failure. Garbage request lines (TLS bytes sent to an HTTP port) are kept as events with `request_line`. The host is the source's `default_host` |
+| `app_json` | JSON lines `{"ts", "event", "user", "target_user"?, "ip"?, "host"?, "app"?, "role"?, "detail"?, "session"?}` | Event names `login_success`, `login_failure`, `logout`, `password_change`, `user_created`, `role_changed`, `config_changed`, `admin_action`, `access_denied`. An unknown name FAILS the record: the application and SentinelX disagree about the contract, and someone should notice |
+| `generic_json` | JSON in SentinelX's own field names | Anything the normalized model accepts (used for process and network telemetry). A `source_type` in the record is ignored. A sender's own `event_id` is dropped from the event but stays in the raw record, and so in the fingerprint |
 
-XML Windows events are not supported at first. Supporting them would need a hardened XML
+Robustness, tested on every parser:
+- random bytes never crash a parser;
+- every regular expression is anchored, with bounded, non-overlapping repetition, and hostile
+  60 KB lines are handled in well under half a second (no catastrophic backtracking);
+- deeply nested JSON fails as `invalid_json`;
+- markup in fields is stored as inert text.
+
+XML Windows events are not supported. Supporting them would need a hardened XML
 parser (`defusedxml`), which we add only if a real XML source is connected.
 
 ## Duplicate strategy
@@ -136,19 +161,26 @@ cannot occur in a UUID, so different (source, record) pairs cannot produce the s
 - Known limitation: two byte-identical lines from one source are collapsed. For sshd this is
   rare because each line carries the client port and PID. For Windows the `EventRecordID`
   makes records unique. For `generic_json` the sender can include its own `event_id`, which is
-  part of the raw text. Documented in the batch report semantics.
+  part of the raw text.
+- Duplicates are detected before parsing, both against stored records and within the batch,
+  so resending a whole file costs one indexed lookup per record. Measured once on this laptop
+  through nginx: 5,000 duplicate lines in 0.06 s. That is one measurement, not a benchmark.
 
-## Enrichment
+## Enrichment (implemented, Phase 5: `ingestion/enrich.py`)
 
 Deterministic, explainable, and computed from data SentinelX holds. There is **no external
 threat intelligence** (NOT IMPLEMENTED, and it will not be pretended).
 
-- `source_ip_scope`: RFC 1918 + configured `INTERNAL_NETWORKS` → `internal`; loopback;
-  link-local; everything else → `external`. The RFC 5737 documentation ranges used by demo data
-  count as `external` so scenarios behave like real ones. That choice is documented and
-  labelled.
-- Asset and identity lookups use an in-memory snapshot loaded **once per batch**, which avoids
-  N+1 queries.
+- `source_ip_scope`: addresses in `INTERNAL_NETWORKS` (default: RFC 1918 and `fc00::/7`) →
+  `internal`; loopback; link-local; everything else → `external`. The RFC 5737 documentation
+  ranges used by demo data count as `external` so scenarios behave like real ones. That choice
+  is documented and labelled.
+- Asset and identity lookups use an in-memory snapshot of the whole inventory, loaded **once
+  per batch**, which avoids N+1 queries. A short name that belongs to two assets is not used
+  for matching (it is ambiguous). The snapshot suits inventories of thousands of assets; a much
+  larger inventory would instead query per batch for the hosts it contains.
+- Identities match on the actor (`username`) only. The target of an action (for example, the
+  account created) is not enriched yet; the risk model will look it up when it needs it.
 - Criticality and privilege are **snapshots**. They show what was known when the event
   arrived. Risk scoring of new alerts uses the **current** asset and identity values and
   records the values it used in the risk breakdown. Both behaviours are documented, so an

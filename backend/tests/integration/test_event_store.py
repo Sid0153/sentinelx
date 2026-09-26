@@ -16,10 +16,10 @@ from app.events.schema import (
     NormalizedEvent,
     SourceType,
 )
-from app.events.store import Enrichment, add_event, add_raw_event, find_raw_event, fingerprint
+from app.events.store import Enrichment, existing_fingerprints, fingerprint
 from app.models.context import Asset
-from app.models.event import Event, LogSource, RawEvent
-from tests.helpers import make_asset, make_source
+from app.models.event import Event, LogSource, ParseStatus, RawEvent
+from tests.helpers import make_asset, make_batch, make_source, stored_event, stored_raw
 
 pytestmark = pytest.mark.integration
 
@@ -58,13 +58,14 @@ def test_fingerprint_depends_on_source_and_exact_text() -> None:
     assert fingerprint(a, LINE) == fingerprint(a, LINE)
     assert fingerprint(a, LINE) != fingerprint(b, LINE)
     assert fingerprint(a, LINE) != fingerprint(a, LINE + " ")
+    assert fingerprint(a, LINE) == fingerprint(a, LINE.encode())  # text is stored as UTF-8
 
 
 def test_raw_and_normalized_round_trip_with_enrichment(db_session: Session) -> None:
     source = make_source(db_session)
     asset = make_asset(db_session, "web-01", Criticality.CRITICAL)
-    raw = add_raw_event(db_session, source.id, LINE)
-    event = add_event(
+    raw = stored_raw(db_session, source, LINE)
+    event = stored_event(
         db_session,
         raw,
         ssh_failure(),
@@ -85,8 +86,9 @@ def test_raw_and_normalized_round_trip_with_enrichment(db_session: Session) -> N
     assert stored.attributes == {"method": "password"}
     assert (stored.source_ip_scope, stored.asset_criticality) == ("external", "critical")
     assert stored.ingested_at is not None
-    stored_raw = db_session.get(RawEvent, raw.id)
-    assert stored_raw is not None and stored_raw.raw_data == LINE.encode()  # byte for byte
+    stored_raw_record = db_session.get(RawEvent, raw.id)
+    assert stored_raw_record is not None
+    assert stored_raw_record.raw_data == LINE.encode()  # byte for byte
 
 
 @pytest.mark.parametrize(
@@ -101,7 +103,9 @@ def test_raw_and_normalized_round_trip_with_enrichment(db_session: Session) -> N
 def test_any_bytes_are_preserved_exactly(db_session: Session, record: bytes) -> None:
     # Malformed input is evidence too: it must be stored, not crash ingestion.
     source = make_source(db_session)
-    raw = add_raw_event(db_session, source.id, record, parse_error="unrecognized_format")
+    raw = stored_raw(
+        db_session, source, record, status=ParseStatus.FAILED, detail="unrecognized_format"
+    )
     db_session.commit()
     db_session.expire_all()
     stored = db_session.get(RawEvent, raw.id)
@@ -112,34 +116,36 @@ def test_any_bytes_are_preserved_exactly(db_session: Session, record: bytes) -> 
 
 def test_the_same_record_from_the_same_source_is_stored_once(db_session: Session) -> None:
     source = make_source(db_session)
-    first = add_raw_event(db_session, source.id, LINE)
-    assert find_raw_event(db_session, source.id, LINE) == first
+    stored_raw(db_session, source, LINE)
+    key = fingerprint(source.id, LINE)
+    assert existing_fingerprints(db_session, [key, "0" * 64]) == {key}
     savepoint = db_session.begin_nested()
     with pytest.raises(IntegrityError, match="uq_raw_events_fingerprint"):
-        add_raw_event(db_session, source.id, LINE)
+        stored_raw(db_session, source, LINE)
     savepoint.rollback()
 
 
 def test_the_same_text_from_another_source_is_a_separate_record(db_session: Session) -> None:
     one, two = make_source(db_session), make_source(db_session)
-    add_raw_event(db_session, one.id, LINE)
-    add_raw_event(db_session, two.id, LINE)
-    count = db_session.scalar(text("SELECT count(*) FROM raw_events"))
-    assert count == 2
+    stored_raw(db_session, one, LINE)
+    stored_raw(db_session, two, LINE)
+    assert db_session.scalar(text("SELECT count(*) FROM raw_events")) == 2
 
 
 def test_failed_records_are_kept_but_cannot_have_an_event(db_session: Session) -> None:
     source = make_source(db_session)
-    raw = add_raw_event(db_session, source.id, b"\x00garbage", parse_error="unrecognized_format")
+    raw = stored_raw(
+        db_session, source, b"\x00garbage", status=ParseStatus.FAILED, detail="unrecognized_format"
+    )
     assert raw.parse_status == "FAILED"
     with pytest.raises(ValueError, match="only a parsed raw record"):
-        add_event(db_session, raw, ssh_failure())
+        stored_event(db_session, raw, ssh_failure())
 
 
 def test_simulated_flag_travels_from_raw_to_event(db_session: Session) -> None:
     source = make_source(db_session)
-    raw = add_raw_event(db_session, source.id, LINE, simulated=True)
-    assert add_event(db_session, raw, ssh_failure()).simulated is True
+    raw = stored_raw(db_session, source, LINE, simulated=True)
+    assert stored_event(db_session, raw, ssh_failure()).simulated is True
 
 
 # ---------- evidence is append-only ----------
@@ -148,8 +154,8 @@ def test_simulated_flag_travels_from_raw_to_event(db_session: Session) -> None:
 @pytest.mark.parametrize("table", ["raw_events", "events"])
 def test_evidence_tables_reject_update_delete_and_truncate(db_session: Session, table: str) -> None:
     source = make_source(db_session)
-    add_event(db_session, add_raw_event(db_session, source.id, LINE), ssh_failure())
-    column = "parse_error" if table == "raw_events" else "username"
+    stored_event(db_session, stored_raw(db_session, source, LINE), ssh_failure())
+    column = "parse_detail" if table == "raw_events" else "username"
     for statement in (
         f"UPDATE {table} SET {column} = 'tampered'",
         f"DELETE FROM {table}",
@@ -162,41 +168,53 @@ def test_evidence_tables_reject_update_delete_and_truncate(db_session: Session, 
 # ---------- constraints ----------
 
 INSERT_RAW = (
-    "INSERT INTO raw_events (id, source_id, received_at, raw_data, fingerprint, parse_status, "
-    "parse_error) VALUES (gen_random_uuid(), :source, now(), 'x'::bytea, :fp, :status, :error)"
+    "INSERT INTO raw_events (id, source_id, batch_id, received_at, raw_data, fingerprint, "
+    "parse_status, parse_detail) VALUES (gen_random_uuid(), :source, :batch, now(), "
+    "'x'::bytea, :fp, :status, :detail)"
 )
 
 
-def test_parse_status_and_error_must_agree(db_session: Session) -> None:
+def test_parse_status_and_detail_must_agree(db_session: Session) -> None:
     source = make_source(db_session)
-    for status, error in (("FAILED", None), ("PARSED", "unrecognized_format"), ("MAYBE", None)):
-        message = rejected(
-            db_session,
-            INSERT_RAW,
-            {"source": source.id, "fp": uuid.uuid4().hex, "status": status, "error": error},
-        )
-        assert "ck_raw_events_" in message
+    batch = make_batch(db_session, source)
+    for status, detail in (
+        ("FAILED", None),
+        ("SKIPPED", None),
+        ("PARSED", "unrecognized_format"),
+        ("MAYBE", "x"),
+    ):
+        values = {
+            "source": source.id,
+            "batch": batch.id,
+            "fp": uuid.uuid4().hex,
+            "status": status,
+            "detail": detail,
+        }
+        assert "ck_raw_events_" in rejected(db_session, INSERT_RAW, values)
 
 
 def test_raw_record_size_is_bounded(db_session: Session) -> None:
     source = make_source(db_session)
     message = rejected(
         db_session,
-        "INSERT INTO raw_events (id, source_id, received_at, raw_data, fingerprint, "
-        "parse_status) VALUES (gen_random_uuid(), :source, now(), "
+        "INSERT INTO raw_events (id, source_id, batch_id, received_at, raw_data, fingerprint, "
+        "parse_status) VALUES (gen_random_uuid(), :source, :batch, now(), "
         "convert_to(repeat('x', 65537), 'UTF8'), :fp, 'PARSED')",
-        {"source": source.id, "fp": uuid.uuid4().hex},
+        {"source": source.id, "batch": make_batch(db_session, source).id, "fp": uuid.uuid4().hex},
     )
     assert "ck_raw_events_raw_data_size" in message
 
 
-def test_raw_record_needs_a_known_source(db_session: Session) -> None:
-    message = rejected(
-        db_session,
-        INSERT_RAW,
-        {"source": uuid.uuid4(), "fp": uuid.uuid4().hex, "status": "PARSED", "error": None},
+def test_raw_record_needs_a_known_source_and_batch(db_session: Session) -> None:
+    source = make_source(db_session)
+    batch = make_batch(db_session, source)
+    values: dict[str, object] = {"fp": uuid.uuid4().hex, "status": "PARSED", "detail": None}
+    unknown_source = {**values, "source": uuid.uuid4(), "batch": batch.id}
+    unknown_batch = {**values, "source": source.id, "batch": uuid.uuid4()}
+    assert "fk_raw_events_source_id_log_sources" in rejected(db_session, INSERT_RAW, unknown_source)
+    assert "fk_raw_events_batch_id_ingestion_batches" in rejected(
+        db_session, INSERT_RAW, unknown_batch
     )
-    assert "fk_raw_events_source_id_log_sources" in message
 
 
 @pytest.mark.parametrize(
@@ -218,7 +236,7 @@ def test_event_columns_are_constrained(
     db_session: Session, column: str, value: str, constraint: str
 ) -> None:
     source = make_source(db_session)
-    raw = add_raw_event(db_session, source.id, f"line {uuid.uuid4()}")
+    raw = stored_raw(db_session, source, f"line {uuid.uuid4()}")
     columns = {
         "event_category": "'authentication'",
         "event_action": "'logon'",
@@ -226,7 +244,7 @@ def test_event_columns_are_constrained(
         column: value,
     }
     statement = (
-        "INSERT INTO events (id, raw_event_id, source_id, source_type, timestamp, ingested_at, "  # noqa: S608
+        "INSERT INTO events (id, raw_event_id, source_id, source_type, timestamp, ingested_at, "
         f"{', '.join(columns)}) VALUES (gen_random_uuid(), :raw, :source, 'linux_auth', now(), "
         f"now(), {', '.join(columns.values())})"
     )
@@ -235,19 +253,19 @@ def test_event_columns_are_constrained(
 
 def test_one_normalized_event_per_raw_record(db_session: Session) -> None:
     source = make_source(db_session)
-    raw = add_raw_event(db_session, source.id, LINE)
-    add_event(db_session, raw, ssh_failure())
+    raw = stored_raw(db_session, source, LINE)
+    stored_event(db_session, raw, ssh_failure())
     savepoint = db_session.begin_nested()
     with pytest.raises(IntegrityError, match="uq_events_raw_event_id"):
-        add_event(db_session, raw, ssh_failure())
+        stored_event(db_session, raw, ssh_failure())
     savepoint.rollback()
 
 
 def test_an_asset_referenced_by_events_cannot_be_deleted(db_session: Session) -> None:
     source = make_source(db_session)
     asset = make_asset(db_session, "db-01", Criticality.HIGH)
-    raw = add_raw_event(db_session, source.id, LINE)
-    add_event(db_session, raw, ssh_failure(), Enrichment(asset_id=asset.id))
+    raw = stored_raw(db_session, source, LINE)
+    stored_event(db_session, raw, ssh_failure(), Enrichment(asset_id=asset.id))
     message = rejected(db_session, "DELETE FROM assets WHERE id = :id", {"id": asset.id})
     assert "fk_events_asset_id_assets" in message
     assert db_session.get(Asset, asset.id) is not None

@@ -1,9 +1,11 @@
 # Architecture
 
-> Status: **Phase 2 foundation implemented** (app skeleton, config, logging, errors, health,
-> migrations baseline, Compose, CI). Everything else is still design. Each section says which
-> phase builds it. This file is updated as phases land, and anything that changes during
-> implementation is recorded in `docs/decisions/`.
+> Status: **implemented through Phase 5**: foundation, authentication and roles, audit log,
+> asset and identity inventory, the event model and store, and ingestion (parsing,
+> normalization, enrichment). Detection, alerts, correlation, incidents, hunting and the SOC UI
+> are still design; each section says which phase builds it. Package status is marked ✅ below.
+> Changes made during implementation are recorded in `docs/decisions/`, and
+> [feature-coverage.md](feature-coverage.md) tracks every feature of the brief.
 
 SentinelX is a security operations platform. It ingests security logs, normalizes them into
 one event model, runs detection rules over them, groups the resulting alerts into incidents,
@@ -50,36 +52,35 @@ rewrite:
 
 ```
 backend/app/
-  core/          config, structured logging, request IDs, errors, security headers, rate limits
-  database/      engine, session, base model
-  models/        SQLAlchemy models (one file per aggregate)
-  schemas/       Pydantic request/response models
-  api/           FastAPI routers, thin: validate, authorize, call a service, map errors
-  auth/          password hashing, tokens, current-user and role dependencies
-  audit/         append-only audit log: record(), event names
-  context/       assets and identities (inventory CRUD + lookup used by enrichment)
-  ingestion/
-    sources.py   log-source registry (which parser, timezone, default host)
-    parsers/     one module per format; raw text/dict → ParsedRecord or ParseError (pure)
-    normalize.py ParsedRecord → NormalizedEvent (pure)
-    enrich.py    NormalizedEvent + context snapshot → enriched event (pure, given the snapshot)
-    service.py   batch lifecycle: dedup, persist raw + normalized, then trigger detection
-  detection/
-    model.py     rule schema (Pydantic), Detection, Evidence
-    conditions.py safe predicate language (field / operator / value), no eval
-    evaluators/  single.py, threshold.py, distinct.py, sequence.py, new_value.py (pure)
-    library/     YAML rule definitions shipped with the product (seeded into the DB)
-    engine.py    picks candidate events from the DB, runs evaluators, returns detections
-    explain.py   builds the WHAT/WHY/WHICH/WHO text from the evidence
-  alerts/        dedup, persistence, workflow (status machine), prioritization
-  correlation/   alert → incident linking (pure scoring + a persistence layer)
-  incidents/     incident lifecycle, notes, evidence pins, activity, timeline assembly
-  risk/          priority/risk model (pure functions, versioned)
-  mitre/         ATT&CK reference data (pinned version) and coverage queries
-  hunting/       structured query compiler (filters → SQLAlchemy), hunt templates, saved hunts
-  dashboard/     aggregate queries
-  demo/          simulated scenario generator; emits RAW log lines, never normalized rows
-  cli.py         create-admin, seed-rules, ingest-file, run-detection, demo commands
+  ✅ core/          config, structured logging, request IDs, client IP, errors, headers, rate limit
+  ✅ database/      engine, session, base model, migration revision check
+  ✅ models/        SQLAlchemy models
+  ✅ schemas/       Pydantic request/response models
+  ✅ api/           FastAPI routers, thin: validate, authorize, call a service, map errors
+  ✅ auth/          password hashing, tokens, current-user and role dependencies
+  ✅ audit/         append-only audit log: record(), event names
+  ✅ users/         user administration
+  ✅ context/       assets and identities (inventory service; enrichment reads it)
+  ✅ events/        schema.py (NormalizedEvent, pure), store.py (the only writer of raw_events
+                   and events), queries.py (events list with keyset paging, raw records)
+  ✅ ingestion/
+       parsers/     one module per format: raw bytes → NormalizedEvent | Skipped | ParseFailure
+                    (pure); registry in __init__.py turns any parser bug into a failed record
+       normalize.py shared mapping helpers the parsers use (users, IPs, ports, paths, times)
+       enrich.py    IP scope + asset/identity lookup from a snapshot loaded once per batch
+       sources.py   log sources (which parser, time zone, default host)
+       service.py   one batch: dedup, parse, enrich, store raw + events, report
+  ✅ demo/          simulated scenario generator; emits RAW log lines, never normalized rows
+  ✅ cli.py         check-config, export-openapi, create-admin, create-source, ingest-file,
+                   demo-scenarios, demo-ingest (later: seed-rules, run-detection)
+  detection/        (Phase 6) model.py, conditions.py, evaluators/, library/, engine.py, explain.py
+  alerts/           (Phase 7) dedup, persistence, workflow, prioritization
+  correlation/      (Phase 8) alert → incident linking (pure scoring + persistence)
+  incidents/        (Phase 8) lifecycle, notes, evidence pins, activity, timeline assembly
+  risk/             (Phases 7, 11) priority/risk model (pure, versioned)
+  mitre/            (Phases 6, 11) ATT&CK reference data (pinned version) and coverage
+  hunting/          (Phase 10) structured query compiler, hunt templates, saved hunts
+  dashboard/        (Phase 9) aggregate queries
 ```
 
 ### Dependency direction
@@ -95,7 +96,8 @@ Rules we will enforce with tests or review:
 - Parsers, evaluators, correlation scoring and risk take plain data and return plain data. They
   do not import SQLAlchemy, FastAPI or the clock. The clock is always passed in, which makes
   time-window tests deterministic.
-- Only `ingestion/service.py` writes `raw_events` and `events`.
+- Only `events/store.py` writes `raw_events` and `events`, and only `ingestion/service.py`
+  calls it.
 - Only `alerts/` writes alerts; only `incidents/` and `correlation/` write incidents.
 - Security-relevant writes call `audit.record()` in the same transaction as the change.
 
@@ -103,19 +105,26 @@ Rules we will enforce with tests or review:
 
 [ADR-008](decisions/0008-synchronous-bounded-pipeline.md) has the full reasoning. Summary:
 
+Implemented in Phase 5: steps 1–4, in one transaction per batch. The batch row is written
+with its final counts, status STORED. Steps 5–8 arrive with detection (Phase 6), together
+with the detection states of a batch and the startup reconciler. Files are sent as
+`text/plain` to the same endpoint, so there is no separate upload route (and no multipart
+dependency).
+
 ```
-POST /api/ingest/{source}  (or file upload, CLI, demo generator)
-  1. validate request: size ≤ 5 MB, ≤ 5,000 records, source exists and is enabled
-  2. create ingestion_batch (RECEIVED)
+POST /api/ingest/{source}  (JSON records or text/plain lines; also CLI ingest-file, demo-ingest)
+  1. validate request: size ≤ 5 MB (read with a cap), ≤ 5,000 records, source exists and enabled
+  2. create ingestion_batch
   ── transaction A ──────────────────────────────────────────────────────────────
   3. for each record:
-       fingerprint = sha256(source_id ‖ raw)          → duplicate? count it, skip
-       parse (pure)          → ParsedRecord | ParseError
-       store raw_events row  (ALWAYS, including parse failures: status PARSED/FAILED)
-       normalize (pure)      → NormalizedEvent
-       enrich (pure, with a context snapshot loaded once per batch)
-       store events row
-  4. batch → STORED with counts (received, parsed, failed, duplicates)
+       too large (> 64 KiB)?  → counted as rejected, not stored
+       fingerprint = sha256(source_id ‖ raw bytes)   → stored or seen in this batch? duplicate
+       parse + normalize (pure) → NormalizedEvent | Skipped | ParseFailure
+       store raw_events row   (ALWAYS: PARSED / SKIPPED / FAILED with a reason code)
+     flush the batch and all raw rows (batched INSERTs), then for each parsed record:
+       enrich (pure, with an inventory snapshot loaded once per batch) and store the event
+  4. batch → STORED with counts (received = parsed + skipped + failed + duplicate + rejected,
+     enforced by a database check)
   ── commit ─────────────────────────────────────────────────────────────────────
   ── transaction B (serialized with pg_advisory_xact_lock('detection')) ─────────
   5. detection: for each enabled rule, load candidate events for the batch's time span
@@ -124,7 +133,7 @@ POST /api/ingest/{source}  (or file upload, CLI, demo generator)
   7. correlation: link alerts to incidents or create incidents
   8. batch → PROCESSED (alerts created/updated, incidents created/updated)
   ── commit ─────────────────────────────────────────────────────────────────────
-  9. respond 200 with the batch report
+  9. respond 201 with the batch report
 ```
 
 Design points:

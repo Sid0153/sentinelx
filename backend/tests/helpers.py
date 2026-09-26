@@ -8,9 +8,19 @@ from sqlalchemy.orm import Session
 from app.auth.passwords import hash_password
 from app.auth.tokens import create_access_token
 from app.core.config import get_settings
+from app.events.schema import NormalizedEvent
+from app.events.store import Enrichment, add_event, add_raw_event
 from app.models.audit_log import AuditLog
 from app.models.context import Asset
-from app.models.event import LogSource
+from app.models.event import (
+    BatchChannel,
+    BatchStatus,
+    Event,
+    IngestionBatch,
+    LogSource,
+    ParseStatus,
+    RawEvent,
+)
 from app.models.user import Role, User
 
 TEST_PASSWORD = "correct-horse-battery-staple"
@@ -81,3 +91,43 @@ def make_asset(db: Session, hostname: str, criticality: str = "medium") -> Asset
     db.add(asset)
     db.flush()
     return asset
+
+
+def make_batch(db: Session, source: LogSource) -> IngestionBatch:
+    batch = IngestionBatch(
+        source_id=source.id, channel=BatchChannel.API, status=BatchStatus.STORED, received_count=0
+    )
+    db.add(batch)
+    db.flush()
+    return batch
+
+
+def stored_raw(
+    db: Session,
+    source: LogSource,
+    raw: bytes | str,
+    *,
+    status: ParseStatus = ParseStatus.PARSED,
+    detail: str | None = None,
+    simulated: bool = False,
+) -> RawEvent:
+    """A raw record in its own batch, flushed (the store itself never flushes)."""
+    record = add_raw_event(
+        db,
+        source_id=source.id,
+        batch_id=make_batch(db, source).id,
+        raw=raw,
+        status=status,
+        detail=detail,
+        simulated=simulated,
+    )
+    db.flush()
+    return record
+
+
+def stored_event(
+    db: Session, raw: RawEvent, normalized: NormalizedEvent, enrichment: Enrichment | None = None
+) -> Event:
+    event = add_event(db, raw, normalized, enrichment)
+    db.flush()
+    return event

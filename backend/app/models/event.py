@@ -34,8 +34,20 @@ MAX_RAW_BYTES = 65_536
 
 
 class ParseStatus(enum.StrEnum):
-    PARSED = "PARSED"
-    FAILED = "FAILED"
+    PARSED = "PARSED"  # became a normalized event
+    SKIPPED = "SKIPPED"  # understood, deliberately not normalized (parse_detail says why)
+    FAILED = "FAILED"  # not understood (parse_detail says why)
+
+
+class BatchChannel(enum.StrEnum):
+    API = "api"  # JSON {"records": [...]}
+    TEXT = "text"  # newline-separated body (files, shippers)
+    CLI = "cli"  # python -m app.cli ingest-file
+    DEMO = "demo"  # the simulated-data generator
+
+
+class BatchStatus(enum.StrEnum):
+    STORED = "STORED"  # records stored; Phase 6 adds detection states after this one
 
 
 def _check_in(column: str, values: type[enum.StrEnum], nullable: bool = False) -> str:
@@ -70,19 +82,63 @@ class LogSource(Base):
     )
 
 
+class IngestionBatch(Base):
+    """One ingest request: who sent what, when, and what became of each record.
+
+    Not append-only: Phase 6 moves a batch through detection states. The records themselves
+    (raw_events, events) are.
+    """
+
+    __tablename__ = "ingestion_batches"
+    __table_args__ = (
+        sa.CheckConstraint(_check_in("channel", BatchChannel), name="channel_valid"),
+        sa.CheckConstraint(_check_in("status", BatchStatus), name="status_valid"),
+        sa.CheckConstraint(
+            "received_count = parsed_count + skipped_count + failed_count + duplicate_count "
+            "+ rejected_count",
+            name="counts_add_up",
+        ),
+        sa.Index("ix_ingestion_batches_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("log_sources.id"), index=True)
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(sa.ForeignKey("users.id"))
+    channel: Mapped[str] = mapped_column(sa.String(8))
+    status: Mapped[str] = mapped_column(sa.String(24))
+    received_count: Mapped[int] = mapped_column(default=0)
+    parsed_count: Mapped[int] = mapped_column(default=0)
+    skipped_count: Mapped[int] = mapped_column(default=0)
+    failed_count: Mapped[int] = mapped_column(default=0)
+    duplicate_count: Mapped[int] = mapped_column(default=0)
+    rejected_count: Mapped[int] = mapped_column(default=0)  # too large to store at all
+    # [{"index": 3, "status": "FAILED", "code": "invalid_json"}, ...]: the first few only.
+    issues: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=sa.text("'[]'::jsonb")
+    )
+    # Event-time span of the parsed events: detection (Phase 6) re-reads this window.
+    first_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    last_event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    simulated: Mapped[bool] = mapped_column(default=False, server_default=sa.false())
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class RawEvent(Base):
     __tablename__ = "raw_events"
     __table_args__ = (
         sa.CheckConstraint(_check_in("parse_status", ParseStatus), name="parse_status_valid"),
         sa.CheckConstraint(f"octet_length(raw_data) <= {MAX_RAW_BYTES}", name="raw_data_size"),
-        # A failed record says why; a parsed one has no error.
+        # Skipped and failed records say why; a parsed one needs no explanation.
         sa.CheckConstraint(
-            "(parse_status = 'FAILED') = (parse_error IS NOT NULL)", name="parse_error_matches"
+            "(parse_status = 'PARSED') = (parse_detail IS NULL)", name="parse_detail_matches"
         ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     source_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("log_sources.id"), index=True)
+    batch_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("ingestion_batches.id"), index=True)
     received_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -90,7 +146,7 @@ class RawEvent(Base):
     # sha256(source_id ‖ raw_data): the same record from the same source is stored once.
     fingerprint: Mapped[str] = mapped_column(sa.String(64), unique=True)
     parse_status: Mapped[str] = mapped_column(sa.String(8))
-    parse_error: Mapped[str | None] = mapped_column(sa.String(64))  # a short code, not text
+    parse_detail: Mapped[str | None] = mapped_column(sa.String(64))  # a short code, not text
     simulated: Mapped[bool] = mapped_column(default=False, server_default=sa.false())
 
     @property

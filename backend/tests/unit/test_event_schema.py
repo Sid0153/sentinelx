@@ -61,7 +61,11 @@ def test_hostnames_are_canonical(given: str, stored: str) -> None:
     assert event(host=given).host == stored
 
 
-@pytest.mark.parametrize("bad", ["-web", "web_01", "a" * 64, "web 01", "web/01", "<script>"])
+def test_netbios_style_underscores_are_accepted() -> None:
+    assert event(host="WS_042").host == "ws_042"
+
+
+@pytest.mark.parametrize("bad", ["-web", "web-", "a" * 64, "web 01", "web/01", "<script>"])
 def test_invalid_hostnames_are_rejected(bad: str) -> None:
     with pytest.raises(ValidationError, match="hostname"):
         event(host=bad)

@@ -48,6 +48,23 @@ class Settings(BaseSettings):
     # see core/client_ip.py. Empty: the direct peer address is always the client.
     trusted_proxies: str = ""
 
+    # Enrichment: source addresses inside these networks are "internal", everything else
+    # (except loopback and link-local) is "external". Comma-separated CIDRs.
+    internal_networks: str = "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7"
+
+    # Ingestion limits per request (ADR-0008): bounded synchronous work.
+    ingest_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
+    ingest_max_records: int = Field(default=5000, ge=1, le=50_000)
+
+    @field_validator("internal_networks")
+    @classmethod
+    def _internal_networks_are_networks(cls, value: str) -> str:
+        try:
+            parse_networks(value)
+        except ValueError:
+            raise ValueError("INTERNAL_NETWORKS must be a comma-separated list of CIDRs") from None
+        return value
+
     @field_validator("database_url")
     @classmethod
     def _database_url_uses_psycopg(cls, value: str) -> str:
@@ -99,6 +116,10 @@ class Settings(BaseSettings):
     @property
     def trusted_networks(self) -> tuple[Network, ...]:
         return parse_networks(self.trusted_proxies)
+
+    @property
+    def internal_network_list(self) -> tuple[Network, ...]:
+        return parse_networks(self.internal_networks)
 
     @property
     def docs_enabled(self) -> bool:
