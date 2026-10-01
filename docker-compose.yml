@@ -9,7 +9,7 @@ services:
   # One-shot: issues the database's TLS certificate (db/make-certs.sh) and exits. Uses the
   # pinned backend base image, which ships openssl. No network needed.
   db-certs:
-    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    image: python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
     entrypoint: ["sh", "/make-certs.sh"]
     network_mode: none
     volumes:
