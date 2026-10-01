@@ -297,7 +297,7 @@ times and actors; `disposition`; `status_note`.
 A documented, versioned **SentinelX priority score** (0–100) with bands. See
 [risk-model.md](risk-model.md). It is project-specific and not an industry standard.
 
-## Rule management (Phase 6 storage, Phase 12 UI depth)
+## Rule management (Phase 6 storage, Phases 9 and 12 UI)
 
 - The effective rule is the **library definition** (from YAML, which owns the logic) plus
   **admin overrides** (only the fields listed in `tunable`, validated against their bounds).
@@ -310,8 +310,29 @@ A documented, versioned **SentinelX priority score** (0–100) with bands. See
   library version and keeps existing overrides. An override that is no longer valid is dropped
   and the drop is audited. The app refuses to start if a YAML file fails validation or
   references an unknown field, evaluator kind or ATT&CK technique.
-- **Exclusions** (allowlists) are part of overrides. They are the first form of alert
-  suppression; time-boxed suppression rules are a Phase 12 evaluation.
+- **Exclusions** (allowlists) are part of overrides. Since Phase 12 an exclusion may be a
+  time-boxed **suppression** (`active_from` / `active_until`, at most 90 days, both or
+  neither): only events whose own time is inside the window are ignored, before or after it
+  the rule sees them again. Suppressed events are stored and searchable; only the rule
+  ignores them. Tested: the window edges (start inside, end outside), validation, and a
+  tuned suppression stopping detection inside the window but not after it.
+- **Version comparison** (Phase 12): the rule page lists the fields that differ between any
+  two versions of the effective definition.
+
+## Detection testing playground (Phase 12, `POST /api/detections/{rule_id}/test`, `/playground`)
+
+An analyst picks a rule, pastes sample log lines (at most 500, 256 KiB) and sees whether it
+fires, the explanation, severity, confidence and ATT&CK of each detection, the evidence lines,
+and for every line whether it was parsed, skipped or failed (with the reason), excluded,
+matched the condition (or which sequence steps). Optional what-if values (threshold, time
+window, severity, confidence, exclusions) are checked against the rule's bounds exactly like
+a real change. It runs the real parser, normalization, enrichment against the current
+inventory (read-only), exclusions, evaluator and explanation, and **stores nothing**: no raw
+records, events, alerts or runs (tested). The rule sees only the sample: a new-value rule
+builds its history from earlier lines of the sample. Analysts and admins only. Built-in
+examples on the page (brute force, failures then success, password spray, sudo root shell)
+fire AUTH-001, AUTH-002, AUTH-003 and PRIV-001 on the live stack. See
+[ADR-0013](decisions/0013-advanced-detection-engineering.md).
 
 ## Testing the engine
 

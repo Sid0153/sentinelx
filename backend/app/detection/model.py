@@ -102,18 +102,48 @@ class Indicator(_Strict):
     confidence: Confidence | None = None
 
 
+MAX_SUPPRESSION = timedelta(days=90)
+
+
 class Exclusion(_Strict):
-    """Events matching an exclusion are ignored by the rule (an allowlist entry)."""
+    """Events matching an exclusion are ignored by the rule (an allowlist entry).
+
+    With `active_from` / `active_until` it is a time-boxed suppression (a maintenance window,
+    a known test): only events whose own time falls inside the window are ignored, at most
+    90 days long, so a suppression cannot quietly become permanent. Without them it is a
+    permanent allowlist entry, as before (Phase 12)."""
 
     field: Literal["source_ip", "username", "target_username", "host"]
     value: str = Field(min_length=1, max_length=253)
     comment: str | None = Field(default=None, max_length=200)
+    active_from: datetime | None = None
+    active_until: datetime | None = None
 
     @model_validator(mode="after")
     def _ip_is_network(self) -> Self:
         if self.field == "source_ip":
             ipaddress.ip_network(self.value, strict=False)
         return self
+
+    @model_validator(mode="after")
+    def _window(self) -> Self:
+        start, end = self.active_from, self.active_until
+        if start is None and end is None:
+            return self
+        if start is None or end is None:
+            raise ValueError("a suppression needs both active_from and active_until")
+        if start.tzinfo is None or end.tzinfo is None:
+            raise ValueError("suppression times need a time zone")
+        if start >= end:
+            raise ValueError("active_from must be before active_until")
+        if end - start > MAX_SUPPRESSION:
+            raise ValueError("a suppression lasts at most 90 days; use a permanent exclusion")
+        return self
+
+    def applies_at(self, moment: datetime) -> bool:
+        if self.active_from is None or self.active_until is None:
+            return True
+        return self.active_from <= moment < self.active_until
 
 
 class IntRange(_Strict):

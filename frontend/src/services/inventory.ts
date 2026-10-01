@@ -8,6 +8,7 @@ import type {
   EventDetail,
   EventPage,
   Identity,
+  PlaygroundResult,
   RuleDetail,
   RuleSummary,
   RuleVersion,
@@ -135,4 +136,21 @@ export function getDetectionMetrics(days: number, signal?: AbortSignal) {
 
 export function getCoverage(days: number, signal?: AbortSignal) {
   return apiRequest<Coverage>("/mitre/coverage", { query: { days }, signal });
+}
+
+// ---------- playground ----------
+
+export interface PlaygroundRequest {
+  source_type: string;
+  records: string[];
+  timezone?: string;
+  default_host?: string | null;
+  changes?: Record<string, unknown> | null;
+}
+
+export function testRule(ruleId: string, body: PlaygroundRequest) {
+  return apiRequest<PlaygroundResult>(`/detections/${encodeURIComponent(ruleId)}/test`, {
+    method: "POST",
+    body,
+  });
 }

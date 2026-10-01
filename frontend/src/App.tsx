@@ -20,6 +20,7 @@ import { IncidentDetailPage } from "./pages/IncidentDetailPage";
 import { IncidentsPage } from "./pages/IncidentsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { StatusPage } from "./pages/StatusPage";
 import { UsersPage } from "./pages/UsersPage";
@@ -49,6 +50,9 @@ export function App() {
           <Route path="detections/:ruleId" element={<DetectionDetailPage />} />
           <Route path="status" element={<StatusPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route element={<RequireRole minimum="ANALYST" />}>
+            <Route path="playground" element={<PlaygroundPage />} />
+          </Route>
           <Route element={<RequireRole minimum="ADMIN" />}>
             <Route path="users" element={<UsersPage />} />
             <Route path="audit" element={<AuditPage />} />

@@ -30,7 +30,7 @@ Last updated: **Phase 8**.
 | 17 | Evidence management | 7, 8 | ✅ alert evidence with raw records, events → alerts citing them, incident evidence pins (append-only, tagged) |
 | 18 | Analyst notes | 8 | ✅ append-only (database triggers) |
 | 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection and alert; grouped per finding and de-duplicated on incidents ✅ |
-| 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window and of the exclusion allowlist (10). Version diff: Phase 12 |
+| 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window and of the exclusion allowlist (10); version comparison, time-boxed suppressions, testing playground (12) |
 | 21 | Search and filtering | 5, 10 | ✅ events API filters (5); hunting: allowlisted fields and operators, time ranges, alert filters, keyset paging, capped counts, statement timeout, indexed substring search (10) |
 | 22 | Security analytics | 9, 11 | ✅ dashboard aggregates and trends (9); per-rule outcomes, false-positive rate, median time to triage and to close (11) |
 | 23 | Risk/context scoring | 7, 8, 11 | ✅ documented, versioned alert priority and incident risk (model 3: privileged target accounts), every brief input accounted for, inventory context shown with the score, open work rescored after a model change ([risk-model.md](risk-model.md)) |
@@ -85,7 +85,7 @@ Last updated: **Phase 8**.
 | /dashboard | 9 | ✅ the default page; tiles link to the filtered pages; trends with table view; checked on desktop and phone widths |
 | /events, /events/:id | 9 | ✅ explorer with time range, category, outcome, host, user and source filters in the URL, keyset paging; event page with enrichment, citing alerts and the raw record as text |
 | /hunt | 10 | ✅ query builder, templates, results with pivot menus, saved hunts; the whole hunt in the URL; checked on desktop and phone widths |
-| /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); outcomes and false-positive rates, `/coverage` (11); version diff / playground (12) ⬜ |
+| /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); outcomes and false-positive rates, `/coverage` (11); version comparison, suppression windows, `/playground` (12) |
 | /alerts, /alerts/:id | 7 | ✅ queue with filters; alert page with the brief's §20 content (incident association: Phase 8); checked on desktop and phone widths |
 | /incidents, /incidents/:id | 8 | ✅ queue, workspace (actions for analysts), checked on desktop and phone widths |
 | /assets, /identities (+ /:id) | 9 | ✅ lists with open alerts and last event, filters; detail with alerts, incidents and events; admin create and edit |
@@ -149,7 +149,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 | ADR-001 … ADR-007 (§38) | ✅ plus 0008–0010 |
 | Performance: indexes, pagination, bounded responses, batch ingestion (§33) | ✅ so far (index-fit tests, keyset paging, batched inserts); measured benchmarks: Phase 14 |
 | Detection coverage view, labelled "Implemented coverage" (§43) | ✅ `/coverage`: active rules, categories, severity, mappings, trigger counts, last triggered; every tactic with gaps stated (11) |
-| Detection testing playground (§44) | ⬜ Phase 12 |
+| Detection testing playground (§44) | ✅ `/playground` (analysts): choose a rule, paste sample events, run it, see whether and why it triggered, the evidence lines, severity and confidence; what-if tuning; nothing stored (12) |
 | Real-world extension plan (§49) | ✅ `architecture.md` |
 | Interview and portfolio package (§48, Phase 19) | ⬜ |
 

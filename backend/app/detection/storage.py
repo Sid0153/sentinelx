@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 TUNABLE_FIELDS = ("threshold", "time_window", "severity", "confidence", "enabled", "exclusions")
 
 
-class RuleChanges(BaseModel):
-    """What an admin may send. Only fields the rule declares tunable are accepted."""
+class TunableValues(BaseModel):
+    """Values for the fields a rule declares tunable (checked by `checked_values`)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -43,12 +43,18 @@ class RuleChanges(BaseModel):
     confidence: Confidence | None = None
     enabled: bool | None = None
     exclusions: list[Exclusion] | None = Field(default=None, max_length=100)
-    reason: str = Field(min_length=5, max_length=500)
 
     @field_validator("time_window", mode="before")
     @classmethod
     def _duration(cls, value: Any) -> Any:
         return parse_duration(value)
+
+
+class RuleChanges(TunableValues):
+    """What an admin may send: tunable values and why. Only fields the rule declares tunable
+    are accepted."""
+
+    reason: str = Field(min_length=5, max_length=500)
 
 
 def _as_json(value: Any) -> Any:
@@ -222,6 +228,35 @@ def update_rule(db: Session, rule_id: str, changes: RuleChanges, actor: User) ->
     if not row.in_library:
         raise AppError(409, "This rule was removed from the library and cannot be changed")
     current = effective(row)
+    new_values = checked_values(rule_id, current, changes)
+    diff = {
+        key: {"from": row.overrides.get(key, _as_json(getattr(current, key))), "to": value}
+        for key, value in new_values.items()
+        if value != row.overrides.get(key, _as_json(getattr(current, key)))
+    }
+    if not diff:
+        return row
+    row.overrides = {**row.overrides, **new_values}
+    candidate = effective(row)  # re-validates the whole rule with the new values
+    row.enabled = candidate.enabled
+    row.version += 1
+    _add_version(db, row, VersionSource.ADMIN, actor=actor, reason=changes.reason)
+    record(
+        db,
+        AuditAction.RULE_UPDATED,
+        actor=actor,
+        entity_type=EntityType.DETECTION_RULE,
+        entity_id=rule_id,
+        details={"version": row.version, "reason": changes.reason, "changes": diff},
+    )
+    db.commit()
+    return row
+
+
+def checked_values(rule_id: str, current: Rule, changes: TunableValues) -> dict[str, Any]:
+    """The values sent, as stored overrides, after checking each field is tunable for this
+    rule and within its bounds. Shared by tuning and the playground's what-if runs, so a trial
+    can never use a value a real change would refuse."""
     requested = changes.model_dump(exclude_unset=True, exclude={"reason"})
     if not requested:
         raise AppError(400, "Send at least one field to change")
@@ -246,30 +281,7 @@ def update_rule(db: Session, rule_id: str, changes: RuleChanges, actor: User) ->
     if changes.time_window is not None and tunable.time_window is not None:
         if not tunable.time_window.min <= changes.time_window <= tunable.time_window.max:
             raise AppError(400, "time_window is outside the bounds this rule allows")
-
-    new_values = {key: _as_json(getattr(changes, key)) for key in requested}
-    diff = {
-        key: {"from": row.overrides.get(key, _as_json(getattr(current, key))), "to": value}
-        for key, value in new_values.items()
-        if value != row.overrides.get(key, _as_json(getattr(current, key)))
-    }
-    if not diff:
-        return row
-    row.overrides = {**row.overrides, **new_values}
-    candidate = effective(row)  # re-validates the whole rule with the new values
-    row.enabled = candidate.enabled
-    row.version += 1
-    _add_version(db, row, VersionSource.ADMIN, actor=actor, reason=changes.reason)
-    record(
-        db,
-        AuditAction.RULE_UPDATED,
-        actor=actor,
-        entity_type=EntityType.DETECTION_RULE,
-        entity_id=rule_id,
-        details={"version": row.version, "reason": changes.reason, "changes": diff},
-    )
-    db.commit()
-    return row
+    return {key: _as_json(getattr(changes, key)) for key in requested}
 
 
 def enabled_rules(db: Session) -> list[tuple[Rule, int]]:

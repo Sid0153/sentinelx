@@ -3388,6 +3388,115 @@
         }
       }
     },
+    "/api/detections/{rule_id}/test": {
+      "post": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Test Rule",
+        "description": "Detection testing playground: runs the rule on sample log lines (at most 500, 256 KiB)\nthrough the real parser, enrichment and evaluator, optionally with what-if tuning values\n(`changes`, checked against the rule's bounds). Stores nothing: no events, alerts or runs.\nThe rule sees only the sample (a new-value rule builds its history from earlier lines).",
+        "operationId": "test_rule_api_detections__rule_id__test_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}-\\d{3}$",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaygroundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaygroundResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/mitre/coverage": {
       "get": {
         "tags": [
@@ -3524,6 +3633,29 @@
           }
         ],
         "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
           {
             "name": "status",
             "in": "query",
@@ -3681,29 +3813,6 @@
               "default": "priority",
               "title": "Sort"
             }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
           }
         ],
         "responses": {
@@ -3713,6 +3822,249 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Page_AlertSummary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alerts/groups": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Group Alerts",
+        "description": "The queue grouped by rule, host, account or source address (`by`), with the same\nfilters as the list: per group, how many alerts, how many open, the highest priority and\nthe latest activity. A view for bursts (many alerts of one rule or from one source);\nalerts and incidents are not changed. At most 100 groups, highest priority first.",
+        "operationId": "group_alerts_api_alerts_groups_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "rule",
+                "host",
+                "username",
+                "source_ip"
+              ],
+              "type": "string",
+              "default": "rule",
+              "title": "By"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AlertStatus"
+              },
+              "maxItems": 5,
+              "default": [],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "default": [],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "band",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 4,
+              "default": [],
+              "title": "Band"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3,5}-\\d{3}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
+            }
+          },
+          {
+            "name": "host",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Host"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "source_ip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 45
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Ip"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "priority",
+                "recent"
+              ],
+              "type": "string",
+              "default": "priority",
+              "title": "Sort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertGroups"
                 }
               }
             }
@@ -6872,6 +7224,76 @@
         ],
         "title": "AlertDetail"
       },
+      "AlertGroupPublic": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "top_priority": {
+            "type": "integer",
+            "title": "Top Priority"
+          },
+          "top_band": {
+            "type": "string",
+            "title": "Top Band"
+          },
+          "last_event_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Event At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "alerts",
+          "open",
+          "top_priority",
+          "top_band",
+          "last_event_at"
+        ],
+        "title": "AlertGroupPublic"
+      },
+      "AlertGroups": {
+        "properties": {
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AlertGroupPublic"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by",
+          "total",
+          "items"
+        ],
+        "title": "AlertGroups"
+      },
       "AlertRef": {
         "properties": {
           "id": {
@@ -9713,6 +10135,30 @@
               }
             ],
             "title": "Comment"
+          },
+          "active_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active From"
+          },
+          "active_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Until"
           }
         },
         "additionalProperties": false,
@@ -9722,7 +10168,7 @@
           "value"
         ],
         "title": "Exclusion",
-        "description": "Events matching an exclusion are ignored by the rule (an allowlist entry)."
+        "description": "Events matching an exclusion are ignored by the rule (an allowlist entry).\n\nWith `active_from` / `active_until` it is a time-boxed suppression (a maintenance window,\na known test): only events whose own time falls inside the window are ignored, at most\n90 days long, so a suppression cannot quietly become permanent. Without them it is a\npermanent allowlist entry, as before (Phase 12)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -11567,6 +12013,432 @@
         ],
         "title": "PinPublic"
       },
+      "PlaygroundDetection": {
+        "properties": {
+          "explanation": {
+            "type": "string",
+            "title": "Explanation"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "indicator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "first_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen"
+          },
+          "evidence_lines": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Evidence Lines"
+          },
+          "group": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Group"
+          },
+          "mitre": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mitre"
+          },
+          "investigation": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Investigation"
+          },
+          "response": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Response"
+          }
+        },
+        "type": "object",
+        "required": [
+          "explanation",
+          "severity",
+          "confidence",
+          "indicator",
+          "event_count",
+          "first_seen",
+          "last_seen",
+          "evidence_lines",
+          "group",
+          "mitre",
+          "investigation",
+          "response"
+        ],
+        "title": "PlaygroundDetection"
+      },
+      "PlaygroundLine": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "event": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "target_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Username"
+          },
+          "source_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ip"
+          },
+          "process_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Name"
+          },
+          "excluded": {
+            "type": "boolean",
+            "title": "Excluded",
+            "default": false
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps",
+            "default": []
+          },
+          "evidence": {
+            "type": "boolean",
+            "title": "Evidence",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "status",
+          "code"
+        ],
+        "title": "PlaygroundLine"
+      },
+      "PlaygroundRequest": {
+        "properties": {
+          "source_type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "records": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Records"
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Timezone",
+            "default": "UTC"
+          },
+          "default_host": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 253
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Host"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TunableValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_type",
+          "records"
+        ],
+        "title": "PlaygroundRequest"
+      },
+      "PlaygroundResult": {
+        "properties": {
+          "triggered": {
+            "type": "boolean",
+            "title": "Triggered"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/PlaygroundRule"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PlaygroundSummary"
+          },
+          "detections": {
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundDetection"
+            },
+            "type": "array",
+            "title": "Detections"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/PlaygroundLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "triggered",
+          "rule",
+          "summary",
+          "detections",
+          "lines"
+        ],
+        "title": "PlaygroundResult"
+      },
+      "PlaygroundRule": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "type": "string",
+            "title": "Confidence"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "time_window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Window"
+          },
+          "tried": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tried"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "kind",
+          "version",
+          "severity",
+          "confidence",
+          "threshold",
+          "time_window",
+          "tried"
+        ],
+        "title": "PlaygroundRule"
+      },
+      "PlaygroundSummary": {
+        "properties": {
+          "lines": {
+            "type": "integer",
+            "title": "Lines"
+          },
+          "parsed": {
+            "type": "integer",
+            "title": "Parsed"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "excluded": {
+            "type": "integer",
+            "title": "Excluded"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "detections": {
+            "type": "integer",
+            "title": "Detections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lines",
+          "parsed",
+          "skipped",
+          "failed",
+          "excluded",
+          "matched",
+          "detections"
+        ],
+        "title": "PlaygroundSummary"
+      },
       "PriorityFactor": {
         "properties": {
           "factor": {
@@ -11961,7 +12833,7 @@
           "reason"
         ],
         "title": "RuleChanges",
-        "description": "What an admin may send. Only fields the rule declares tunable are accepted."
+        "description": "What an admin may send: tunable values and why. Only fields the rule declares tunable\nare accepted."
       },
       "RuleDetail": {
         "properties": {
@@ -13696,6 +14568,84 @@
           "items"
         ],
         "title": "Trends"
+      },
+      "TunableValues": {
+        "properties": {
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "time_window": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "duration"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Window"
+          },
+          "severity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Severity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Confidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "exclusions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Exclusion"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TunableValues",
+        "description": "Values for the fields a rule declares tunable (checked by `checked_values`)."
       },
       "UserCreate": {
         "properties": {

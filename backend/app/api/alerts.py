@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.alerts import queries, service, workflow
 from app.api.deps import DbSession
@@ -21,6 +21,8 @@ from app.models.user import User
 from app.schemas.alert import (
     AlertActivity,
     AlertDetail,
+    AlertGroupPublic,
+    AlertGroups,
     AlertSummary,
     AlertTechnique,
     EvidenceEvent,
@@ -111,10 +113,7 @@ def _detail(db: DbSession, alert: Alert) -> AlertDetail:
     )
 
 
-@alerts.get("", response_model=Page[AlertSummary], responses=error_responses(400))
-def list_alerts(
-    _user: CurrentUser,
-    db: DbSession,
+def alert_filters(
     status: Annotated[list[AlertStatus], Query(max_length=5)] = [],  # noqa: B006
     severity: Severity = [],  # noqa: B006
     band: Severity = [],  # noqa: B006
@@ -125,18 +124,14 @@ def list_alerts(
     since: datetime | None = None,
     until: datetime | None = None,
     sort: queries.Sort = "priority",
-    limit: Limit = 50,
-    offset: Offset = 0,
-) -> Page[AlertSummary]:
-    """The alert queue. Default order: priority score, then most recent activity. Filters:
-    `status`, `severity` and `band` (each repeatable), rule, host, user, source address, and
-    `since` / `until` on the alert's event times."""
+) -> queries.AlertFilters:
+    """The queue's filters, shared by the list and the grouped view."""
     levels = {"low", "medium", "high", "critical"}
     if not set(severity) <= levels or not set(band) <= levels:
         raise AppError(400, "severity and band take low, medium, high or critical")
     if source_ip is not None and optional_ip(source_ip) is None:
         raise AppError(400, "source_ip must be an IP address")
-    filters = queries.AlertFilters(
+    return queries.AlertFilters(
         status=[str(s) for s in status],
         severity=severity,
         band=band,
@@ -148,12 +143,40 @@ def list_alerts(
         until=until,
         sort=sort,
     )
+
+
+Filters = Annotated[queries.AlertFilters, Depends(alert_filters)]
+
+
+@alerts.get("", response_model=Page[AlertSummary], responses=error_responses(400))
+def list_alerts(
+    _user: CurrentUser, db: DbSession, filters: Filters, limit: Limit = 50, offset: Offset = 0
+) -> Page[AlertSummary]:
+    """The alert queue. Default order: priority score, then most recent activity. Filters:
+    `status`, `severity` and `band` (each repeatable), rule, host, user, source address, and
+    `since` / `until` on the alert's event times."""
     rows, total = queries.list_alerts(db, filters, limit, offset)
     return Page(
         items=[AlertSummary.model_validate(a) for a in rows],
         total=total,
         limit=limit,
         offset=offset,
+    )
+
+
+@alerts.get("/groups", response_model=AlertGroups, responses=error_responses(400))
+def group_alerts(
+    _user: CurrentUser, db: DbSession, filters: Filters, by: queries.GroupBy = "rule"
+) -> AlertGroups:
+    """The queue grouped by rule, host, account or source address (`by`), with the same
+    filters as the list: per group, how many alerts, how many open, the highest priority and
+    the latest activity. A view for bursts (many alerts of one rule or from one source);
+    alerts and incidents are not changed. At most 100 groups, highest priority first."""
+    groups, total = queries.group_alerts(db, filters, by)
+    return AlertGroups(
+        by=by,
+        total=total,
+        items=[AlertGroupPublic(**vars(g)) for g in groups],
     )
 
 

@@ -18,7 +18,7 @@ import { useApi } from "../hooks/useApi";
 import { ApiError } from "../services/http";
 import { getDetectionMetrics, getRule, listRuleVersions, tuneRule } from "../services/inventory";
 import { PERIODS } from "./DetectionsPage";
-import type { RuleDetail } from "../types/inventory";
+import type { RuleDetail, RuleVersion } from "../types/inventory";
 
 const LEVELS = ["critical", "high", "medium", "low"];
 const EXCLUSION_FIELDS = ["source_ip", "username", "target_username", "host"] as const;
@@ -27,22 +27,47 @@ interface Exclusion {
   field: (typeof EXCLUSION_FIELDS)[number];
   value: string;
   comment?: string | null;
+  // A time-boxed suppression (both set): only events inside the window are ignored.
+  active_from?: string | null;
+  active_until?: string | null;
 }
+
+/** "until 2026-10-02 08:00 UTC", "expired", or "" for a permanent exclusion. */
+export function suppressionLabel(e: Exclusion, now = Date.now()): string {
+  if (!e.active_from || !e.active_until) return "";
+  const until = Date.parse(e.active_until);
+  if (until <= now) return "suppression expired";
+  const from = Date.parse(e.active_from);
+  const span = `${formatUtc(e.active_from)} – ${formatUtc(e.active_until)}`;
+  return from > now ? `suppression from ${span}` : `suppressed ${span}`;
+}
+
+/** datetime-local (read as UTC) -> ISO, or null. */
+const utcInput = (value: string) => (value ? `${value}:00Z` : null);
 
 function exclusionsOf(rule: RuleDetail): Exclusion[] {
   const list = rule.definition.exclusions;
   return Array.isArray(list) ? (list as Exclusion[]) : [];
 }
 
+const exclusionKey = (e: Exclusion) => [
+  e.field,
+  e.value,
+  e.comment ?? null,
+  e.active_from ? Date.parse(e.active_from) : null,
+  e.active_until ? Date.parse(e.active_until) : null,
+];
 const sameExclusions = (a: Exclusion[], b: Exclusion[]) =>
-  JSON.stringify(a.map((e) => [e.field, e.value, e.comment ?? null])) ===
-  JSON.stringify(b.map((e) => [e.field, e.value, e.comment ?? null]));
+  JSON.stringify(a.map(exclusionKey)) === JSON.stringify(b.map(exclusionKey));
 
 /** The allowlist of a rule: events matching an entry are ignored by it. */
 function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (next: Exclusion[]) => void }) {
   const [field, setField] = useState<Exclusion["field"]>("source_ip");
   const [entry, setEntry] = useState("");
   const [comment, setComment] = useState("");
+  const [from, setFrom] = useState("");
+  const [until, setUntil] = useState("");
+  const halfWindow = Boolean(from) !== Boolean(until);
   return (
     <fieldset className="space-y-2">
       <legend className="mb-1 text-sm text-slate-300">Exclusions (events matching one are ignored by this rule)</legend>
@@ -56,6 +81,7 @@ function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (
                 {e.field} = {e.value}
               </span>
               {e.comment && <span className="text-xs text-slate-500">({e.comment})</span>}
+              {suppressionLabel(e) && <span className="text-xs text-amber-300">{suppressionLabel(e)}</span>}
               <button
                 type="button"
                 className="text-xs text-rose-300 hover:underline"
@@ -90,18 +116,53 @@ function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (
           className={`${inputClass} w-48`}
           maxLength={200}
         />
+        <label className="text-xs text-slate-400">
+          Suppress from (UTC, optional)
+          <input
+            type="datetime-local"
+            aria-label="Suppression from"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className={`${inputClass} w-52`}
+          />
+        </label>
+        <label className="text-xs text-slate-400">
+          until
+          <input
+            type="datetime-local"
+            aria-label="Suppression until"
+            value={until}
+            onChange={(e) => setUntil(e.target.value)}
+            className={`${inputClass} w-52`}
+          />
+        </label>
         <Button
           variant="secondary"
-          disabled={!entry.trim() || value.length >= 100}
+          disabled={!entry.trim() || value.length >= 100 || halfWindow}
           onClick={() => {
-            onChange([...value, { field, value: entry.trim(), comment: comment.trim() || null }]);
+            onChange([
+              ...value,
+              {
+                field,
+                value: entry.trim(),
+                comment: comment.trim() || null,
+                ...(from && until ? { active_from: utcInput(from), active_until: utcInput(until) } : {}),
+              },
+            ]);
             setEntry("");
             setComment("");
+            setFrom("");
+            setUntil("");
           }}
         >
-          Add exclusion
+          {from && until ? "Add suppression" : "Add exclusion"}
         </Button>
       </div>
+      <p className="text-xs text-slate-500">
+        Without dates an exclusion is permanent. With both, it is a suppression (a maintenance
+        window, an announced test) of at most 90 days: only events inside the window are ignored.
+        {halfWindow && <span className="text-amber-300"> Give both dates, or neither.</span>}
+      </p>
     </fieldset>
   );
 }
@@ -264,6 +325,93 @@ function TuneForm({ rule, onSaved, onCancel }: { rule: RuleDetail; onSaved: () =
   );
 }
 
+/** Every leaf of a definition as "path" -> JSON text ("steps.0.min_count" -> "3"). */
+function flatten(value: unknown, prefix = "", out: Record<string, string> = {}): Record<string, string> {
+  if (value !== null && typeof value === "object") {
+    const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v] as const) : Object.entries(value);
+    if (entries.length === 0) out[prefix || "(root)"] = JSON.stringify(value);
+    for (const [key, child] of entries) flatten(child, prefix ? `${prefix}.${key}` : key, out);
+  } else {
+    out[prefix || "(root)"] = JSON.stringify(value);
+  }
+  return out;
+}
+
+export interface DefinitionChange {
+  path: string;
+  from: string | null; // null: not present in the older version
+  to: string | null; // null: removed in the newer version
+}
+
+/** The fields that differ between two rule definitions, in path order. */
+export function diffDefinitions(older: unknown, newer: unknown): DefinitionChange[] {
+  const a = flatten(older);
+  const b = flatten(newer);
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])]
+    .sort()
+    .filter((path) => a[path] !== b[path])
+    .map((path) => ({ path, from: a[path] ?? null, to: b[path] ?? null }));
+}
+
+function VersionDiff({ versions }: { versions: RuleVersion[] }) {
+  const numbers = versions.map((v) => v.version).sort((x, y) => x - y);
+  const [older, setOlder] = useState(numbers[numbers.length - 2] ?? numbers[0]);
+  const [newer, setNewer] = useState(numbers[numbers.length - 1]);
+  if (numbers.length < 2) return null;
+  const pick = (n: number) => versions.find((v) => v.version === n);
+  const a = pick(older);
+  const b = pick(newer);
+  const changes = a && b ? diffDefinitions(a.definition, b.definition) : [];
+  return (
+    <div className="mt-4 border-t border-slate-800 pt-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+        Compare
+        <select aria-label="Older version" value={older} onChange={(e) => setOlder(Number(e.target.value))} className={selectClass}>
+          {numbers.map((n) => (
+            <option key={n} value={n}>
+              v{n}
+            </option>
+          ))}
+        </select>
+        with
+        <select aria-label="Newer version" value={newer} onChange={(e) => setNewer(Number(e.target.value))} className={selectClass}>
+          {numbers.map((n) => (
+            <option key={n} value={n}>
+              v{n}
+            </option>
+          ))}
+        </select>
+      </div>
+      {older === newer ? (
+        <p className="text-sm text-slate-400">Choose two different versions.</p>
+      ) : changes.length === 0 ? (
+        <p className="text-sm text-slate-400">The definitions are identical.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs" aria-label="Changed fields">
+            <thead className="uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="py-1 pr-3 font-medium">Field</th>
+                <th className="py-1 pr-3 font-medium">v{older}</th>
+                <th className="py-1 font-medium">v{newer}</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono">
+              {changes.map((c) => (
+                <tr key={c.path} className="border-t border-slate-800 align-top">
+                  <td className="py-1 pr-3 text-slate-300">{c.path}</td>
+                  <td className="break-all py-1 pr-3 text-rose-300">{c.from ?? "—"}</td>
+                  <td className="break-all py-1 text-emerald-300">{c.to ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Versions({ ruleId, attempt }: { ruleId: string; attempt: number }) {
   const load = useCallback(
     (signal: AbortSignal) => listRuleVersions(ruleId, signal),
@@ -273,7 +421,8 @@ function Versions({ ruleId, attempt }: { ruleId: string; attempt: number }) {
   if (error) return <ErrorMessage>{error.message}</ErrorMessage>;
   if (!data) return <p className="text-sm text-slate-400">Loading history…</p>;
   return (
-    <ol className="space-y-2 text-sm">
+    <>
+      <ol className="space-y-2 text-sm">
       {data.map((v) => (
         <li key={v.version} className="border-t border-slate-800 pt-2 first:border-0 first:pt-0">
           <div className="flex flex-wrap items-baseline gap-2">
@@ -288,7 +437,9 @@ function Versions({ ruleId, attempt }: { ruleId: string; attempt: number }) {
           )}
         </li>
       ))}
-    </ol>
+      </ol>
+      <VersionDiff key={data.length} versions={data} />
+    </>
   );
 }
 
@@ -406,7 +557,11 @@ export function DetectionDetailPage() {
                   {exclusionsOf(rule).length === 0
                     ? "none"
                     : exclusionsOf(rule)
-                        .map((e) => `${e.field} = ${e.value}${e.comment ? ` (${e.comment})` : ""}`)
+                        .map(
+                          (e) =>
+                            `${e.field} = ${e.value}${e.comment ? ` (${e.comment})` : ""}` +
+                            (suppressionLabel(e) ? `, ${suppressionLabel(e)}` : ""),
+                        )
                         .join("; ")}
                 </p>
                 {canTune && (
@@ -454,6 +609,11 @@ export function DetectionDetailPage() {
             <Link to={`/alerts?rule_id=${encodeURIComponent(rule.rule_id)}`} className="mt-2 inline-block text-sm text-sky-300">
               Alerts from this rule
             </Link>
+            {hasRole(user, "ANALYST") && rule.in_library && (
+              <Link to={`/playground?rule=${encodeURIComponent(rule.rule_id)}`} className="ml-4 mt-2 inline-block text-sm text-sky-300">
+                Test this rule
+              </Link>
+            )}
           </Panel>
           <RuleOutcomes ruleId={rule.rule_id} />
         </div>

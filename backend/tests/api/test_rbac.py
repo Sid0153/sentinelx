@@ -82,6 +82,8 @@ EXPECTED_ACCESS: dict[Route, Role] = {
     ("GET", "/api/dashboard/summary"): Role.VIEWER,
     ("GET", "/api/dashboard/trends"): Role.VIEWER,
     ("GET", "/api/detections/metrics"): Role.VIEWER,
+    ("POST", "/api/detections/{rule_id}/test"): Role.ANALYST,
+    ("GET", "/api/alerts/groups"): Role.VIEWER,
     ("GET", "/api/mitre/coverage"): Role.VIEWER,
     ("GET", "/api/hunt/fields"): Role.VIEWER,
     ("POST", "/api/hunt/query"): Role.VIEWER,

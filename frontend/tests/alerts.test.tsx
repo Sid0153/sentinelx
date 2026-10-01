@@ -354,3 +354,34 @@ describe("Inventory context", () => {
     expect(panel).toHaveTextContent("Not in the inventory: deploy");
   });
 });
+
+describe("Grouped queue", () => {
+  it("groups the queue and opens a group as a narrowed queue", async () => {
+    const api = mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/alerts": page([summary()]),
+      "GET /api/alerts/groups": {
+        body: {
+          by: "rule",
+          total: 2,
+          items: [
+            { key: "AUTH-005", label: "One account attacked from many sources", alerts: 41, open: 40, top_priority: 48, top_band: "medium", last_event_at: "2026-09-30T10:00:00Z" },
+            { key: "AUTH-001", label: "Repeated failed logons", alerts: 3, open: 3, top_priority: 38, top_band: "medium", last_event_at: "2026-09-30T09:00:00Z" },
+          ],
+        },
+      },
+    });
+    renderApp("/alerts?group=rule&severity=medium");
+    const link = await screen.findByRole("link", { name: /AUTH-005 One account attacked/ });
+    expect(link.closest("tr")).toHaveTextContent("4140 open");
+    expect(api.callsTo("GET /api/alerts/groups")[0].url.searchParams.get("by")).toBe("rule");
+    expect(api.callsTo("GET /api/alerts/groups")[0].url.searchParams.get("severity")).toBe("medium");
+    expect(link.getAttribute("href")).toBe("/alerts?severity=medium&rule_id=AUTH-005");
+
+    fireEvent.click(link);
+    expect(await screen.findByText("show all rules")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.callsTo("GET /api/alerts").at(-1)!.url.searchParams.get("rule_id")).toBe("AUTH-005"),
+    );
+  });
+});

@@ -133,3 +133,19 @@ class TransitionRequest(BaseModel):
     @classmethod
     def _blank_is_none(cls, value: object) -> object:
         return value.strip() or None if isinstance(value, str) else value
+
+
+class AlertGroupPublic(BaseModel):
+    key: str  # rule ID, host, username or source address
+    label: str  # the rule's name for rules, else the key
+    alerts: int
+    open: int
+    top_priority: int
+    top_band: str
+    last_event_at: datetime
+
+
+class AlertGroups(BaseModel):
+    by: str
+    total: int  # groups in all (at most 100 are listed)
+    items: list[AlertGroupPublic]

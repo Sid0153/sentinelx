@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { PriorityBadge, SimulatedTag, StatusText } from "../components/alerts";
 import { ErrorMessage, Field, PageHeader, Pagination, formatUtc, selectClass } from "../components/ui";
 import { useApi } from "../hooks/useApi";
-import { listAlerts } from "../services/alerts";
+import { groupAlerts, listAlerts, type AlertQuery, type GroupBy } from "../services/alerts";
 import type { AlertStatus, AlertSummary } from "../types/api";
 
 const PAGE_SIZE = 50;
@@ -59,20 +59,123 @@ function AlertRow({ alert }: { alert: AlertSummary }) {
   );
 }
 
+// Narrowing filters, shown as removable chips (links from groups, dashboards and pivots).
+const SCOPES = [
+  { key: "rule_id", label: "Rule", clear: "show all rules" },
+  { key: "host", label: "Host", clear: "all hosts" },
+  { key: "username", label: "Account", clear: "all accounts" },
+  { key: "source_ip", label: "Source", clear: "all sources" },
+] as const;
+
+const GROUPS: { value: GroupBy; label: string; param: string }[] = [
+  { value: "rule", label: "Rule", param: "rule_id" },
+  { value: "host", label: "Host", param: "host" },
+  { value: "username", label: "Account", param: "username" },
+  { value: "source_ip", label: "Source address", param: "source_ip" },
+];
+
+/** The queue counted per rule, host, account or source: a burst of 40 alerts of one rule
+ * becomes one row. A view only; each row opens the queue narrowed to it. */
+function GroupedQueue({
+  query,
+  by,
+  filterKey,
+  params,
+}: {
+  query: Omit<AlertQuery, "offset" | "limit">;
+  by: GroupBy;
+  filterKey: string;
+  params: URLSearchParams;
+}) {
+  const load = useCallback(
+    (signal: AbortSignal) => groupAlerts(query, by, signal),
+    [filterKey], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const { data, error, loading } = useApi(load);
+  const param = GROUPS.find((g) => g.value === by)?.param ?? "rule_id";
+  const linkFor = (key: string) => {
+    const next = new URLSearchParams(params);
+    next.delete("group");
+    next.delete("offset");
+    next.set(param, key);
+    return `/alerts?${next.toString()}`;
+  };
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900 px-4">
+      {error ? (
+        <div className="py-3">
+          <ErrorMessage>{error.message}</ErrorMessage>
+        </div>
+      ) : !data ? (
+        <p className="py-3 text-sm text-slate-400">Grouping alerts…</p>
+      ) : data.items.length === 0 ? (
+        <p className="py-3 text-sm text-slate-400">No alerts match these filters.</p>
+      ) : (
+        <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
+          <caption className="py-2 text-left text-xs text-slate-500">
+            {data.total} group{data.total === 1 ? "" : "s"}
+            {data.total > data.items.length && ` (the ${data.items.length} with the highest priority shown)`}
+          </caption>
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="py-2 pr-4 font-medium">Highest priority</th>
+              <th className="py-2 pr-4 font-medium">{GROUPS.find((g) => g.value === by)?.label}</th>
+              <th className="py-2 pr-4 text-right font-medium">Alerts</th>
+              <th className="py-2 font-medium">Last activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((g) => (
+              <tr key={g.key} className="border-t border-slate-800 align-top">
+                <td className="py-2 pr-4">
+                  <PriorityBadge score={g.top_priority} band={g.top_band} />
+                </td>
+                <td className="py-2 pr-4">
+                  <Link to={linkFor(g.key)} className="text-slate-100 hover:text-sky-300">
+                    {by === "rule" ? (
+                      <>
+                        <span className="font-mono text-xs text-slate-500">{g.key}</span> {g.label}
+                      </>
+                    ) : (
+                      <span className="font-mono">{g.key}</span>
+                    )}
+                  </Link>
+                </td>
+                <td className="py-2 pr-4 text-right font-mono text-slate-200">
+                  {g.alerts}
+                  {g.open !== g.alerts && <div className="text-xs text-slate-500">{g.open} open</div>}
+                </td>
+                <td className="whitespace-nowrap py-2 font-mono text-xs text-slate-400">
+                  {formatUtc(g.last_event_at)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export function AlertsPage() {
   // Filters live in the URL, so a queue view can be bookmarked and shared.
   const [params, setParams] = useSearchParams();
   const view = params.get("view") ?? "open";
   const severity = params.get("severity") ?? "";
-  const ruleId = params.get("rule_id") ?? "";
-  const sort = params.get("sort") === "recent" ? "recent" : "priority";
+  const sort: AlertQuery["sort"] = params.get("sort") === "recent" ? "recent" : "priority";
   const offset = Number(params.get("offset") ?? "0") || 0;
   const statuses = (VIEWS[view] ?? VIEWS.open).statuses;
+  const scope = Object.fromEntries(SCOPES.map((s) => [s.key, params.get(s.key) ?? ""])) as Record<
+    (typeof SCOPES)[number]["key"],
+    string
+  >;
+  const groupBy = (GROUPS.find((g) => g.value === params.get("group"))?.value ?? "") as GroupBy | "";
+  const filterKey = params.toString();
 
+  const query = { status: statuses, severity, sort, ...scope };
   const load = useCallback(
-    (signal: AbortSignal) =>
-      listAlerts({ status: statuses, severity, rule_id: ruleId, sort, offset, limit: PAGE_SIZE }, signal),
-    [statuses, severity, ruleId, sort, offset],
+    (signal: AbortSignal) => listAlerts({ ...query, offset, limit: PAGE_SIZE }, signal),
+    [filterKey], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const { data, error, loading } = useApi(load);
 
@@ -114,15 +217,29 @@ export function AlertsPage() {
             <option value="recent">Most recent activity</option>
           </select>
         </Field>
-        {ruleId && (
-          <p className="flex items-end gap-2 pb-1.5 text-sm text-slate-300">
-            Rule <span className="font-mono">{ruleId}</span>
-            <button type="button" className="text-sky-300 hover:underline" onClick={() => setFilter("rule_id", "")}>
-              show all rules
+        <Field label="Group by">
+          <select value={groupBy} onChange={(e) => setFilter("group", e.target.value)} className={selectClass}>
+            <option value="">No grouping</option>
+            {GROUPS.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {SCOPES.filter((s) => scope[s.key]).map((s) => (
+          <p key={s.key} className="flex items-end gap-2 pb-1.5 text-sm text-slate-300">
+            {s.label} <span className="font-mono">{scope[s.key]}</span>
+            <button type="button" className="text-sky-300 hover:underline" onClick={() => setFilter(s.key, "")}>
+              {s.clear}
             </button>
           </p>
-        )}
+        ))}
       </div>
+      {groupBy ? (
+        <GroupedQueue query={query} by={groupBy} filterKey={filterKey} params={params} />
+      ) : (
+      <>
       <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900 px-4">
         {error ? (
           <div className="py-3">
@@ -166,6 +283,8 @@ export function AlertsPage() {
             setParams(updated);
           }}
         />
+      )}
+      </>
       )}
     </section>
   );

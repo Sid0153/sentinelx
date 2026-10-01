@@ -8,10 +8,11 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, status
 from sqlalchemy import select
 
-from app.api.deps import DbSession
-from app.auth.deps import AdminUser, CurrentUser
-from app.detection import insights, service
+from app.api.deps import DbSession, SettingsDep
+from app.auth.deps import AdminUser, AnalystUser, CurrentUser
+from app.detection import insights, playground, service
 from app.detection.library import get_library
+from app.detection.model import format_duration
 from app.detection.storage import RuleChanges, effective, get_rule, update_rule
 from app.models.detection import (
     DetectionRule,
@@ -28,6 +29,11 @@ from app.schemas.detection import (
     CoverageTactic,
     CoverageTechnique,
     DetectionMetrics,
+    PlaygroundDetection,
+    PlaygroundLine,
+    PlaygroundResult,
+    PlaygroundRule,
+    PlaygroundSummary,
     RuleDetail,
     RuleMetricsPublic,
     RuleSummary,
@@ -202,6 +208,95 @@ def list_versions(rule_id: RuleId, _user: CurrentUser, db: DbSession) -> list[Ru
         .order_by(DetectionRuleVersion.version.desc())
     )
     return [RuleVersionPublic.model_validate(r) for r in rows]
+
+
+def _playground_line(line: playground.LineResult, evidence: bool) -> PlaygroundLine:
+    event = line.event
+    return PlaygroundLine(
+        line=line.line,
+        status=line.status,
+        code=line.code,
+        timestamp=event.timestamp if event else None,
+        event=(
+            f"{event.event_category}/{event.event_action} {event.event_outcome}" if event else None
+        ),
+        host=event.host if event else None,
+        username=event.username if event else None,
+        target_username=event.target_username if event else None,
+        source_ip=event.source_ip if event else None,
+        process_name=event.process_name if event else None,
+        excluded=line.excluded,
+        matched=line.matched,
+        steps=line.steps,
+        evidence=evidence,
+    )
+
+
+@detections.post(
+    "/{rule_id}/test",
+    response_model=PlaygroundResult,
+    responses=error_responses(400, 404, 409, 422),
+)
+def test_rule(
+    rule_id: RuleId,
+    payload: playground.PlaygroundRequest,
+    _user: AnalystUser,
+    db: DbSession,
+    settings: SettingsDep,
+) -> PlaygroundResult:
+    """Detection testing playground: runs the rule on sample log lines (at most 500, 256 KiB)
+    through the real parser, enrichment and evaluator, optionally with what-if tuning values
+    (`changes`, checked against the rule's bounds). Stores nothing: no events, alerts or runs.
+    The rule sees only the sample (a new-value rule builds its history from earlier lines)."""
+    result = playground.run(db, rule_id, payload, settings)
+    evidence: dict[int, list[int]] = {}
+    for number, detection in enumerate(result.detections):
+        evidence[number] = sorted(int(e.split("-", 1)[1]) for e in detection.evidence_event_ids)
+    cited = {line for lines in evidence.values() for line in lines}
+    rule = result.rule
+    lines = [_playground_line(line, line.line in cited) for line in result.lines]
+    parsed = [line for line in result.lines if line.event is not None]
+    return PlaygroundResult(
+        triggered=bool(result.detections),
+        rule=PlaygroundRule(
+            rule_id=rule.id,
+            name=rule.name,
+            kind=rule.kind,
+            version=result.version,
+            severity=str(rule.severity),
+            confidence=str(rule.confidence),
+            threshold=rule.threshold,
+            time_window=format_duration(rule.time_window) if rule.time_window else None,
+            tried=result.tried,
+        ),
+        summary=PlaygroundSummary(
+            lines=len(result.lines),
+            parsed=len(parsed),
+            skipped=sum(line.status == "skipped" for line in result.lines),
+            failed=sum(line.status == "failed" for line in result.lines),
+            excluded=sum(line.excluded for line in parsed),
+            matched=sum(bool(line.matched) or bool(line.steps) for line in parsed),
+            detections=len(result.detections),
+        ),
+        detections=[
+            PlaygroundDetection(
+                explanation=d.explanation,
+                severity=str(d.severity),
+                confidence=str(d.confidence),
+                indicator=d.indicator,
+                event_count=d.event_count,
+                first_seen=d.first_seen,
+                last_seen=d.last_seen,
+                evidence_lines=evidence[number],
+                group=d.group,
+                mitre=[m.technique for m in d.mitre],
+                investigation=d.investigation,
+                response=d.response,
+            )
+            for number, d in enumerate(result.detections)
+        ],
+        lines=lines,
+    )
 
 
 @detections.patch("/{rule_id}", response_model=RuleDetail, responses=error_responses(400, 404, 409))

@@ -145,6 +145,17 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
   closed work alone. Mutation-checked: the rate's denominator, indicator attribution, target
   reprioritization and the incident refresh each have a test that fails without them.
 
+**Detection engineering** ✅ (Phase 12; `tests/api/test_playground.py`,
+`frontend/tests/playground.test.tsx`, `frontend/tests/alerts.test.tsx`)
+- Playground: a rule firing on sample lines with its explanation and evidence lines, nothing
+  stored (row counts unchanged), why a rule did not fire, what-if values accepted within
+  bounds and refused outside them, sequence steps per line, exclusions and suppressions
+  applied, input bounds, analysts only.
+- Suppression windows: edges (start inside, end outside), validation, a tuned suppression
+  stopping detection inside its window and not after it. Mutation-checked.
+- Grouped queue: counts per rule and per source with filters; the version comparison and the
+  suppression editor in the UI.
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.

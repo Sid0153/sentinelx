@@ -10,9 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.audit.events import AuditAction, EntityType
 from app.core.errors import AppError
-from app.models.alert import Alert, AlertEvent
+from app.models.alert import ACTIVE_STATUSES, Alert, AlertEvent
 from app.models.audit_log import AuditLog
+from app.models.detection import DetectionRule
 from app.models.event import Event, RawEvent
+from app.risk.priority import band
 
 RELATED_WINDOW = timedelta(hours=24)
 MAX_RELATED = 20
@@ -55,6 +57,67 @@ def _conditions(filters: AlertFilters) -> list[ColumnElement[bool]]:
     if filters.until:
         found.append(Alert.first_event_at <= filters.until)
     return found
+
+
+GroupBy = Literal["rule", "host", "username", "source_ip"]
+MAX_GROUPS = 100
+
+
+@dataclass(frozen=True)
+class AlertGroup:
+    key: str
+    label: str
+    alerts: int
+    open: int
+    top_priority: int
+    top_band: str
+    last_event_at: datetime
+
+
+def group_alerts(db: Session, filters: AlertFilters, by: GroupBy) -> tuple[list[AlertGroup], int]:
+    """The queue's alerts (with the same filters) counted per rule, host, account or source,
+    the group with the highest priority first. A view only: alerts and incidents are
+    unchanged. Alerts without the grouped value (an alert with no source address) are left
+    out. Returns at most MAX_GROUPS groups, and how many there are."""
+    column = {
+        "rule": Alert.rule_id,
+        "host": Alert.host,
+        "username": Alert.username,
+        "source_ip": Alert.source_ip,
+    }[by]
+    top = func.max(Alert.priority_score)
+    statement = (
+        select(
+            column,
+            func.count(),
+            func.count().filter(Alert.status.in_(ACTIVE_STATUSES)),
+            top,
+            func.max(Alert.last_event_at),
+        )
+        .where(*_conditions(filters), column.isnot(None))
+        .group_by(column)
+    )
+    total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    rows = db.execute(
+        statement.order_by(top.desc(), func.count().desc(), column).limit(MAX_GROUPS)
+    ).all()
+    names = (
+        dict(db.execute(select(DetectionRule.rule_id, DetectionRule.name)).tuples().all())
+        if by == "rule"
+        else {}
+    )
+    return [
+        AlertGroup(
+            key=str(key),
+            label=names.get(key, str(key)),
+            alerts=count,
+            open=open_count,
+            top_priority=score,
+            top_band=band(score),
+            last_event_at=last,
+        )
+        for key, count, open_count, score, last in rows
+    ], int(total)
 
 
 def list_alerts(

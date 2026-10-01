@@ -26,6 +26,8 @@ def group_dict(rule: Rule, key: tuple[Any, ...]) -> dict[str, Any]:
 
 def excluded(event: DetectionEvent, exclusions: list[Exclusion]) -> bool:
     for exclusion in exclusions:
+        if not exclusion.applies_at(event.timestamp):
+            continue  # a suppression window that does not cover this event
         actual = event.get(exclusion.field)
         if actual is None:
             continue

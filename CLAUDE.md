@@ -23,7 +23,8 @@ its rules always apply:
 | 8 Correlation and incidents | Done, green in CI (1007 backend tests incl. real-concurrency tests, 98% coverage; 56 frontend tests; correlation checked in the Compose smoke test; pages checked at desktop and phone widths) |
 | 9 Dashboard and investigation workspace | Done, green in CI (1028 backend tests, 98% coverage; 74 frontend tests; dashboard, events, assets, identities, detections checked on the live stack at phone width) |
 | 10 Threat hunting | Done, green in CI (1133 backend tests, 98% coverage; 82 frontend tests; hunts and templates checked on the live stack at desktop and phone widths) |
-| 11 Risk, context, coverage | Done (1153 backend tests, 98% coverage; 87 frontend tests; risk model 3; coverage, metrics and context checked on the live stack) |
+| 11 Risk, context, coverage | Done, green in CI (1153 backend tests, 98% coverage; 87 frontend tests; risk model 3; coverage, metrics and context checked on the live stack) |
+| 12 Advanced detection engineering | Done (1178 backend tests, 98% coverage; 95 frontend tests; playground examples fire their rules on the live stack; ADR-0013) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until

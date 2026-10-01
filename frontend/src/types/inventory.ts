@@ -258,3 +258,73 @@ export interface Coverage {
   tactics: { id: string; name: string; url: string; techniques: string[]; active: boolean }[];
   techniques: CoverageTechnique[];
 }
+
+// ---------- Phase 12: detection playground, grouped queue ----------
+
+export interface PlaygroundLine {
+  line: number;
+  status: "parsed" | "skipped" | "failed";
+  code: string | null;
+  timestamp: string | null;
+  event: string | null;
+  host: string | null;
+  username: string | null;
+  target_username: string | null;
+  source_ip: string | null;
+  process_name: string | null;
+  excluded: boolean;
+  matched: boolean | null;
+  steps: string[];
+  evidence: boolean;
+}
+
+export interface PlaygroundDetection {
+  explanation: string;
+  severity: Level;
+  confidence: "low" | "medium" | "high";
+  indicator: string | null;
+  event_count: number;
+  first_seen: string;
+  last_seen: string;
+  evidence_lines: number[];
+  group: Record<string, unknown>;
+  mitre: string[];
+  investigation: string[];
+  response: string[];
+}
+
+export interface PlaygroundResult {
+  triggered: boolean;
+  rule: {
+    rule_id: string;
+    name: string;
+    kind: string;
+    version: number;
+    severity: Level;
+    confidence: string;
+    threshold: number | null;
+    time_window: string | null;
+    tried: Record<string, unknown>;
+  };
+  summary: {
+    lines: number;
+    parsed: number;
+    skipped: number;
+    failed: number;
+    excluded: number;
+    matched: number;
+    detections: number;
+  };
+  detections: PlaygroundDetection[];
+  lines: PlaygroundLine[];
+}
+
+export interface AlertGroup {
+  key: string;
+  label: string;
+  alerts: number;
+  open: number;
+  top_priority: number;
+  top_band: Level;
+  last_event_at: string;
+}

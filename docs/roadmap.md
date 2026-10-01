@@ -17,7 +17,7 @@ starts only on "Proceed to Phase N".
 | 9 | SOC dashboard, alert and incident workspaces, event explorer, asset and identity views | All numbers from the DB; empty states; visual check desktop + phone | **Done** |
 | 10 | Threat hunting: structured queries, templates, pivots, saved hunts, `pg_trgm` | Query compiler tests (incl. injection attempts); pagination tests | **Done** |
 | 11 | Incident risk, context display, rule metrics (triggers, FP rate, time to resolve), ATT&CK implemented-coverage view | Metric queries tested against known fixtures | **Done** |
-| 12 | Evaluate and build where justified: detection playground, version diff UI, suppression windows, alert grouping | Each item justified or explicitly deferred | Not started |
+| 12 | Evaluate and build where justified: detection playground, version diff UI, suppression windows, alert grouping | Each item justified or explicitly deferred | **Done** ([ADR-0013](decisions/0013-advanced-detection-engineering.md): advanced temporal correlation deferred) |
 | 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | Not started |
 | 14 | Test completion; controlled benchmark (generated data, `EXPLAIN ANALYZE`) | Numbers recorded with machine spec, none invented | Not started |
 | 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | Not started |

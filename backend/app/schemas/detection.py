@@ -170,3 +170,65 @@ class Coverage(BaseModel):
     summary: CoverageSummary
     tactics: list[CoverageTactic]
     techniques: list[CoverageTechnique]
+
+
+class PlaygroundRule(BaseModel):
+    rule_id: str
+    name: str
+    kind: str
+    version: int
+    severity: str
+    confidence: str
+    threshold: int | None
+    time_window: str | None  # "5 min"
+    tried: dict[str, Any]  # what-if values used; empty: the rule as it runs
+
+
+class PlaygroundLine(BaseModel):
+    line: int
+    status: str  # parsed, skipped, failed
+    code: str | None  # why it was skipped or failed
+    timestamp: datetime | None = None
+    event: str | None = None  # "authentication/logon failure"
+    host: str | None = None
+    username: str | None = None
+    target_username: str | None = None
+    source_ip: str | None = None
+    process_name: str | None = None
+    excluded: bool = False  # ignored by an exclusion or an active suppression
+    matched: bool | None = None  # passed the rule's condition (null: sequence rules)
+    steps: list[str] = []  # sequence steps this event matches
+    evidence: bool = False  # part of a detection
+
+
+class PlaygroundDetection(BaseModel):
+    explanation: str
+    severity: str
+    confidence: str
+    indicator: str | None
+    event_count: int
+    first_seen: datetime
+    last_seen: datetime
+    evidence_lines: list[int]
+    group: dict[str, Any]
+    mitre: list[str]
+    investigation: list[str]
+    response: list[str]
+
+
+class PlaygroundSummary(BaseModel):
+    lines: int
+    parsed: int
+    skipped: int
+    failed: int
+    excluded: int
+    matched: int  # events passing the condition (or any sequence step)
+    detections: int
+
+
+class PlaygroundResult(BaseModel):
+    triggered: bool
+    rule: PlaygroundRule
+    summary: PlaygroundSummary
+    detections: list[PlaygroundDetection]
+    lines: list[PlaygroundLine]
