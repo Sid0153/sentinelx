@@ -51,9 +51,10 @@ export interface EventDetail extends EventRecord {
     parse_status: string;
     parse_detail: string | null;
     size_bytes: number;
-    text: string;
+    text: string | null; // null: withheld from viewers (raw records are analyst-only)
     truncated: boolean;
     simulated: boolean;
+    withheld: boolean;
   };
   source_name: string;
   alerts: { id: string; title: string; status: string; priority_band: Level }[];

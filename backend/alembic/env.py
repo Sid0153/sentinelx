@@ -16,7 +16,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=get_settings().database_url,
+        url=get_settings().owner_database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -26,7 +26,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(get_settings().database_url, poolclass=pool.NullPool)
+    # Migrations change the schema, so they run as the owner (MIGRATION_DATABASE_URL); the
+    # application connects as a least-privilege role (app/database/roles.py).
+    engine = create_engine(get_settings().owner_database_url, poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

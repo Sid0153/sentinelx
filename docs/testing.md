@@ -156,6 +156,46 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
 - Grouped queue: counts per rule and per source with filters; the version comparison and the
   suppression editor in the UI.
 
+**Security review** ✅ (Phase 13; `tests/api/test_security_review.py`, `test_ingest_keys.py`,
+`tests/integration/test_app_role.py`, CI)
+- Every state-changing route needs ANALYST+ or has a stated reason; every request body model
+  refuses unknown fields and bounds every string; errors leak no internals; docs off in
+  production.
+- Ingest keys: issue, use, wrong source, rotation, revocation, never logged or audited; the
+  per-source rate limit; the CLI.
+- Body limits: by declared length, while streaming (chunked), before authentication, the
+  larger ingest limit.
+- The application's database role cannot disable triggers, alter, drop, truncate, create, or
+  update and delete evidence, and can do everything the application does.
+- CI (running stack): the app connects only as the least-privilege role; CSP without
+  `unsafe-inline`; no query value in the proxy log; an oversized body refused with nginx
+  bypassed; a shipper ingests with its key; every secret, including the ingest key, absent from
+  all container logs. Mutation-checked: the key's source binding and the suppression window.
+
+**Residual risks closed** ✅ (Phase 13, after the review; `tests/api/test_mfa.py`,
+`tests/integration/test_audit_chain.py`, `test_rate_limit.py`, `tests/api/test_raw_access.py`,
+`frontend/tests/security.test.tsx`, `scripts/security_smoke.py`, CI)
+- TOTP against the RFC 4226 test vectors; enrolment (a wrong code turns nothing on), sign-in
+  needing the code, a code refused the second time, wrong codes locking the account, a
+  recovery code working once, turning it off needing password and code, no secret or code in
+  the database or audit details.
+- Admin password reset: old password and sessions gone, every other route 403 until changed,
+  the new password must differ, two-factor still required, the temporary password in no audit
+  record. Admin two-factor reset. Neither reset on one's own account.
+- Audit hash chain: an edited or deleted entry is found at the right `seq` (the tests turn
+  the append-only trigger off as the owner could); a writer cannot choose the hashes;
+  concurrent writers keep one chain; removing the newest entries, which the chain alone cannot
+  show, is caught by an anchor; anchors are logged only after commit; CLI and API.
+- Rate limits shared by two limiter instances (a restart, or replicas); the window slides.
+- Raw text withheld from viewers in all four views, shown to analysts and admins.
+- A source refuses records naming a host outside its allowlist.
+- UI: the code step at sign-in, recovery codes, enrolment showing codes once, turning it off,
+  the forced-change screen, the admin resets (with confirmation), the integrity panel
+  (intact and broken), "withheld" raw records.
+- CI (running stack): the security smoke script end to end; every database connection is
+  TLS 1.3, plaintext refused, the server key absent from the backend; the audit chain
+  verifies; HSTS sent.
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.

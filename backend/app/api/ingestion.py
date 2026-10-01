@@ -2,24 +2,35 @@
 
 import json
 import uuid
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import ValidationError
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
 from app.alerts.queries import alerts_citing
 from app.api.deps import DbSession, SettingsDep
-from app.auth.deps import AdminUser, AnalystUser, CurrentUser
+from app.auth.deps import (
+    AdminUser,
+    CurrentUser,
+    bearer_scheme,
+    can_read_raw_records,
+    get_current_user,
+    require_role,
+)
 from app.core.errors import AppError
 from app.events import queries
 from app.events.schema import EventCategory, EventOutcome
+from app.ingestion import keys
 from app.ingestion import sources as source_service
 from app.ingestion.normalize import optional_ip
 from app.ingestion.service import IngestRequest, ingest, reject
 from app.models.event import BatchChannel, IngestionBatch, ParseStatus, RawEvent
+from app.models.user import Role, User
 from app.schemas.common import Page, error_responses
 from app.schemas.ingestion import (
     AlertRef,
@@ -27,6 +38,7 @@ from app.schemas.ingestion import (
     EventDetail,
     EventPage,
     EventPublic,
+    IngestKeyIssued,
     IngestRecords,
     RawRecordPublic,
     SourceCreate,
@@ -81,7 +93,76 @@ def update_source(
     return SourcePublic.model_validate(source_service.update_source(db, source_id, payload, admin))
 
 
+@sources.post(
+    "/{source_id}/ingest-key",
+    response_model=IngestKeyIssued,
+    status_code=status.HTTP_201_CREATED,
+    responses=error_responses(404),
+)
+def issue_ingest_key(source_id: uuid.UUID, admin: AdminUser, db: DbSession) -> IngestKeyIssued:
+    """A new ingest key for this source, replacing any previous one (rotation). The key is in
+    this response only: it is stored as a hash and cannot be shown again. A shipper sends it
+    as `X-Ingest-Key` to `POST /api/ingest/{source_id}`; it is valid for this source only.
+    Audited as `INGEST_KEY_ISSUED` (prefix only)."""
+    source = source_service.get_source(db, source_id)
+    issued = keys.issue(db, source, admin)
+    return IngestKeyIssued(
+        source_id=source.id, key=issued.key, key_prefix=issued.prefix, created_at=issued.created_at
+    )
+
+
+@sources.delete(
+    "/{source_id}/ingest-key",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=error_responses(404),
+)
+def revoke_ingest_key(source_id: uuid.UUID, admin: AdminUser, db: DbSession) -> Response:
+    """The source's key stops working at once. Audited as `INGEST_KEY_REVOKED`."""
+    keys.revoke(db, source_service.get_source(db, source_id), admin)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # ---------- ingestion ----------
+
+
+@dataclass(frozen=True)
+class IngestCaller:
+    """Who is sending: an analyst (or admin) signed in, or a source's ingest key."""
+
+    user: User | None
+    key_prefix: str | None
+
+
+_require_analyst = require_role(Role.ANALYST)
+
+
+def ingest_caller(
+    source_id: uuid.UUID,
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: DbSession,
+    settings: SettingsDep,
+) -> IngestCaller:
+    """An `X-Ingest-Key` header must be the key of this very source (401 otherwise, audited
+    without the key). Without the header, a signed-in ANALYST or ADMIN is required."""
+    key = request.headers.get("x-ingest-key")
+    if key is not None:
+        source = keys.source_for_key(db, key)
+        if source is None or source.id != source_id:
+            reject(db, None, source_id, "invalid_ingest_key")
+            raise AppError(401, "Invalid ingest key for this source")
+        return IngestCaller(user=None, key_prefix=source.ingest_key_prefix)
+    user = get_current_user(request, credentials, db, settings)
+    return IngestCaller(user=_require_analyst(request, user, db), key_prefix=None)
+
+
+Caller = Annotated[IngestCaller, Depends(ingest_caller)]
+
+
+def _count_ingest_request(request: Request, db: DbSession, source_id: str) -> bool:
+    allowed: bool = request.app.state.ingest_limiter.allow(db, source_id)
+    db.commit()  # the request counts whatever happens next
+    return allowed
 
 
 async def _read_body(request: Request, limit: int) -> bytes:
@@ -119,16 +200,18 @@ def _split_records(request: Request, body: bytes) -> tuple[list[bytes], BatchCha
     "/{source_id}",
     response_model=BatchPublic,
     status_code=status.HTTP_201_CREATED,
-    responses=error_responses(404, 409, 413, 415, 422),
+    responses=error_responses(404, 409, 413, 415, 422, 429),
 )
 async def ingest_records(
     source_id: uuid.UUID,
     request: Request,
-    analyst: AnalystUser,
+    caller: Caller,
     db: DbSession,
     settings: SettingsDep,
 ) -> BatchPublic:
-    """Store and normalize a batch of records for one log source (ANALYST+).
+    """Store and normalize a batch of records for one log source: ANALYST+, or this source's
+    ingest key in `X-Ingest-Key` (for log shippers). At most INGEST_RATE_LIMIT_PER_MINUTE
+    requests per source per minute (429).
 
     - `application/json`: `{"records": ["<raw line or JSON text>", ...]}`
     - `text/plain`: one record per line (a log file as-is; NDJSON for JSON sources).
@@ -140,14 +223,25 @@ async def ingest_records(
     # The body is read here, on the event loop, with a size cap. The database work is
     # synchronous, so it runs in the thread pool instead of blocking other requests.
     source = await run_in_threadpool(source_service.get_source, db, source_id)
+    allowed = await run_in_threadpool(_count_ingest_request, request, db, str(source.id))
+    if not allowed:
+        await run_in_threadpool(reject, db, caller.user, source.id, "rate_limited")
+        raise AppError(
+            429, "Too many ingest requests for this source", headers={"Retry-After": "60"}
+        )
     try:
         body = await _read_body(request, settings.ingest_max_bytes)
         records, channel = _split_records(request, body)
     except AppError as error:
-        await run_in_threadpool(reject, db, analyst, source.id, error.code)
+        await run_in_threadpool(reject, db, caller.user, source.id, error.code)
         raise
+    if caller.key_prefix is not None:
+        source.ingest_key_last_used_at = datetime.now(UTC)
     batch = await run_in_threadpool(
-        ingest, db, IngestRequest(source, records, channel, analyst), settings
+        ingest,
+        db,
+        IngestRequest(source, records, channel, caller.user, ingest_key_prefix=caller.key_prefix),
+        settings,
     )
     return BatchPublic.model_validate(batch)
 
@@ -187,8 +281,10 @@ def get_batch(batch_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> BatchPu
     return BatchPublic.model_validate(_batch(db, batch_id))
 
 
-def raw_record(raw: RawEvent) -> RawRecordPublic:
-    text = raw.display_text
+def raw_record(raw: RawEvent, user: User) -> RawRecordPublic:
+    """`text` is withheld from users who may not read raw records (viewers)."""
+    shown = can_read_raw_records(user)
+    text = raw.display_text if shown else ""
     return RawRecordPublic(
         id=raw.id,
         batch_id=raw.batch_id,
@@ -196,9 +292,10 @@ def raw_record(raw: RawEvent) -> RawRecordPublic:
         parse_status=ParseStatus(raw.parse_status),
         parse_detail=raw.parse_detail,
         size_bytes=len(raw.raw_data),
-        text=text[: queries.DISPLAY_LIMIT],
+        text=text[: queries.DISPLAY_LIMIT] if shown else None,
         truncated=len(text) > queries.DISPLAY_LIMIT,
         simulated=raw.simulated,
+        withheld=not shown,
     )
 
 
@@ -209,7 +306,7 @@ def raw_record(raw: RawEvent) -> RawRecordPublic:
 )
 def list_batch_records(
     batch_id: uuid.UUID,
-    _user: CurrentUser,
+    user: CurrentUser,
     db: DbSession,
     parse_status: ParseStatus | None = None,
     limit: Limit = 50,
@@ -218,7 +315,7 @@ def list_batch_records(
     """The stored raw records of a batch, e.g. `?parse_status=FAILED` to see what failed."""
     _batch(db, batch_id)
     rows, total = queries.list_batch_records(db, batch_id, parse_status, limit, offset)
-    return Page(items=[raw_record(r) for r in rows], total=total, limit=limit, offset=offset)
+    return Page(items=[raw_record(r, user) for r in rows], total=total, limit=limit, offset=offset)
 
 
 # ---------- events ----------
@@ -256,14 +353,14 @@ def list_events(
 
 
 @events.get("/{event_id}", response_model=EventDetail, responses=error_responses(404))
-def get_event(event_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> EventDetail:
+def get_event(event_id: uuid.UUID, user: CurrentUser, db: DbSession) -> EventDetail:
     """One event with the raw record it came from, as received, and the alerts that cite
     it as evidence."""
     event, raw, source = queries.get_event(db, event_id)
     return EventDetail.model_validate(
         {
             **EventPublic.model_validate(event).model_dump(),
-            "raw": raw_record(raw),
+            "raw": raw_record(raw, user),
             "source_name": source.name,
             "alerts": [
                 AlertRef(id=a.id, title=a.title, status=a.status, priority_band=a.priority_band)

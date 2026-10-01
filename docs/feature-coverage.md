@@ -41,7 +41,7 @@ Last updated: **Phase 8**.
 | 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
 | 30 | CI/CD | 2, 15 | ✅ CI (lint, types, tests, audits, gitleaks, Compose smoke). ⬜ production-style configuration and deployment docs: Phase 15 |
-| 31 | Security hardening | 2+, 13 | ◐ headers, CSP, rate limit, validation, hardened containers, spoofing-proof client IP; full review: Phase 13 |
+| 31 | Security hardening | 2+, 13 | ✅ headers, CSP without inline scripts or styles, rate limits (login, per-source ingest), validation (unknown fields refused, bounded strings), backend body limits, hardened containers, spoofing-proof client IP, least-privilege database role, per-source ingest keys; nine-area review in [security.md](security.md); then TOTP two-factor sign-in, admin password reset with forced change, shared rate limits, hash-chained audit log, per-source host allowlist, raw text analyst-only, database TLS, HSTS, images pinned by digest (13) |
 | 32 | Comprehensive documentation | every phase, 17 | ◐ design docs and ADRs current; screenshots, guides, demo guide: Phase 17 |
 
 ## Detection (brief §4–§7)
@@ -143,7 +143,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 |---|---|
 | Modular monolith (§ARCHITECTURAL PRINCIPLE) | ✅ ADR-0001 |
 | Raw and normalized stored separately; raw never modified (§46) | ✅ bytes, append-only incl. TRUNCATE (ADR-0010) |
-| Threat model: assets, trust boundaries, attack surfaces, threats, mitigations, residual risks (§26) | ◐ initial in `security.md`; completed in Phase 13 |
+| Threat model: assets, trust boundaries, attack surfaces, threats, mitigations, residual risks (§26) | ✅ [security.md](security.md) (completed and re-derived from the code in Phase 13) |
 | Observability: request IDs, structured logs, ingestion counts, processing and database errors (§34) | ✅ including detection runs (per-rule candidates, detections, errors, time; `detection.run_completed` log) |
 | Docker: health checks, env config, persistent volume, documented start (§35) | ✅ |
 | ADR-001 … ADR-007 (§38) | ✅ plus 0008–0010 |

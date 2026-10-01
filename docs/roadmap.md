@@ -18,7 +18,7 @@ starts only on "Proceed to Phase N".
 | 10 | Threat hunting: structured queries, templates, pivots, saved hunts, `pg_trgm` | Query compiler tests (incl. injection attempts); pagination tests | **Done** |
 | 11 | Incident risk, context display, rule metrics (triggers, FP rate, time to resolve), ATT&CK implemented-coverage view | Metric queries tested against known fixtures | **Done** |
 | 12 | Evaluate and build where justified: detection playground, version diff UI, suppression windows, alert grouping | Each item justified or explicitly deferred | **Done** ([ADR-0013](decisions/0013-advanced-detection-engineering.md): advanced temporal correlation deferred) |
-| 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | Not started |
+| 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | **Done** ([security.md](security.md#phase-13-review)) |
 | 14 | Test completion; controlled benchmark (generated data, `EXPLAIN ANALYZE`) | Numbers recorded with machine spec, none invented | Not started |
 | 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | Not started |
 | 16 | Demo environment: scenario loader, 10 scenarios, reset, SIMULATED labels | Each scenario triggers exactly its documented rules (test) | Not started |

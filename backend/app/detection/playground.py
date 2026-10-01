@@ -15,7 +15,7 @@ events; the batch scoping and alert dedup of production runs do not apply.
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -67,7 +67,9 @@ class PlaygroundRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_type: SourceType
-    records: list[str] = Field(min_length=1, max_length=MAX_LINES)
+    records: list[Annotated[str, Field(max_length=MAX_LINE_BYTES)]] = Field(
+        min_length=1, max_length=MAX_LINES
+    )
     timezone: str = Field(default="UTC", max_length=64)
     default_host: str | None = Field(default=None, max_length=253)
     changes: TunableValues | None = None  # what-if tuning, within the rule's bounds

@@ -66,7 +66,7 @@
           "auth"
         ],
         "summary": "Login",
-        "description": "Email + password \u2192 short-lived access token (body) and refresh token (httpOnly cookie).",
+        "description": "Email + password \u2192 short-lived access token (body) and refresh token (httpOnly cookie).\n\nWith two-factor sign-in on, a right password without `otp` / `recovery_code` gets a 401\nwith code `mfa_required`; the client asks for the code and sends everything again.",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
@@ -239,6 +239,199 @@
           },
           "401": {
             "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/mfa/setup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Mfa Setup",
+        "description": "Step 1 of turning on two-factor sign-in: a new secret for the authenticator app.",
+        "operationId": "mfa_setup_api_auth_mfa_setup_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaSetup"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/mfa/enable": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Mfa Enable",
+        "description": "Step 2: a code from the app proves it is set up. Returns recovery codes, once.",
+        "operationId": "mfa_enable_api_auth_mfa_enable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaRecoveryCodes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/auth/mfa/disable": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Mfa Disable",
+        "operationId": "mfa_disable_api_auth_mfa_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MfaDisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
             "content": {
               "application/json": {
                 "schema": {
@@ -517,6 +710,231 @@
             }
           }
         }
+      }
+    },
+    "/api/users/{user_id}/reset-password": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Reset User Password",
+        "description": "A temporary password, shown once; the user must change it at next sign-in. Their\nsessions end and a lockout is lifted. Not for your own account.",
+        "operationId": "reset_user_password_api_users__user_id__reset_password_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemporaryPassword"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{user_id}/reset-mfa": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Reset User Mfa",
+        "description": "Turns off two-factor sign-in for a user who lost their device and recovery codes.\nTheir sessions end. Not for your own account.",
+        "operationId": "reset_user_mfa_api_users__user_id__reset_mfa_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audit/integrity": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Audit Integrity",
+        "description": "Recomputes the audit log's hash chain in the database: `intact` false means an entry\nwas changed, removed or reordered (`first_broken_seq`). Compare `head_seq` / `head_hash`\nwith the newest `audit.chained` line in the application log, which lives outside the\ndatabase, to also catch a rewritten tail. ADMIN only.",
+        "operationId": "audit_integrity_api_audit_integrity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditIntegrity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/audit": {
@@ -1998,13 +2416,162 @@
         }
       }
     },
+    "/api/sources/{source_id}/ingest-key": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Issue Ingest Key",
+        "description": "A new ingest key for this source, replacing any previous one (rotation). The key is in\nthis response only: it is stored as a hash and cannot be shown again. A shipper sends it\nas `X-Ingest-Key` to `POST /api/ingest/{source_id}`; it is valid for this source only.\nAudited as `INGEST_KEY_ISSUED` (prefix only).",
+        "operationId": "issue_ingest_key_api_sources__source_id__ingest_key_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestKeyIssued"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Revoke Ingest Key",
+        "description": "The source's key stops working at once. Audited as `INGEST_KEY_REVOKED`.",
+        "operationId": "revoke_ingest_key_api_sources__source_id__ingest_key_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ingest/{source_id}": {
       "post": {
         "tags": [
           "ingest"
         ],
         "summary": "Ingest Records",
-        "description": "Store and normalize a batch of records for one log source (ANALYST+).\n\n- `application/json`: `{\"records\": [\"<raw line or JSON text>\", ...]}`\n- `text/plain`: one record per line (a log file as-is; NDJSON for JSON sources).\n\nAt most INGEST_MAX_BYTES (5 MB) and INGEST_MAX_RECORDS (5,000 records) per request; each\nrecord at most 64 KiB. Records already stored for this source are counted as duplicates\nand not stored again, so resending a file is safe.",
+        "description": "Store and normalize a batch of records for one log source: ANALYST+, or this source's\ningest key in `X-Ingest-Key` (for log shippers). At most INGEST_RATE_LIMIT_PER_MINUTE\nrequests per source per minute (429).\n\n- `application/json`: `{\"records\": [\"<raw line or JSON text>\", ...]}`\n- `text/plain`: one record per line (a log file as-is; NDJSON for JSON sources).\n\nAt most INGEST_MAX_BYTES (5 MB) and INGEST_MAX_RECORDS (5,000 records) per request; each\nrecord at most 64 KiB. Records already stored for this source are counted as duplicates\nand not stored again, so resending a file is safe.",
         "operationId": "ingest_records_api_ingest__source_id__post",
         "security": [
           {
@@ -2096,6 +2663,16 @@
           },
           "422": {
             "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see Retry-After",
             "content": {
               "application/json": {
                 "schema": {
@@ -7564,7 +8141,8 @@
           },
           "ip_addresses": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 45
             },
             "type": "array",
             "maxItems": 16,
@@ -7605,7 +8183,8 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 32
             },
             "type": "array",
             "maxItems": 20,
@@ -7840,7 +8419,8 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 45
                 },
                 "type": "array",
                 "maxItems": 16
@@ -7909,7 +8489,8 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 32
                 },
                 "type": "array",
                 "maxItems": 20
@@ -7967,6 +8548,11 @@
           "ACCOUNT_LOCKED",
           "LOGOUT",
           "PASSWORD_CHANGED",
+          "MFA_ENABLED",
+          "MFA_DISABLED",
+          "MFA_RECOVERY_CODE_USED",
+          "MFA_RESET",
+          "PASSWORD_RESET",
           "REFRESH_TOKEN_REUSED",
           "ACCESS_DENIED",
           "USER_CREATED",
@@ -7980,6 +8566,8 @@
           "SOURCE_CREATED",
           "SOURCE_UPDATED",
           "INGEST_REJECTED",
+          "INGEST_KEY_ISSUED",
+          "INGEST_KEY_REVOKED",
           "RULE_ADDED",
           "RULE_LIBRARY_UPDATED",
           "RULE_RETIRED",
@@ -8000,6 +8588,66 @@
           "HUNT_DELETED"
         ],
         "title": "AuditAction"
+      },
+      "AuditIntegrity": {
+        "properties": {
+          "intact": {
+            "type": "boolean",
+            "title": "Intact"
+          },
+          "chained": {
+            "type": "integer",
+            "title": "Chained"
+          },
+          "legacy": {
+            "type": "integer",
+            "title": "Legacy"
+          },
+          "first_broken_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Broken Seq"
+          },
+          "head_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Seq"
+          },
+          "head_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "intact",
+          "chained",
+          "legacy",
+          "first_broken_seq",
+          "head_seq",
+          "head_hash"
+        ],
+        "title": "AuditIntegrity",
+        "description": "The hash chain checked end to end (app/audit/chain.py)."
       },
       "AuditLogPublic": {
         "properties": {
@@ -8092,6 +8740,17 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Details"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
           }
         },
         "type": "object",
@@ -8352,6 +9011,7 @@
             "title": "New Password"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "current_password",
@@ -9997,12 +10657,24 @@
             "title": "Simulated"
           },
           "raw_text": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Raw Text"
           },
           "raw_truncated": {
             "type": "boolean",
             "title": "Raw Truncated"
+          },
+          "raw_withheld": {
+            "type": "boolean",
+            "title": "Raw Withheld",
+            "default": false
           }
         },
         "type": "object",
@@ -10266,6 +10938,7 @@
         "properties": {
           "field": {
             "type": "string",
+            "maxLength": 80,
             "title": "Field"
           },
           "op": {
@@ -10495,7 +11168,8 @@
           },
           "tags": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 32
             },
             "type": "array",
             "maxItems": 20,
@@ -10855,7 +11529,8 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 32
                 },
                 "type": "array",
                 "maxItems": 20
@@ -11405,6 +12080,37 @@
         ],
         "title": "IncidentTransition"
       },
+      "IngestKeyIssued": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "key_prefix": {
+            "type": "string",
+            "title": "Key Prefix"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "key",
+          "key_prefix",
+          "created_at"
+        ],
+        "title": "IngestKeyIssued",
+        "description": "Shown once: the key is not stored and cannot be shown again."
+      },
       "InventoryContextPublic": {
         "properties": {
           "assets": {
@@ -11522,14 +12228,114 @@
             "maxLength": 128,
             "minLength": 1,
             "title": "Password"
+          },
+          "otp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Otp"
+          },
+          "recovery_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Code"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "email",
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "MfaCode": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "MfaCode"
+      },
+      "MfaDisableRequest": {
+        "properties": {
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "password",
+          "code"
+        ],
+        "title": "MfaDisableRequest"
+      },
+      "MfaRecoveryCodes": {
+        "properties": {
+          "recovery_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recovery Codes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recovery_codes"
+        ],
+        "title": "MfaRecoveryCodes",
+        "description": "Shown once, when two-factor sign-in is turned on. Each works once."
+      },
+      "MfaSetup": {
+        "properties": {
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          },
+          "otpauth_uri": {
+            "type": "string",
+            "title": "Otpauth Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "secret",
+          "otpauth_uri"
+        ],
+        "title": "MfaSetup",
+        "description": "The new secret, to type in or to scan as a QR code of `otpauth_uri`. Shown once."
       },
       "NotePublic": {
         "properties": {
@@ -12247,7 +13053,8 @@
           },
           "records": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 8192
             },
             "type": "array",
             "maxItems": 500,
@@ -12526,7 +13333,14 @@
             "title": "Size Bytes"
           },
           "text": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Text"
           },
           "truncated": {
@@ -12536,6 +13350,11 @@
           "simulated": {
             "type": "boolean",
             "title": "Simulated"
+          },
+          "withheld": {
+            "type": "boolean",
+            "title": "Withheld",
+            "default": false
           }
         },
         "type": "object",
@@ -13826,6 +14645,15 @@
             "maxLength": 64,
             "title": "Timezone",
             "default": "UTC"
+          },
+          "allowed_hosts": {
+            "items": {
+              "type": "string",
+              "maxLength": 253
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Allowed Hosts"
           }
         },
         "additionalProperties": false,
@@ -13880,6 +14708,14 @@
             "type": "boolean",
             "title": "Enabled"
           },
+          "allowed_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Hosts",
+            "default": []
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -13889,6 +14725,41 @@
             "type": "string",
             "format": "date-time",
             "title": "Updated At"
+          },
+          "ingest_key_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingest Key Prefix"
+          },
+          "ingest_key_created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingest Key Created At"
+          },
+          "ingest_key_last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingest Key Last Used At"
           }
         },
         "type": "object",
@@ -13978,6 +14849,22 @@
               }
             ],
             "title": "Enabled"
+          },
+          "allowed_hosts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 253
+                },
+                "type": "array",
+                "maxItems": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Hosts"
           }
         },
         "additionalProperties": false,
@@ -14284,6 +15171,20 @@
         ],
         "title": "TemplateRunRequest"
       },
+      "TemporaryPassword": {
+        "properties": {
+          "temporary_password": {
+            "type": "string",
+            "title": "Temporary Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "temporary_password"
+        ],
+        "title": "TemporaryPassword",
+        "description": "Returned once by an admin password reset. The user must change it at next sign-in."
+      },
       "TimeRange": {
         "properties": {
           "from": {
@@ -14313,7 +15214,8 @@
           "last": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 8
               },
               {
                 "type": "null"
@@ -14706,6 +15608,16 @@
               }
             ],
             "title": "Last Login At"
+          },
+          "mfa_enabled": {
+            "type": "boolean",
+            "title": "Mfa Enabled",
+            "default": false
+          },
+          "must_change_password": {
+            "type": "boolean",
+            "title": "Must Change Password",
+            "default": false
           }
         },
         "type": "object",

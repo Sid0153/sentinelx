@@ -1,5 +1,10 @@
 # Secret scanning (run in CI) with gitleaks' default rules. Tests generate throwaway values at
-# runtime or use obviously fake ones, so no allowlist is needed yet. If one is ever added, it
-# must name exact values, never whole files or directories.
+# runtime or use obviously fake ones. An allowlist entry must name an exact value, never whole
+# files or directories, and say why it is not a secret.
 [extend]
 useDefault = true
+
+[[allowlists]]
+description = "Detection test fixture (backend/tests/unit/test_detection_rules.py): a sample download-then-extract command line with no credential; matched by curl-auth-header since gitleaks 8.2x"
+regexTarget = "match"
+regexes = ['''curl -o /tmp/r\.tar\.gz https://example\.invalid/r\.tar\.gz && tar xzf /tmp/r\.tar\.gz''']

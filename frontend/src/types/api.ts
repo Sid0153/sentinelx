@@ -41,6 +41,8 @@ export interface User {
   is_active: boolean;
   created_at: string;
   last_login_at: string | null;
+  mfa_enabled: boolean;
+  must_change_password: boolean; // after an admin reset: nothing else works until changed
 }
 
 export interface TokenResponse {
@@ -63,6 +65,22 @@ export interface AuditEntry {
   client_ip: string | null;
   request_id: string | null;
   details: Record<string, unknown>;
+}
+
+/** The audit hash chain checked end to end (backend/app/audit/chain.py). */
+export interface AuditIntegrity {
+  intact: boolean;
+  chained: number;
+  legacy: number;
+  first_broken_seq: number | null;
+  head_seq: number | null;
+  head_hash: string | null;
+}
+
+/** Two-factor setup: the secret for the authenticator app, shown once. */
+export interface MfaSetup {
+  secret: string;
+  otpauth_uri: string;
 }
 
 // ---------- alerts (mirror backend/app/schemas/alert.py) ----------
@@ -195,8 +213,9 @@ export interface EvidenceEvent {
   command_line: string | null;
   message: string | null;
   simulated: boolean;
-  raw_text: string;
+  raw_text: string | null; // null: withheld from viewers (raw records are analyst-only)
   raw_truncated: boolean;
+  raw_withheld: boolean;
 }
 
 export interface TransitionRequest {
@@ -320,7 +339,7 @@ export interface TimelineEvent {
   source_ip: string | null;
   process_name: string | null;
   command_line: string | null;
-  raw_text: string;
+  raw_text: string | null; // null: withheld from viewers
   rules: string[];
   simulated: boolean;
 }

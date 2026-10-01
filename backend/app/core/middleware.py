@@ -131,3 +131,88 @@ class RequestContextMiddleware:
             }
         )
         await send({"type": "http.response.body", "body": body})
+
+
+class BodyLimitMiddleware:
+    """Refuses request bodies over a limit, whatever proxy is (or is not) in front: nginx caps
+    bodies too, but the backend must not depend on it (Phase 13). The declared Content-Length
+    is checked first; a body without one (chunked) is counted as it streams in, so it is
+    never read whole. When the count passes the limit, the 413 is sent from here and the app
+    is told the client went away (it stops reading; anything it still sends is dropped).
+    Raising instead would not work: FastAPI turns errors while reading a body into a 400.
+    Ingest paths use the ingest limit, every other path `default_limit`."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        default_limit: int,
+        ingest_limit: int,
+        ingest_prefix: str = "/api/ingest/",
+    ) -> None:
+        self.app = app
+        self.default_limit = default_limit
+        self.ingest_limit = ingest_limit
+        self.ingest_prefix = ingest_prefix
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path: str = scope["path"]
+        limit = self.ingest_limit if path.startswith(self.ingest_prefix) else self.default_limit
+        declared = Headers(scope=scope).get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            await self._too_large(scope, send, limit)
+            return
+        received = 0
+        refused = False
+        started = False
+
+        async def counting_receive() -> Message:
+            nonlocal received, refused, started
+            if refused:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    refused = True
+                    if not started:
+                        started = True
+                        await self._too_large(scope, send, limit)
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message: Message) -> None:
+            nonlocal started
+            if refused:
+                return  # the 413 has been sent; the app's own answer is dropped
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        await self.app(scope, counting_receive, guarded_send)
+
+    @staticmethod
+    async def _too_large(scope: Scope, send: Send, limit: int) -> None:
+        state = scope.get("state", {})
+        body = json.dumps(
+            {
+                "error": {
+                    "code": "payload_too_large",
+                    "message": f"The request body can be at most {limit} bytes",
+                    "request_id": state.get("request_id"),
+                }
+            }
+        ).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})

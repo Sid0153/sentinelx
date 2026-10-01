@@ -2,7 +2,7 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 12 (advanced detection engineering) complete.** Sign-in and roles, the audit log,
+> **Status: Phase 13 (security hardening) complete.** Sign-in and roles, the audit log,
 > the asset and identity inventory, ingestion of five log formats into an append-only event
 > store, detection (9 rules mapped to ATT&CK v19.2), alerts (deduplicated, prioritized,
 > explained), and **incidents**: related alerts correlated into one investigation with a
@@ -12,6 +12,10 @@ Security operations platform for detection, correlation, threat hunting and inci
 > queries, reviewed templates, pivots, saved hunts), per-rule outcome metrics and an
 > implemented ATT&CK coverage view (`/coverage`), and a detection testing playground
 > (`/playground`), rule version comparison, time-boxed suppressions and a grouped alert queue.
+> Security review (Phase 13): least-privilege database role, per-source ingest keys for log
+> shippers, backend body limits, query-free proxy logs; then two-factor sign-in, admin password
+> reset, a hash-chained audit log, TLS to the database and shared rate limits; see
+> [docs/security.md](docs/security.md).
 > [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
 
 SentinelX is designed to:

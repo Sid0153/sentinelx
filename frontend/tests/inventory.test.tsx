@@ -117,6 +117,30 @@ describe("Event explorer", () => {
     expect(third.get("cursor")).toBeNull();
   });
 
+  it("tells a viewer the raw record is withheld (raw text is analyst-only)", async () => {
+    const detail: EventDetail = {
+      ...event(),
+      raw: {
+        id: "raw-1",
+        batch_id: "b-1",
+        received_at: "2026-09-27T09:00:02Z",
+        parse_status: "parsed",
+        parse_detail: null,
+        size_bytes: 80,
+        text: null,
+        truncated: false,
+        simulated: false,
+        withheld: true,
+      },
+      source_name: "web-01 auth.log",
+      alerts: [],
+    };
+    mockApi({ ...signedInAs("VIEWER"), "GET /api/events/ev-1": { body: detail } });
+    renderApp("/events/ev-1");
+    expect(await screen.findByText(/Raw record withheld/)).toBeInTheDocument();
+    expect(screen.getByText("root")).toBeInTheDocument(); // the normalized event is still shown
+  });
+
   it("shows an event with its raw record as text and the alerts citing it", async () => {
     const detail: EventDetail = {
       ...event(),
@@ -130,6 +154,7 @@ describe("Event explorer", () => {
         text: "Sep 27 09:00:00 web-01 sshd[1]: Failed password for root <img src=x onerror=alert(1)>",
         truncated: false,
         simulated: false,
+        withheld: false,
       },
       source_name: "web-01 auth.log",
       alerts: [{ id: "a-1", title: "Repeated failed logons", status: "NEW", priority_band: "high" }],

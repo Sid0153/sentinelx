@@ -234,8 +234,8 @@ is included in every error body. Planned below:
 
 - The design is sized for one PostgreSQL instance and one backend process: a lab, a demo, or a
   small environment. It is not a replacement for a SIEM at enterprise ingest rates.
-- The in-process rate limiter and the advisory-lock detection model assume one backend
-  instance.
+- Rate limits are counted in PostgreSQL and hold across several backend instances (Phase 13);
+  the advisory-lock detection model still assumes one backend instance.
 - There is no retention policy at first. The `events` table is designed to be partitioned by
   month later (a time-leading primary key and a BRIN index option); see `database-schema.md`.
 - Controlled benchmarks (Phase 14) will measure ingest rate and detection latency on this
@@ -245,7 +245,7 @@ is included in every error body. Planned below:
 
 How real sources would connect without changing detection:
 - **Linux**: a log shipper (rsyslog `omhttp`, Vector, Fluent Bit) posts auth.log lines to
-  `/api/ingest/{source}` with a per-source ingest key (Phase 13 design; see `security.md`).
+  `/api/ingest/{source}` with a per-source ingest key (Phase 13, see `security.md`).
 - **Windows**: Windows Event Forwarding → a collector → Winlogbeat/NXLog JSON. A parser
   mapping for that JSON shape is added under `ingestion/parsers/`.
 - **Cloud audit logs** (CloudTrail, Azure Activity): a new parser and new rules. Detection and

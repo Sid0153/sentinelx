@@ -42,7 +42,9 @@ def test_login_returns_token_user_and_a_locked_down_cookie(
     assert body["expires_in"] == 15 * 60
     assert body["user"]["email"] == user.email
     assert body["user"]["role"] == "ANALYST"
-    assert "password" not in response.text
+    # Neither the password nor its hash is ever returned (the user has a
+    # must_change_password flag, so the word itself does appear).
+    assert TEST_PASSWORD not in response.text and "hash" not in response.text
 
     cookie = response.headers["set-cookie"].lower()
     assert f"{REFRESH_COOKIE}=" in cookie

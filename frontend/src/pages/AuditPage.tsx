@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { ErrorMessage, Field, formatUtc, PageHeader, Pagination, selectClass } from "../components/ui";
 import { useApi } from "../hooks/useApi";
-import { listAudit } from "../services/admin";
+import { auditIntegrity, listAudit } from "../services/admin";
 import type { AuditEntry, AuditResult } from "../types/api";
 
 const PAGE_SIZE = 50;
@@ -16,6 +16,11 @@ const ACTIONS = [
   "ACCOUNT_LOCKED",
   "LOGOUT",
   "PASSWORD_CHANGED",
+  "PASSWORD_RESET",
+  "MFA_ENABLED",
+  "MFA_DISABLED",
+  "MFA_RECOVERY_CODE_USED",
+  "MFA_RESET",
   "REFRESH_TOKEN_REUSED",
   "ACCESS_DENIED",
   "USER_CREATED",
@@ -29,6 +34,8 @@ const ACTIONS = [
   "SOURCE_CREATED",
   "SOURCE_UPDATED",
   "INGEST_REJECTED",
+  "INGEST_KEY_ISSUED",
+  "INGEST_KEY_REVOKED",
   "RULE_ADDED",
   "RULE_LIBRARY_UPDATED",
   "RULE_RETIRED",
@@ -78,6 +85,38 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
   );
 }
 
+/** The hash chain checked end to end by the server (Phase 13, docs/security.md). */
+function IntegrityPanel() {
+  const { data, error } = useApi(useCallback((signal: AbortSignal) => auditIntegrity(signal), []));
+  if (error) return <ErrorMessage>{error.message}</ErrorMessage>;
+  if (!data) return <p className="mb-3 text-sm text-slate-400">Checking the audit chain…</p>;
+  return (
+    <div
+      role="status"
+      aria-label="Audit log integrity"
+      className={`mb-3 rounded-lg border p-3 text-sm ${
+        data.intact ? "border-emerald-800 bg-emerald-950/40" : "border-rose-800 bg-rose-950/40"
+      }`}
+    >
+      <p className={data.intact ? "text-emerald-300" : "font-semibold text-rose-300"}>
+        {data.intact
+          ? `Hash chain intact: ${data.chained} entries verified.`
+          : `Hash chain BROKEN at entry ${data.first_broken_seq ?? "?"}: the log was changed outside the application.`}
+      </p>
+      <p className="mt-1 text-xs text-slate-400">
+        {data.legacy > 0 && `${data.legacy} older entries predate the chain and are not covered. `}
+        {data.head_seq !== null && (
+          <>
+            Newest entry {data.head_seq}, hash{" "}
+            <span className="break-all font-mono">{data.head_hash}</span>. Compare with the
+            audit.chained lines in the application log to detect a rewritten chain.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export function AuditPage() {
   // Filters live in the URL, so a filtered view can be bookmarked and shared.
   const [params, setParams] = useSearchParams();
@@ -106,6 +145,7 @@ export function AuditPage() {
         title="Audit log"
         description="Append-only record of security-relevant actions. Entries cannot be edited or deleted, by anyone."
       />
+      <IntegrityPanel />
       <div className="mb-3 flex flex-wrap gap-3">
         <Field label="Action">
           <select value={action} onChange={(e) => setFilter("action", e.target.value)} className={selectClass}>

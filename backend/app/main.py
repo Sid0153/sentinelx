@@ -10,8 +10,8 @@ from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
-from app.core.middleware import RequestContextMiddleware
-from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.middleware import BodyLimitMiddleware, RequestContextMiddleware
+from app.core.rate_limit import RateLimiter
 from app.detection.library import get_library
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("app.stopping")
 
 
+# Every API body except ingest is small JSON; 1 MiB leaves ample room (Phase 13).
+MAX_API_BODY_BYTES = 1024 * 1024
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Application factory. Run with: uvicorn app.main:create_app --factory"""
     settings = settings or get_settings()
@@ -94,10 +98,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Request-ID"],
     )
+    # Inside the request context (so a 413 still carries the request ID and headers).
+    app.add_middleware(
+        BodyLimitMiddleware,
+        default_limit=MAX_API_BODY_BYTES,
+        ingest_limit=settings.ingest_max_bytes,
+    )
     app.add_middleware(RequestContextMiddleware, trusted_networks=settings.trusted_networks)
 
-    # One limiter per app instance (so tests are isolated); keyed by client IP.
-    app.state.login_limiter = SlidingWindowRateLimiter(settings.login_rate_limit_per_minute)
+    # Counters live in PostgreSQL (shared by every backend process); keyed by client IP.
+    app.state.login_limiter = RateLimiter("login", settings.login_rate_limit_per_minute)
+    # Ingest requests per log source (keyed by source ID).
+    app.state.ingest_limiter = RateLimiter("ingest", settings.ingest_rate_limit_per_minute)
 
     register_exception_handlers(app)
     app.include_router(api_router, prefix="/api")

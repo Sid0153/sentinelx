@@ -5,7 +5,12 @@ import type { AuditEntry, User } from "../src/types/api";
 import { makeUser, mockApi, signedInAs } from "./mockApi";
 import { renderApp } from "./renderApp";
 
-const ADMIN = signedInAs("ADMIN");
+const ADMIN = {
+  ...signedInAs("ADMIN"),
+  "GET /api/audit/integrity": {
+    body: { intact: true, chained: 1, legacy: 0, first_broken_seq: null, head_seq: 1, head_hash: "ab".repeat(32) },
+  },
+};
 
 function page<T>(items: T[]) {
   return { body: { items, total: items.length, limit: 50, offset: 0 } };

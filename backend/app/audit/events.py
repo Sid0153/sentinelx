@@ -12,6 +12,13 @@ class AuditAction(enum.StrEnum):
     LOGOUT = "LOGOUT"
     # FAILURE when the current password was wrong. (Event names, not secrets: S105.)
     PASSWORD_CHANGED = "PASSWORD_CHANGED"  # noqa: S105
+    # Two-factor sign-in (Phase 13). FAILURE when the confirming code or password was wrong.
+    MFA_ENABLED = "MFA_ENABLED"
+    MFA_DISABLED = "MFA_DISABLED"
+    MFA_RECOVERY_CODE_USED = "MFA_RECOVERY_CODE_USED"
+    # By an admin, for another user: two-factor removed / temporary password issued.
+    MFA_RESET = "MFA_RESET"
+    PASSWORD_RESET = "PASSWORD_RESET"  # noqa: S105
     # A used refresh token was presented again: possible theft; all sessions revoked.
     REFRESH_TOKEN_REUSED = "REFRESH_TOKEN_REUSED"  # noqa: S105
     # Authorization: a signed-in user called a route their role forbids.
@@ -31,6 +38,9 @@ class AuditAction(enum.StrEnum):
     SOURCE_CREATED = "SOURCE_CREATED"
     SOURCE_UPDATED = "SOURCE_UPDATED"
     INGEST_REJECTED = "INGEST_REJECTED"
+    # Per-source ingest keys (Phase 13): the prefix only, never the key.
+    INGEST_KEY_ISSUED = "INGEST_KEY_ISSUED"
+    INGEST_KEY_REVOKED = "INGEST_KEY_REVOKED"
     # Detection rules: the library changing them, admins tuning them, manual runs.
     RULE_ADDED = "RULE_ADDED"
     RULE_LIBRARY_UPDATED = "RULE_LIBRARY_UPDATED"

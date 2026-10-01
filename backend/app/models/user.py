@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -39,3 +40,14 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
     )
+    # Two-factor sign-in (Phase 13, app/auth/mfa.py). Only salts are stored: the TOTP secret
+    # is derived from SECRET_KEY + salt. Recovery codes are stored as SHA-256 hashes.
+    mfa_enabled: Mapped[bool] = mapped_column(default=False, server_default=sa.false())
+    totp_salt: Mapped[str | None] = mapped_column(sa.String(64))
+    totp_pending_salt: Mapped[str | None] = mapped_column(sa.String(64))  # set up, not confirmed
+    totp_last_step: Mapped[int | None] = mapped_column(sa.BigInteger)  # replay protection
+    mfa_recovery_hashes: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=sa.text("'[]'::jsonb")
+    )
+    # Set by an admin password reset: the user must choose a new password before anything else.
+    must_change_password: Mapped[bool] = mapped_column(default=False, server_default=sa.false())

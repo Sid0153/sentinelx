@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DbSession
-from app.auth.deps import AdminUser, AnalystUser, CurrentUser
+from app.auth.deps import AdminUser, AnalystUser, CurrentUser, can_read_raw_records
 from app.context.lookup import inventory_context
 from app.core.errors import AppError
 from app.incidents import queries, service, workflow
@@ -215,7 +215,7 @@ def get_incident(incident_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> I
 )
 def get_timeline(
     incident_id: uuid.UUID,
-    _user: CurrentUser,
+    user: CurrentUser,
     db: DbSession,
     limit: Limit = 100,
     cursor: Annotated[str | None, Query(max_length=300)] = None,
@@ -225,6 +225,10 @@ def get_timeline(
     incident's activity. Pass `next_cursor` back as `cursor` for the next page."""
     queries.get_incident(db, incident_id)
     items, next_cursor = queries.timeline(db, incident_id, limit, cursor)
+    if not can_read_raw_records(user):  # viewers see the normalized event only
+        for item in items:
+            if item.get("event"):
+                item["event"]["raw_text"] = None
     return TimelinePage.model_validate({"items": items, "next_cursor": next_cursor, "limit": limit})
 
 

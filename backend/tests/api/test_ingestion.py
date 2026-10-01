@@ -303,6 +303,18 @@ def test_batch_report_lists_its_records_by_outcome(
         headers=viewer,
     ).json()
     (record,) = failed["items"]
+    # Viewers see the outcome, not the raw text (Phase 13: raw records are analyst-only).
+    assert (record["text"], record["withheld"], record["parse_detail"]) == (
+        None,
+        True,
+        "unrecognized_format",
+    )
+    failed = db_client.get(
+        f"/api/ingest/batches/{batch['id']}/records",
+        params={"parse_status": "FAILED"},
+        headers=analyst,
+    ).json()
+    (record,) = failed["items"]
     assert (record["text"], record["parse_detail"], record["truncated"]) == (
         "<b>not syslog</b>",  # shown as text; the UI never renders it as HTML
         "unrecognized_format",
@@ -378,9 +390,13 @@ def test_event_detail_includes_the_raw_record(
     line = syslog(NOW, FAILED)
     send(db_client, analyst, source["id"], [line])
     (item,) = db_client.get("/api/events", headers=viewer).json()["items"]
-    detail = db_client.get(f"/api/events/{item['id']}", headers=viewer).json()
+    detail = db_client.get(f"/api/events/{item['id']}", headers=analyst).json()
     assert detail["raw"]["text"] == line
     assert detail["raw"]["parse_status"] == "PARSED"
+    # A viewer gets the event and the raw record's metadata, not its text.
+    seen = db_client.get(f"/api/events/{item['id']}", headers=viewer).json()
+    assert (seen["raw"]["text"], seen["raw"]["withheld"]) == (None, True)
+    assert seen["raw"]["parse_status"] == "PARSED" and seen["username"] == "root"
     assert detail["source_name"] == "web-01 auth.log"
     assert detail["attributes"] == {"auth_method": "password", "invalid_user": False}
     missing = db_client.get("/api/events/00000000-0000-0000-0000-000000000000", headers=viewer)

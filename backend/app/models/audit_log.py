@@ -18,12 +18,21 @@ class AuditLog(Base):
     """
 
     __tablename__ = "audit_logs"
+    # Read the trigger-set values back with the INSERT (RETURNING), for the log anchor.
+    __mapper_args__ = {"eager_defaults": True}  # noqa: RUF012
     __table_args__ = (
         sa.CheckConstraint("result IN ('SUCCESS', 'FAILURE', 'DENIED')", name="result_valid"),
         sa.Index("ix_audit_logs_entity", "entity_type", "entity_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # The hash chain (migration 0011, app/audit/chain.py): set by a database trigger on every
+    # insert, whatever the writer sends. NULL hashes: entries written before the chain.
+    seq: Mapped[int] = mapped_column(
+        sa.BigInteger, server_default=sa.FetchedValue(), unique=True, index=True
+    )
+    prev_hash: Mapped[str | None] = mapped_column(sa.String(64), server_default=sa.FetchedValue())
+    entry_hash: Mapped[str | None] = mapped_column(sa.String(64), server_default=sa.FetchedValue())
     occurred_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), default=lambda: datetime.now(UTC), index=True
     )

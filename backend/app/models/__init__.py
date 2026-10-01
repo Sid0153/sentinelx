@@ -20,6 +20,7 @@ from app.models.incident import (
     IncidentEvidence,
     IncidentNote,
 )
+from app.models.rate_limit import RateLimitCounter
 from app.models.refresh_token import RefreshToken
 from app.models.user import Role, User
 
@@ -43,6 +44,7 @@ __all__ = [
     "IngestionBatch",
     "LogSource",
     "MitreTechnique",
+    "RateLimitCounter",
     "RawEvent",
     "RefreshToken",
     "Role",

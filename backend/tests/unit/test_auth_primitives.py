@@ -25,7 +25,7 @@ from app.auth.tokens import (
     hash_refresh_token,
 )
 from app.core.client_ip import parse_networks, resolve_client_ip
-from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.rate_limit import sliding_count
 
 KEY = secrets.token_urlsafe(48)
 
@@ -154,18 +154,11 @@ def test_refresh_tokens_are_long_random_and_hashed() -> None:
 # ---------- rate limiter ----------
 
 
-def test_rate_limiter_allows_up_to_the_limit_per_key() -> None:
-    limiter = SlidingWindowRateLimiter(max_events=3, window_seconds=60)
-    assert [limiter.allow("a", now=t) for t in (0, 1, 2, 3)] == [True, True, True, False]
-    assert limiter.allow("b", now=3)  # other keys are independent
-
-
-def test_rate_limiter_window_slides() -> None:
-    limiter = SlidingWindowRateLimiter(max_events=2, window_seconds=60)
-    assert limiter.allow("a", now=0)
-    assert limiter.allow("a", now=30)
-    assert not limiter.allow("a", now=59)
-    assert limiter.allow("a", now=60.5)  # the event at t=0 has left the window
+def test_the_sliding_estimate_weights_the_previous_window() -> None:
+    # At the start of a window all of the previous one still counts; at its end none does.
+    assert sliding_count(previous=10, current=0, elapsed_fraction=0.0) == 10
+    assert sliding_count(previous=10, current=2, elapsed_fraction=0.5) == 7
+    assert sliding_count(previous=10, current=4, elapsed_fraction=1.0) == 4
 
 
 # ---------- client IP ----------

@@ -6,11 +6,13 @@ from fastapi.responses import JSONResponse
 from app.api.deps import DbSession, SettingsDep
 from app.audit.events import AuditAction, AuditResult, EntityType
 from app.audit.service import record
+from app.auth import account
 from app.auth.deps import CurrentUser
 from app.auth.passwords import hash_password, verify_password
 from app.auth.service import (
     InvalidCredentialsError,
     InvalidRefreshTokenError,
+    MfaRequiredError,
     authenticate,
     revoke_all_for_user,
     revoke_refresh_token,
@@ -20,10 +22,18 @@ from app.auth.service import (
 from app.core.config import Settings
 from app.core.errors import AppError, error_body
 from app.core.middleware import client_ip
-from app.core.rate_limit import SlidingWindowRateLimiter
+from app.core.rate_limit import RateLimiter
 from app.models.refresh_token import RevokedReason
 from app.models.user import User
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    MfaCode,
+    MfaDisableRequest,
+    MfaRecoveryCodes,
+    MfaSetup,
+    TokenResponse,
+)
 from app.schemas.common import error_responses
 from app.schemas.users import UserPublic
 
@@ -67,8 +77,10 @@ def _token_response(access_token: str, user: User, settings: Settings) -> TokenR
 
 
 def _check_login_rate(request: Request, db: DbSession) -> None:
-    limiter: SlidingWindowRateLimiter = request.app.state.login_limiter
-    if not limiter.allow(client_ip(request)):
+    limiter: RateLimiter = request.app.state.login_limiter
+    allowed = limiter.allow(db, client_ip(request))
+    db.commit()  # the attempt counts whatever happens next
+    if not allowed:
         logger.warning("auth.login_rate_limited")
         record(db, AuditAction.LOGIN_RATE_LIMITED, result=AuditResult.FAILURE)
         db.commit()
@@ -85,10 +97,19 @@ def login(
     db: DbSession,
     settings: SettingsDep,
 ) -> TokenResponse:
-    """Email + password → short-lived access token (body) and refresh token (httpOnly cookie)."""
+    """Email + password → short-lived access token (body) and refresh token (httpOnly cookie).
+
+    With two-factor sign-in on, a right password without `otp` / `recovery_code` gets a 401
+    with code `mfa_required`; the client asks for the code and sends everything again."""
     _check_login_rate(request, db)
     try:
-        user = authenticate(db, payload.email, payload.password, settings)
+        user = authenticate(
+            db, payload.email, payload.password, settings, payload.otp, payload.recovery_code
+        )
+    except MfaRequiredError:
+        raise AppError(
+            401, "Enter the code from your authenticator app", code="mfa_required"
+        ) from None
     except InvalidCredentialsError:
         # Same message for unknown email, wrong password, locked and disabled accounts.
         # The email is not logged: people sometimes type their password into that field.
@@ -163,7 +184,10 @@ def change_password(
         db.commit()
         # 400, not 401: a 401 would make the frontend think the session expired.
         raise AppError(400, "Current password is incorrect")
+    if verify_password(user.password_hash, payload.new_password):
+        raise AppError(400, "The new password must be different from the current one")
     user.password_hash = hash_password(payload.new_password)
+    user.must_change_password = False
     revoke_all_for_user(db, user.id, RevokedReason.PASSWORD_CHANGED)
     record(
         db,
@@ -177,3 +201,30 @@ def change_password(
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     _clear_refresh_cookie(response, settings)
     return response
+
+
+@router.post("/mfa/setup", response_model=MfaSetup, responses=error_responses(401, 409))
+def mfa_setup(user: CurrentUser, db: DbSession, settings: SettingsDep) -> MfaSetup:
+    """Step 1 of turning on two-factor sign-in: a new secret for the authenticator app."""
+    secret, uri = account.start_mfa_setup(db, user, settings)
+    return MfaSetup(secret=secret, otpauth_uri=uri)
+
+
+@router.post(
+    "/mfa/enable", response_model=MfaRecoveryCodes, responses=error_responses(400, 401, 409)
+)
+def mfa_enable(
+    payload: MfaCode, user: CurrentUser, db: DbSession, settings: SettingsDep
+) -> MfaRecoveryCodes:
+    """Step 2: a code from the app proves it is set up. Returns recovery codes, once."""
+    return MfaRecoveryCodes(recovery_codes=account.enable_mfa(db, user, payload.code, settings))
+
+
+@router.post(
+    "/mfa/disable", status_code=status.HTTP_204_NO_CONTENT, responses=error_responses(400, 401, 409)
+)
+def mfa_disable(
+    payload: MfaDisableRequest, user: CurrentUser, db: DbSession, settings: SettingsDep
+) -> Response:
+    account.disable_mfa(db, user, payload.password, payload.code, settings)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

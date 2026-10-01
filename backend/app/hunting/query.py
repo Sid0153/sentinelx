@@ -83,7 +83,7 @@ class HuntFilter(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    field: str
+    field: str = Field(max_length=80)
     op: HuntOperator
     value: Any = None
 
@@ -192,7 +192,7 @@ class TimeRange(BaseModel):
 
     start: datetime | None = Field(default=None, alias="from")
     end: datetime | None = Field(default=None, alias="to")
-    last: str | None = None
+    last: str | None = Field(default=None, max_length=8)
 
     @model_validator(mode="after")
     def _check(self) -> "TimeRange":

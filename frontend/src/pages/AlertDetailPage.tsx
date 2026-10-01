@@ -194,10 +194,14 @@ function EvidenceRow({ event }: { event: EvidenceEvent }) {
         <tr>
           <td colSpan={4} className="pb-2">
             {/* Log content is rendered as text, never as HTML. */}
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-2 text-xs text-slate-300">
-              {event.raw_text}
-            </pre>
-            {event.raw_truncated && (
+            {event.raw_text === null ? (
+              <p className="text-xs text-slate-400">Raw record withheld: raw log text is shown to analysts and admins only.</p>
+            ) : (
+              <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-2 text-xs text-slate-300">
+                {event.raw_text}
+              </pre>
+            )}
+            {event.raw_truncated && !event.raw_withheld && (
               <p className="text-xs text-slate-500">Shown up to 4,096 characters.</p>
             )}
           </td>

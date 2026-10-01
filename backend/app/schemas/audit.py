@@ -19,3 +19,15 @@ class AuditLogPublic(BaseModel):
     client_ip: str | None
     request_id: str | None
     details: dict[str, Any]
+    seq: int | None = None  # its place in the hash chain
+
+
+class AuditIntegrity(BaseModel):
+    """The hash chain checked end to end (app/audit/chain.py)."""
+
+    intact: bool
+    chained: int  # entries covered by the chain
+    legacy: int  # written before the chain existed: not covered
+    first_broken_seq: int | None  # the first entry whose hash or link does not match
+    head_seq: int | None  # the newest entry: compare with the `audit.chained` log line
+    head_hash: str | None

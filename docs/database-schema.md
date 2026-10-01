@@ -35,12 +35,12 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 
 | Table | Phase | Purpose / key columns |
 |---|---|---|
-| `users` ✅ | 3 | email (unique; check: lowercase), password_hash (Argon2id), role (check: ADMIN/ANALYST/VIEWER), is_active, failed_login_count, locked_until, last_login_at, created_at |
+| `users` ✅ | 3 | email (unique; check: lowercase), password_hash (Argon2id), role (check: ADMIN/ANALYST/VIEWER), is_active, failed_login_count, locked_until, last_login_at, created_at; Phase 13: mfa_enabled, totp_salt / totp_pending_salt (the TOTP secret is derived from SECRET_KEY + salt, never stored), totp_last_step (replay protection), mfa_recovery_hashes JSONB (SHA-256), must_change_password |
 | `refresh_tokens` ✅ | 3 | user_id (FK, cascade), token_hash (SHA-256, unique), expires_at, revoked_at, revoked_reason (ROTATED/LOGOUT/PASSWORD_CHANGED/DEACTIVATED/REUSE_DETECTED), created_at |
-| `audit_logs` ✅ | 3 | occurred_at, action, result (check: SUCCESS/FAILURE/DENIED), actor_id (FK without cascade: a user with audit history cannot be deleted), actor_label (email at the time), entity_type, entity_id, client_ip, request_id, details JSONB (sanitized, no secrets). **Append-only** |
+| `audit_logs` ✅ | 3 | occurred_at, action, result (check: SUCCESS/FAILURE/DENIED), actor_id (FK without cascade: a user with audit history cannot be deleted), actor_label (email at the time), entity_type, entity_id, client_ip, request_id, details JSONB (sanitized, no secrets); Phase 13: seq (unique, from `audit_logs_seq`), prev_hash, entry_hash (the hash chain, set by the `audit_logs_chain` trigger; null on entries from before it). **Append-only** |
 | `assets` ✅ | 4 | hostname (unique; check: lowercase), ip_addresses inet[] (GIN), asset_type, environment, criticality (low/medium/high/critical), owner, description, tags, status (active/retired), created_at, updated_at |
 | `identities` ✅ | 4 | username (unique; check: lowercase), display_name, department, title, privilege_level (standard/privileged/service), status (active/disabled), tags, created_at, updated_at |
-| `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled. `ingest_key_hash` arrives in Phase 13 |
+| `log_sources` ✅ | 4 | name (unique), source_type (check: the five parsers), description, default_host, timezone, enabled, ingest_key_hash (SHA-256, unique, nullable), ingest_key_prefix, ingest_key_created_at, ingest_key_last_used_at (Phase 13; the key itself is never stored), allowed_hosts (text array, default empty: any host) |
 | `ingestion_batches` ✅ | 5 | source_id, submitted_by (null for CLI/demo), channel (api/text/cli/demo), status (check: STORED → PROCESSED / PROCESSED_WITH_ERRORS / DETECTION_FAILED), received / parsed / skipped / failed / duplicate / rejected counts (check: they add up to received), detection_count (Phase 6), alerts_created / alerts_updated (Phase 7), issues JSONB (first 50), first/last event time, simulated, created_at. Not append-only: detection moves it through its states |
 | `raw_events` ✅ | 4, 5 | source_id (FK), batch_id (FK, Phase 5), received_at, raw_data **bytea** (exact bytes, ≤ 64 KiB), fingerprint (unique), parse_status (PARSED / SKIPPED / FAILED; check: parse_detail present ⇔ not PARSED), parse_detail (short reason code; `parse_error` until migration 0004), simulated. **Append-only** |
 | `events` ✅ | 4 | normalized + enrichment columns ([event-model.md](event-model.md)); raw_event_id (unique FK), source_id (FK), asset_id / identity_id (FK, restrict). Checks: category, outcome, action format, port ranges, lowercase host/user, IP scope, criticality, sizes. **Append-only** |
@@ -58,6 +58,7 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `incident_activity` ✅ | 8 | incident_id, seq (identity: insertion order), actor_id (null: the engine), kind (CREATED/LINK/UNLINK/STATUS/ASSIGN/NOTE/EVIDENCE/RENAME), details JSONB, created_at. **Append-only** |
 | `saved_hunts` ✅ | 10 | owner_id (FK users), name (unique per owner), description, kind (check: query/template), definition JSONB (validated again on every load), shared (indexed), created_at, updated_at |
 | `app_settings` ✅ | 8 | key, value JSONB, updated_at, updated_by: the correlation and sequence windows; changes audited |
+| `rate_limit_counters` ✅ | 13 | key (scope + client or source), window_start, count; PK (key, window_start). Sliding-window rate limits shared by every backend instance; old windows removed now and then |
 
 `log_sources` moved from Phase 5 to Phase 4: every event references its source, so the event
 store cannot exist without it. The batches that group records per ingest request stay in
@@ -80,6 +81,11 @@ Phase 5.
 - The partial unique index `alerts(dedup_key) WHERE status IN ('NEW','TRIAGED','IN_PROGRESS')`
   makes "one active alert per key" a database guarantee, not just application logic.
 - `incident_alerts(alert_id)` is unique.
+- **Audit hash chain** (Phase 13): the `BEFORE INSERT` trigger `audit_logs_chain` runs
+  `audit_chain()`, which takes an advisory lock, assigns the next `seq`, links `prev_hash` to
+  the newest entry and computes `entry_hash` with `audit_entry_digest()` (SHA-256 over the
+  entry's fields as a JSON array). The application cannot choose these values: the trigger
+  overwrites them.
 
 ## Indexes (from the queries we know we will run)
 

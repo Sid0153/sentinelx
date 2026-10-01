@@ -71,6 +71,8 @@ export function makeUser(role: Role, overrides: Partial<User> = {}): User {
     is_active: true,
     created_at: "2026-09-01T08:00:00Z",
     last_login_at: "2026-09-25T09:30:00Z",
+    mfa_enabled: false,
+    must_change_password: false,
     ...overrides,
   };
 }

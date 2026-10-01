@@ -1,7 +1,28 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
+import { ChangePasswordForm } from "../components/account";
+import { Button } from "../components/ui";
 import type { Role } from "../types/api";
 import { hasRole, useAuth } from "./AuthContext";
+
+/** After an admin password reset the API refuses everything else until the password is
+ * changed (403 password_change_required), so the app shows only this. */
+function PasswordChangeRequired() {
+  const { signOut } = useAuth();
+  return (
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md space-y-3">
+        <p className="text-sm text-slate-300">
+          An administrator reset your password. Choose a new one to continue.
+        </p>
+        <ChangePasswordForm forced />
+        <Button variant="secondary" onClick={() => void signOut()}>
+          Sign out
+        </Button>
+      </div>
+    </main>
+  );
+}
 
 /** Routes that need a signed-in user. The server still checks every API call. */
 export function RequireAuth() {
@@ -24,6 +45,7 @@ export function RequireAuth() {
       />
     );
   }
+  if (state.user.must_change_password) return <PasswordChangeRequired />;
   return <Outlet />;
 }
 

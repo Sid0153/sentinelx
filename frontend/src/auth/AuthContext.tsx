@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { login, logout, restoreSession } from "../services/auth";
+import { currentUser, login, logout, restoreSession, type SecondFactor } from "../services/auth";
 import { onSessionExpired } from "../services/http";
 import type { Role, User } from "../types/api";
 
@@ -19,8 +19,10 @@ type AuthState =
 
 interface AuthContextValue {
   state: AuthState;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string, second?: SecondFactor) => Promise<void>;
   signOut: (reason?: "signed_out" | "password_changed") => Promise<void>;
+  /** Reloads the signed-in user (after turning two-factor sign-in on or off). */
+  reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -51,8 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const user = await login(email, password);
+  const signIn = useCallback(async (email: string, password: string, second?: SecondFactor) => {
+    const user = await login(email, password, second);
+    setState({ status: "authenticated", user });
+  }, []);
+
+  const reloadUser = useCallback(async () => {
+    const user = await currentUser();
     setState({ status: "authenticated", user });
   }, []);
 
@@ -65,7 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: "unauthenticated", reason });
   }, []);
 
-  const value = useMemo(() => ({ state, signIn, signOut }), [state, signIn, signOut]);
+  const value = useMemo(
+    () => ({ state, signIn, signOut, reloadUser }),
+    [state, signIn, signOut, reloadUser],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

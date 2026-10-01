@@ -155,11 +155,19 @@ export function EventDetailPage() {
               As received ({event.raw.size_bytes} bytes), parse status {event.raw.parse_status}.
               Shown as text; the stored bytes are never changed.
             </p>
-            {/* Log content is rendered as text, never as HTML. */}
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-2 text-xs text-slate-300">
-              {event.raw.text}
-            </pre>
-            {event.raw.truncated && <p className="text-xs text-slate-500">Shown up to 4,096 characters.</p>}
+            {event.raw.withheld || event.raw.text === null ? (
+              <p className="text-sm text-slate-400">Raw record withheld: raw log text is shown to analysts and admins only.</p>
+            ) : (
+              <>
+                {/* Log content is rendered as text, never as HTML. */}
+                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-2 text-xs text-slate-300">
+                  {event.raw.text}
+                </pre>
+                {event.raw.truncated && (
+                  <p className="text-xs text-slate-500">Shown up to 4,096 characters.</p>
+                )}
+              </>
+            )}
           </Panel>
         </div>
       </div>

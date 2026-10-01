@@ -30,6 +30,8 @@ class UserPublic(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: datetime | None
+    mfa_enabled: bool = False
+    must_change_password: bool = False
 
 
 class UserCreate(BaseModel):
@@ -48,6 +50,12 @@ class UserCreate(BaseModel):
     @classmethod
     def _valid_password(cls, value: str) -> str:
         return validate_password_policy(value)
+
+
+class TemporaryPassword(BaseModel):
+    """Returned once by an admin password reset. The user must change it at next sign-in."""
+
+    temporary_password: str
 
 
 class UserUpdate(BaseModel):

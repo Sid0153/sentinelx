@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
+from app.audit import chain as _chain  # noqa: F401  (registers the chain's log anchor)
 from app.audit.events import AuditAction, AuditResult, EntityType
 from app.core.logging import client_ip_var, request_id_var
 from app.core.redaction import redact

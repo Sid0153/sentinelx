@@ -1,4 +1,4 @@
-import type { AuditEntry, AuditResult, Page, Role, User } from "../types/api";
+import type { AuditEntry, AuditIntegrity, AuditResult, Page, Role, User } from "../types/api";
 import { apiRequest } from "./http";
 
 export function listUsers(offset: number, limit: number, signal?: AbortSignal) {
@@ -14,6 +14,22 @@ export function updateUser(
   changes: { role?: Role; is_active?: boolean },
 ): Promise<User> {
   return apiRequest<User>(`/users/${encodeURIComponent(id)}`, { method: "PATCH", body: changes });
+}
+
+/** A temporary password, shown once; the user must change it at next sign-in. */
+export function resetPassword(id: string): Promise<{ temporary_password: string }> {
+  return apiRequest<{ temporary_password: string }>(
+    `/users/${encodeURIComponent(id)}/reset-password`,
+    { method: "POST" },
+  );
+}
+
+export function resetMfa(id: string): Promise<User> {
+  return apiRequest<User>(`/users/${encodeURIComponent(id)}/reset-mfa`, { method: "POST" });
+}
+
+export function auditIntegrity(signal?: AbortSignal): Promise<AuditIntegrity> {
+  return apiRequest<AuditIntegrity>("/audit/integrity", { signal });
 }
 
 export interface AuditQuery {

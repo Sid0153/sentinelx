@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.audit.events import AuditAction, AuditResult, EntityType
 from app.audit.service import record
+from app.auth import mfa
 from app.auth.passwords import verify_against_dummy, verify_password
 from app.auth.tokens import create_access_token, generate_refresh_token, hash_refresh_token
 from app.core.config import Settings
@@ -17,6 +18,10 @@ from app.models.user import User
 
 class InvalidCredentialsError(Exception):
     """Wrong email or password, locked or disabled account. Callers must not say which."""
+
+
+class MfaRequiredError(Exception):
+    """The password was right; the account has two-factor sign-in and no code was given."""
 
 
 class InvalidRefreshTokenError(Exception):
@@ -41,7 +46,58 @@ def _login_failed(db: Session, user: User | None, reason: str) -> InvalidCredent
     return InvalidCredentialsError()
 
 
-def authenticate(db: Session, email: str, password: str, settings: Settings) -> User:
+def _count_failure(db: Session, user: User, now: datetime, settings: Settings) -> None:
+    """A wrong password or a wrong second-factor code: both count towards the lockout."""
+    user.failed_login_count += 1
+    if user.failed_login_count >= settings.max_failed_logins:
+        user.locked_until = now + timedelta(minutes=settings.lockout_minutes)
+        user.failed_login_count = 0
+        record(
+            db,
+            AuditAction.ACCOUNT_LOCKED,
+            result=AuditResult.FAILURE,
+            entity_type=EntityType.USER,
+            entity_id=user.id,
+            details={"minutes": settings.lockout_minutes},
+        )
+
+
+def check_second_factor(
+    db: Session, user: User, otp: str | None, recovery_code: str | None, settings: Settings
+) -> bool:
+    """True when `otp` (a code from the app) or `recovery_code` is valid for the user; it is
+    then used up (the TOTP step is remembered, the recovery code removed). The caller commits."""
+    now = datetime.now(UTC)
+    if otp and user.totp_salt:
+        secret = mfa.derive_secret(settings.secret_key, user.totp_salt)
+        step = mfa.verify_totp(secret, otp, now, user.totp_last_step)
+        if step is not None:
+            user.totp_last_step = step
+            return True
+    if recovery_code:
+        remaining = mfa.use_recovery_code(list(user.mfa_recovery_hashes), recovery_code)
+        if remaining is not None:
+            user.mfa_recovery_hashes = remaining
+            record(
+                db,
+                AuditAction.MFA_RECOVERY_CODE_USED,
+                actor=user,
+                entity_type=EntityType.USER,
+                entity_id=user.id,
+                details={"remaining": len(remaining)},
+            )
+            return True
+    return False
+
+
+def authenticate(
+    db: Session,
+    email: str,
+    password: str,
+    settings: Settings,
+    otp: str | None = None,
+    recovery_code: str | None = None,
+) -> User:
     now = datetime.now(UTC)
     # FOR UPDATE serializes concurrent attempts, so the failure counter cannot be skipped.
     user = db.scalar(select(User).where(User.email == email).with_for_update())
@@ -55,22 +111,20 @@ def authenticate(db: Session, email: str, password: str, settings: Settings) -> 
         raise _login_failed(db, user, "account_locked")
 
     if not verify_password(user.password_hash, password):
-        user.failed_login_count += 1
-        if user.failed_login_count >= settings.max_failed_logins:
-            user.locked_until = now + timedelta(minutes=settings.lockout_minutes)
-            user.failed_login_count = 0
-            record(
-                db,
-                AuditAction.ACCOUNT_LOCKED,
-                result=AuditResult.FAILURE,
-                entity_type=EntityType.USER,
-                entity_id=user.id,
-                details={"minutes": settings.lockout_minutes},
-            )
+        _count_failure(db, user, now, settings)
         raise _login_failed(db, user, "wrong_password")
 
     if not user.is_active:
         raise _login_failed(db, user, "account_disabled")
+
+    if user.mfa_enabled:
+        if not otp and not recovery_code:
+            # Not a failure: the normal first step of a two-step sign-in.
+            db.rollback()  # releases the row lock
+            raise MfaRequiredError
+        if not check_second_factor(db, user, otp, recovery_code, settings):
+            _count_failure(db, user, now, settings)
+            raise _login_failed(db, user, "wrong_mfa_code")
 
     user.failed_login_count = 0
     user.locked_until = None

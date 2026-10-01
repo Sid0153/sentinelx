@@ -12,7 +12,7 @@ import {
   selectClass,
 } from "../components/ui";
 import { useApi } from "../hooks/useApi";
-import { createUser, listUsers, updateUser } from "../services/admin";
+import { createUser, listUsers, resetMfa, resetPassword, updateUser } from "../services/admin";
 import { ApiError } from "../services/http";
 import type { Role, User } from "../types/api";
 
@@ -99,6 +99,31 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
 function UserRow({ user, isSelf, onChanged }: { user: User; isSelf: boolean; onChanged: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Shown once, here only: the admin passes it on; the user must change it at sign-in.
+  const [temporary, setTemporary] = useState<string | null>(null);
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      onChanged();
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function onResetPassword() {
+    if (!window.confirm(`Reset the password of ${user.email}? Their sessions end now.`)) return;
+    void run(async () => setTemporary((await resetPassword(user.id)).temporary_password));
+  }
+
+  function onResetMfa() {
+    if (!window.confirm(`Turn off two-factor sign-in for ${user.email}? Their sessions end now.`)) return;
+    void run(() => resetMfa(user.id));
+  }
 
   async function change(changes: { role?: Role; is_active?: boolean }) {
     setBusy(true);
@@ -118,7 +143,17 @@ function UserRow({ user, isSelf, onChanged }: { user: User; isSelf: boolean; onC
       <td className="py-2 pr-4 text-slate-100">
         {user.email}
         {isSelf && <span className="ml-2 text-xs text-slate-500">(you)</span>}
+        {user.mfa_enabled && <span className="ml-2 text-xs text-emerald-300">2FA</span>}
+        {user.must_change_password && (
+          <span className="ml-2 text-xs text-amber-300">must change password</span>
+        )}
         {error && <ErrorMessage>{error}</ErrorMessage>}
+        {temporary && (
+          <div role="status" className="mt-1 text-xs text-slate-300">
+            Temporary password (shown once):{" "}
+            <span className="select-all font-mono text-slate-100">{temporary}</span>
+          </div>
+        )}
       </td>
       <td className="py-2 pr-4">
         <select
@@ -141,7 +176,17 @@ function UserRow({ user, isSelf, onChanged }: { user: User; isSelf: boolean; onC
       <td className="whitespace-nowrap py-2 pr-4 font-mono text-xs text-slate-400">
         {formatUtc(user.last_login_at)}
       </td>
-      <td className="py-2 text-right">
+      <td className="space-x-2 whitespace-nowrap py-2 text-right">
+        {!isSelf && (
+          <Button variant="secondary" disabled={busy} onClick={onResetPassword}>
+            Reset password
+          </Button>
+        )}
+        {!isSelf && user.mfa_enabled && (
+          <Button variant="secondary" disabled={busy} onClick={onResetMfa}>
+            Reset 2FA
+          </Button>
+        )}
         {!isSelf && (
           <Button
             variant={user.is_active ? "danger" : "secondary"}

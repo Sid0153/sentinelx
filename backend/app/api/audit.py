@@ -5,13 +5,31 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession
+from app.audit import chain
 from app.audit.events import AuditAction, AuditResult, EntityType
 from app.audit.service import AuditFilters, list_audit_logs
 from app.auth.deps import AdminUser
-from app.schemas.audit import AuditLogPublic
+from app.schemas.audit import AuditIntegrity, AuditLogPublic
 from app.schemas.common import Page, error_responses
 
 router = APIRouter(prefix="/audit", tags=["audit"], responses=error_responses(401, 403))
+
+
+@router.get("/integrity", response_model=AuditIntegrity)
+def audit_integrity(_admin: AdminUser, db: DbSession) -> AuditIntegrity:
+    """Recomputes the audit log's hash chain in the database: `intact` false means an entry
+    was changed, removed or reordered (`first_broken_seq`). Compare `head_seq` / `head_hash`
+    with the newest `audit.chained` line in the application log, which lives outside the
+    database, to also catch a rewritten tail. ADMIN only."""
+    report = chain.verify(db)
+    return AuditIntegrity(
+        intact=report.intact,
+        chained=report.chained,
+        legacy=report.legacy,
+        first_broken_seq=report.first_broken,
+        head_seq=report.head_seq,
+        head_hash=report.head_hash,
+    )
 
 
 @router.get("", response_model=Page[AuditLogPublic])

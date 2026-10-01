@@ -2,7 +2,7 @@ import ipaddress
 import re
 import uuid
 from datetime import datetime
-from typing import ClassVar, Self
+from typing import Annotated, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -18,6 +18,10 @@ from app.models.context import (
 
 MAX_TAGS = 20
 MAX_IPS = 16
+# Each item is bounded in the schema too, so an oversized value is refused before any
+# validator runs (Phase 13 input review).
+Tag = Annotated[str, Field(max_length=32)]
+IpText = Annotated[str, Field(max_length=45)]
 _TAG = re.compile(r"^[a-z0-9][a-z0-9._-]{0,31}$")
 
 
@@ -100,13 +104,13 @@ class AssetListItem(AssetPublic):
 
 class AssetCreate(_Strict):
     hostname: str = Field(max_length=253)
-    ip_addresses: list[str] = Field(default_factory=list, max_length=MAX_IPS)
+    ip_addresses: list[IpText] = Field(default_factory=list, max_length=MAX_IPS)
     asset_type: AssetType
     environment: Environment
     criticality: Criticality
     owner: str | None = Field(default=None, max_length=128)
     description: str | None = Field(default=None, max_length=500)
-    tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS)
+    tags: list[Tag] = Field(default_factory=list, max_length=MAX_TAGS)
 
     @field_validator("hostname")
     @classmethod
@@ -130,13 +134,13 @@ class AssetUpdate(_Updatable):
 
     CLEARABLE = frozenset({"owner", "description"})
 
-    ip_addresses: list[str] | None = Field(default=None, max_length=MAX_IPS)
+    ip_addresses: list[IpText] | None = Field(default=None, max_length=MAX_IPS)
     asset_type: AssetType | None = None
     environment: Environment | None = None
     criticality: Criticality | None = None
     owner: str | None = Field(default=None, max_length=128)
     description: str | None = Field(default=None, max_length=500)
-    tags: list[str] | None = Field(default=None, max_length=MAX_TAGS)
+    tags: list[Tag] | None = Field(default=None, max_length=MAX_TAGS)
     status: AssetStatus | None = None
 
     @field_validator("ip_addresses")
@@ -179,7 +183,7 @@ class IdentityCreate(_Strict):
     department: str | None = Field(default=None, max_length=128)
     title: str | None = Field(default=None, max_length=128)
     privilege_level: PrivilegeLevel
-    tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS)
+    tags: list[Tag] = Field(default_factory=list, max_length=MAX_TAGS)
 
     @field_validator("username")
     @classmethod
@@ -200,7 +204,7 @@ class IdentityUpdate(_Updatable):
     title: str | None = Field(default=None, max_length=128)
     privilege_level: PrivilegeLevel | None = None
     status: IdentityStatus | None = None
-    tags: list[str] | None = Field(default=None, max_length=MAX_TAGS)
+    tags: list[Tag] | None = Field(default=None, max_length=MAX_TAGS)
 
     @field_validator("tags")
     @classmethod

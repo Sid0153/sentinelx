@@ -19,15 +19,21 @@ from app.core.errors import AppError
 from app.database.session import get_db
 from app.models.user import ROLE_RANK, Role, User
 
-_bearer_scheme = HTTPBearer(auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _unauthorized() -> AppError:
     return AppError(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"})
 
 
+# The only routes open to a user who must change their password (after an admin reset).
+# Logout is public anyway.
+PASSWORD_CHANGE_ROUTES = frozenset({"/api/auth/me", "/api/auth/change-password"})
+
+
 def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> User:
@@ -43,6 +49,10 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise _unauthorized()
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ROUTES:
+        # A temporary password from an admin reset is known to two people: until it is
+        # replaced, the account can do nothing else.
+        raise AppError(403, "Change your password to continue", code="password_change_required")
     return user
 
 
@@ -74,6 +84,13 @@ def require_role(minimum: Role) -> Callable[..., User]:
         return user
 
     return dependency
+
+
+def can_read_raw_records(user: User) -> bool:
+    """Raw log records can hold secrets typed into the wrong field (a password entered as a
+    username); they are stored as received, so their full text is shown to analysts and
+    admins only. Viewers see the normalized event (Phase 13, docs/security.md)."""
+    return ROLE_RANK[user.role] >= ROLE_RANK[Role.ANALYST]
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

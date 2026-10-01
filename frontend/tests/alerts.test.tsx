@@ -135,6 +135,7 @@ function evidence(): EvidenceEvent {
     simulated: true,
     raw_text: HOSTILE,
     raw_truncated: false,
+    raw_withheld: false,
   };
 }
 

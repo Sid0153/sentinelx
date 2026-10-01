@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import INET, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base
@@ -87,6 +87,18 @@ class LogSource(Base):
     default_host: Mapped[str | None] = mapped_column(sa.String(253))
     timezone: Mapped[str] = mapped_column(sa.String(64), default="UTC")
     enabled: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    # The hosts this source may speak for (Phase 13). Empty: any host. A record naming another
+    # host is stored as FAILED (`host_not_allowed`) and never becomes an event, so a
+    # compromised shipper cannot forge activity for the rest of the estate.
+    allowed_hosts: Mapped[list[str]] = mapped_column(
+        ARRAY(sa.String(253)), default=list, server_default=sa.text("'{}'")
+    )
+    # Per-source ingest key (Phase 13, app/ingestion/keys.py): only its SHA-256 hash and a
+    # short prefix for people; the key itself is never stored.
+    ingest_key_hash: Mapped[str | None] = mapped_column(sa.String(64), unique=True)
+    ingest_key_prefix: Mapped[str | None] = mapped_column(sa.String(16))
+    ingest_key_created_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    ingest_key_last_used_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
     )
@@ -117,6 +129,8 @@ class IngestionBatch(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     source_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("log_sources.id"), index=True)
     submitted_by: Mapped[uuid.UUID | None] = mapped_column(sa.ForeignKey("users.id"))
+    # The ingest key that sent it (its prefix), when a shipper rather than a person did.
+    ingest_key_prefix: Mapped[str | None] = mapped_column(sa.String(16))
     channel: Mapped[str] = mapped_column(sa.String(8))
     status: Mapped[str] = mapped_column(sa.String(24))
     received_count: Mapped[int] = mapped_column(default=0)

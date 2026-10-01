@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any, ClassVar, Self
+from typing import Annotated, Any, ClassVar, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -32,8 +32,22 @@ class SourcePublic(BaseModel):
     default_host: str | None
     timezone: str
     enabled: bool
+    allowed_hosts: list[str] = []
     created_at: datetime
     updated_at: datetime
+    # The ingest key: whether there is one, its prefix and when it was issued and last used
+    # (never the key or its hash).
+    ingest_key_prefix: str | None = None
+    ingest_key_created_at: datetime | None = None
+    ingest_key_last_used_at: datetime | None = None
+
+
+MAX_ALLOWED_HOSTS = 200
+
+
+def clean_hosts(values: list[str]) -> list[str]:
+    """Canonical, de-duplicated host names (the form events are stored with)."""
+    return sorted({canonical_hostname(v) for v in values if v.strip()})
 
 
 class SourceCreate(BaseModel):
@@ -44,6 +58,14 @@ class SourceCreate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     default_host: str | None = Field(default=None, max_length=253)
     timezone: str = Field(default="UTC", max_length=64)
+    allowed_hosts: list[Annotated[str, Field(max_length=253)]] = Field(
+        default_factory=list, max_length=MAX_ALLOWED_HOSTS
+    )
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def _allowed(cls, value: list[str]) -> list[str]:
+        return clean_hosts(value)
 
     @field_validator("name")
     @classmethod
@@ -76,6 +98,14 @@ class SourceUpdate(BaseModel):
     default_host: str | None = Field(default=None, max_length=253)
     timezone: str | None = Field(default=None, max_length=64)
     enabled: bool | None = None
+    allowed_hosts: list[Annotated[str, Field(max_length=253)]] | None = Field(
+        default=None, max_length=MAX_ALLOWED_HOSTS
+    )
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def _allowed(cls, value: list[str] | None) -> list[str] | None:
+        return None if value is None else clean_hosts(value)
 
     @field_validator("default_host")
     @classmethod
@@ -153,9 +183,10 @@ class RawRecordPublic(BaseModel):
     parse_status: ParseStatus
     parse_detail: str | None
     size_bytes: int
-    text: str
+    text: str | None  # None when withheld from this user (viewers: docs/security.md)
     truncated: bool
     simulated: bool
+    withheld: bool = False
 
 
 # ---------- events ----------
@@ -223,3 +254,12 @@ class EventPage(BaseModel):
     items: list[EventPublic]
     next_cursor: str | None
     limit: int
+
+
+class IngestKeyIssued(BaseModel):
+    """Shown once: the key is not stored and cannot be shown again."""
+
+    source_id: uuid.UUID
+    key: str
+    key_prefix: str
+    created_at: datetime

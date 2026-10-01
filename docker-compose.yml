@@ -6,14 +6,52 @@ name: sentinelx
 # the usual 5432 / 8000 / 8080. Every port is bound to 127.0.0.1 only.
 
 services:
+  # One-shot: issues the database's TLS certificate (db/make-certs.sh) and exits. Uses the
+  # pinned backend base image, which ships openssl. No network needed.
+  db-certs:
+    image: python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+    entrypoint: ["sh", "/make-certs.sh"]
+    network_mode: none
+    volumes:
+      - ./db/make-certs.sh:/make-certs.sh:ro
+      - db_tls_ca:/out/ca
+      - db_tls_server:/out/server
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN  # gives the server key to the postgres user
+    read_only: true
+    tmpfs:
+      - /tmp
+
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+    # TLS only for network connections (db/pg_hba.conf refuses unencrypted ones), TLS 1.3.
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/tls/server.crt
+      - -c
+      - ssl_key_file=/tls/server.key
+      - -c
+      - ssl_min_protocol_version=TLSv1.3
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     volumes:
       - db_data:/var/lib/postgresql/data
+      - db_tls_server:/tls:ro
+      - ./db/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    depends_on:
+      db-certs:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:5433:5432"
     healthcheck:
@@ -30,7 +68,13 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: json
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # The application connects as a least-privilege role (rows only, no schema or trigger
+      # changes); migrations and the role setup use the owner (docs/security.md).
+      # TLS with the certificate checked against the local CA and the name "db".
+      DATABASE_URL: postgresql+psycopg://${APP_DB_USER:-sentinelx_app}:${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env}@db:5432/${POSTGRES_DB}?sslmode=verify-full&sslrootcert=/tls-ca/ca.crt
+      MIGRATION_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=verify-full&sslrootcert=/tls-ca/ca.crt
+      APP_DB_USER: ${APP_DB_USER:-sentinelx_app}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
       # Only nginx (its fixed address below) may say who the client is. Requests that reach
       # the backend port directly arrive from the bridge gateway and are not trusted.
@@ -38,6 +82,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - db_tls_ca:/tls-ca:ro  # the CA certificate only, never the server key
     ports:
       - "127.0.0.1:8001:8000"
     # Hardening: no privilege escalation, no Linux capabilities, read-only filesystem
@@ -78,3 +124,5 @@ networks:
 
 volumes:
   db_data:
+  db_tls_ca:
+  db_tls_server:

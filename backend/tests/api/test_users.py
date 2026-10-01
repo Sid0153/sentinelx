@@ -33,7 +33,7 @@ def test_admin_creates_a_user_who_can_sign_in(
     body = response.json()
     assert body["email"] == "new.analyst@example.com"
     assert body["role"] == "ANALYST"
-    assert "password" not in response.text and "hash" not in response.text
+    assert TEST_PASSWORD not in response.text and "hash" not in response.text
     assert login(db_client, "new.analyst@example.com", TEST_PASSWORD).status_code == 200
 
     (entry,) = audit_entries(db_session, "USER_CREATED")

@@ -118,8 +118,9 @@ class AlertDetail(AlertSummary):
 
 
 class EvidenceEvent(EventPublic):
-    raw_text: str  # the raw record as text (at most 4,096 characters shown)
+    raw_text: str | None  # the raw record as text (at most 4,096 characters); None: withheld
     raw_truncated: bool
+    raw_withheld: bool = False  # viewers do not see raw records (docs/security.md)
 
 
 class TransitionRequest(BaseModel):

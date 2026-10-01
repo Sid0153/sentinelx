@@ -93,8 +93,8 @@ jobs:
           fetch-depth: 0 # every commit, so a secret removed later is still found
       - name: Scan for committed secrets
         run: >-
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.18.4
-          detect --source /repo --config /repo/.gitleaks.toml --no-banner --redact
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1
+          git /repo --config /repo/.gitleaks.toml --no-banner --redact
 
   docker-stack:
     name: Docker Compose smoke test
@@ -106,6 +106,7 @@ jobs:
           cp .env.example .env
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
           sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+          sed -i "s/^APP_DB_PASSWORD=.*/APP_DB_PASSWORD=$(openssl rand -hex 24)/" .env
       - name: Build and start the stack (waits for health checks)
         run: docker compose up -d --build --wait --wait-timeout 240
       - name: Backend liveness (direct)
@@ -144,6 +145,8 @@ jobs:
           echo "$admin_password" > /tmp/admin_password
           docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend             python -m app.cli create-admin --email admin@ci.example
           python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$admin_password"
+      - name: Two-factor sign-in, admin resets and the audit hash chain work end to end (through nginx)
+        run: python3 scripts/security_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
       - name: Ingestion, detection, alerts and incidents work end to end (API through nginx, scenarios via CLI)
         run: |
           python3 scripts/ingest_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
@@ -156,6 +159,46 @@ jobs:
           docker compose exec -T backend python -m app.cli demo-ingest --scenario multi_stage_attack \
             --source ci-auth --host ci-web-02 --source-ip 198.51.100.200 | tee /tmp/chain.txt
           grep -q "1 new incidents" /tmp/chain.txt  # the whole chain is one story
+      - name: The application connects as a least-privilege database role
+        run: |
+          docker compose logs backend | grep -q "Runtime role sentinelx_app"
+          docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "select usename from pg_stat_activity where datname = current_database() and pid <> pg_backend_pid()"' | tr -d '\r' | sort -u > /tmp/db_users.txt
+          cat /tmp/db_users.txt
+          test "$(cat /tmp/db_users.txt)" = "sentinelx_app"
+          docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "select rolsuper from pg_roles where rolname = '"'"'sentinelx_app'"'"'"' | tr -d '\r' | grep -qx f
+      - name: Hardening (Phase 13) holds on the running stack
+        run: |
+          # The page's CSP allows no inline styles or scripts.
+          ! curl -fsS -D - -o /dev/null http://127.0.0.1:8081/ | grep -qi "unsafe-inline"
+          curl -fsS -D - -o /dev/null http://127.0.0.1:8081/ | grep -qi "strict-transport-security: max-age=31536000; includeSubDomains"
+          # Query strings (search values, hunt definitions) never reach the proxy log.
+          curl -s -o /dev/null "http://127.0.0.1:8081/events?username=ci-private-user"
+          ! docker compose logs frontend | grep -q "ci-private-user"
+          # The backend refuses an oversized body itself, even with nginx bypassed.
+          head -c 2000000 /dev/zero > /tmp/big.json
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @/tmp/big.json http://127.0.0.1:8001/api/hunt/query)"
+          test "$code" = "413"
+          # A log shipper ingests with its source's key (no user account), through nginx.
+          docker compose exec -T backend python -m app.cli issue-ingest-key --source ci-auth | tr -d '\r' > /tmp/key_output.txt
+          source_id="$(sed -n 's/^Source ID: //p' /tmp/key_output.txt)"
+          tail -n 1 /tmp/key_output.txt > /tmp/ingest_key
+          echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) ci-host sshd[1]: Failed password for root from 203.0.113.9 port 1 ssh2" > /tmp/line.txt
+          # The header comes from a file: the key stays out of the command line (and gitleaks).
+          printf 'X-Ingest-Key: %s\n' "$(cat /tmp/ingest_key)" > /tmp/key_header
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H @/tmp/key_header -H 'Content-Type: text/plain' --data-binary @/tmp/line.txt "http://127.0.0.1:8081/api/ingest/$source_id")"
+          test "$code" = "201"
+          printf 'X-Ingest-Key: sxk_wrong\n' > /tmp/wrong_key_header
+          code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H @/tmp/wrong_key_header -H 'Content-Type: text/plain' --data-binary @/tmp/line.txt "http://127.0.0.1:8081/api/ingest/$source_id")"
+          test "$code" = "401"
+          # Database connections use TLS 1.3 with a verified certificate; plaintext is refused.
+          docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -c "select distinct s.ssl, s.version from pg_stat_activity a join pg_stat_ssl s using (pid) where a.datname = current_database() and a.pid <> pg_backend_pid()"' | tr -d '\r' > /tmp/db_tls.txt
+          cat /tmp/db_tls.txt
+          test "$(cat /tmp/db_tls.txt)" = "t|TLSv1.3"
+          ! docker compose exec -T backend python -c "import os, psycopg; psycopg.connect(os.environ['DATABASE_URL'].replace('postgresql+psycopg', 'postgresql').split('?')[0] + '?sslmode=disable')"
+          # The backend container holds the CA certificate only, never the server key.
+          ! docker compose exec -T backend test -e /tls/server.key
+          # The tamper-evident audit chain verifies.
+          docker compose exec -T backend python -m app.cli verify-audit
       - name: A forged X-Forwarded-For does not escape the login rate limit
         run: |
           for path in 8081 8001; do  # through nginx, and straight to the backend port
@@ -168,7 +211,7 @@ jobs:
       - name: No secret appears in the logs
         run: |
           logs="$(docker compose logs --no-color)"
-          for secret in "$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2)"                         "$(grep ^SECRET_KEY= .env | cut -d= -f2)" "$(cat /tmp/admin_password)"; do
+          for secret in "$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2)"                         "$(grep ^SECRET_KEY= .env | cut -d= -f2)" "$(grep ^APP_DB_PASSWORD= .env | cut -d= -f2)" "$(cat /tmp/admin_password)"                         "$(cat /tmp/ingest_key)"; do
             ! echo "$logs" | grep -qF "$secret"
           done
       - name: Readiness reports a database outage (and recovers)

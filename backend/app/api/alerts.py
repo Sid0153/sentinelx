@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.alerts import queries, service, workflow
 from app.api.deps import DbSession
-from app.auth.deps import AnalystUser, CurrentUser
+from app.auth.deps import AnalystUser, CurrentUser, can_read_raw_records
 from app.context.lookup import inventory_context
 from app.core.errors import AppError
 from app.events.queries import DISPLAY_LIMIT
@@ -193,7 +193,7 @@ def get_alert(alert_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> AlertDe
 )
 def list_evidence(
     alert_id: uuid.UUID,
-    _user: CurrentUser,
+    user: CurrentUser,
     db: DbSession,
     limit: Limit = 50,
     offset: Offset = 0,
@@ -202,14 +202,16 @@ def list_evidence(
     came from (as text, at most 4,096 characters)."""
     queries.get_alert(db, alert_id)
     rows, total = queries.evidence(db, alert_id, limit, offset)
+    shown = can_read_raw_records(user)
     items = []
     for event, raw in rows:
-        text = raw.display_text
+        text = raw.display_text if shown else ""
         items.append(
             EvidenceEvent(
                 **EventPublic.model_validate(event).model_dump(),
-                raw_text=text[:DISPLAY_LIMIT],
+                raw_text=text[:DISPLAY_LIMIT] if shown else None,
                 raw_truncated=len(text) > DISPLAY_LIMIT,
+                raw_withheld=not shown,
             )
         )
     return Page(items=items, total=total, limit=limit, offset=offset)

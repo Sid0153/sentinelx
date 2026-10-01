@@ -4,10 +4,13 @@
     python -m app.cli export-openapi   # writes docs/openapi.json (a test fails if it is stale)
     python -m app.cli create-admin --email you@example.com
     python -m app.cli create-source --name web-01-auth --type linux_auth [--timezone UTC]
+    python -m app.cli issue-ingest-key --source web-01-auth  # key for a log shipper (shown once)
     python -m app.cli ingest-file --source web-01-auth --file /var/log/auth.log
     python -m app.cli seed-rules       # load the rule library (run by docker-entrypoint.sh)
     python -m app.cli reconcile-batches  # mark batches a crash left undetected (entrypoint)
     python -m app.cli rescore            # score open work with the current risk model (entrypoint)
+    python -m app.cli setup-app-role     # the application's least-privilege DB role (entrypoint)
+    python -m app.cli verify-audit [--anchor SEQ:HASH]  # check the audit log's hash chain
     python -m app.cli run-detection --from 2026-09-25T00:00:00Z --to 2026-09-26T00:00:00Z
     python -m app.cli demo-scenarios   # SIMULATED scenarios and the options each accepts
     python -m app.cli demo-ingest --scenario brute_force --source web-01-auth \
@@ -226,6 +229,76 @@ def _reconcile_batches() -> int:
     return 0
 
 
+def _verify_audit(anchors: list[str]) -> int:
+    from app.audit.chain import verify
+    from app.database.session import get_session_factory
+
+    parsed = []
+    for anchor in anchors:
+        seq, _, digest = anchor.partition(":")
+        if not seq.isdigit() or len(digest) != 64:
+            print(f"An anchor looks like SEQ:HASH (from an audit.chained log line): {anchor}")
+            return 2
+        parsed.append((int(seq), digest))
+    with get_session_factory()() as db:
+        report = verify(db, parsed)
+    print(f"{report.chained} entries in the chain, {report.legacy} from before it (not covered)")
+    if report.head_seq is not None:
+        print(f"Newest entry: {report.head_seq} {report.head_hash}")
+    for problem in report.anchor_problems:
+        print(f"ANCHOR MISMATCH: {problem}")
+    if report.first_broken is not None:
+        print(f"BROKEN: entry {report.first_broken} was changed, removed or reordered")
+    print("Audit log intact" if report.intact else "Audit log NOT intact")
+    return 0 if report.intact else 1
+
+
+def _setup_app_role() -> int:
+    from sqlalchemy import create_engine
+
+    from app.core.config import get_settings
+    from app.database.roles import setup_app_role
+
+    settings = get_settings()
+    if not settings.app_db_user or not settings.app_db_password:
+        print("APP_DB_USER and APP_DB_PASSWORD must be set", file=sys.stderr)
+        return 1
+    engine = create_engine(settings.owner_database_url)
+    try:
+        with engine.begin() as connection:
+            tables = setup_app_role(connection, settings.app_db_user, settings.app_db_password)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    finally:
+        engine.dispose()
+    print(
+        f"Runtime role {settings.app_db_user}: rows only on {tables} tables "
+        "(append-only tables: insert and read only); no schema, trigger or role changes"
+    )
+    return 0
+
+
+def _issue_ingest_key(source_name: str) -> int:
+    from app.core.errors import AppError
+    from app.database.session import get_session_factory
+    from app.ingestion.keys import issue
+    from app.ingestion.sources import get_source_by_name
+
+    with get_session_factory()() as db:
+        try:
+            source = get_source_by_name(db, source_name)
+        except AppError as exc:
+            print(exc.message, file=sys.stderr)
+            return 1
+        issued = issue(db, source, None)
+    # The key goes to the operator's terminal only: it is stored as a hash and never logged.
+    print(f"Ingest key for {source_name} (shown once, store it in the shipper's secret store).")
+    print(f"Source ID: {source.id}")  # the shipper posts to /api/ingest/<source ID>
+    print(issued.key)
+    return 0
+
+
 def _rescore() -> int:
     from app.alerts.service import rescore_outdated
     from app.database.session import get_session_factory
@@ -304,6 +377,10 @@ def main(argv: list[str] | None = None) -> int:
     create_source.add_argument("--type", required=True, dest="source_type")
     create_source.add_argument("--timezone", default="UTC")
     create_source.add_argument("--default-host")
+    issue_key = subcommands.add_parser(
+        "issue-ingest-key", help="Issue (or rotate) a source's ingest key for a log shipper"
+    )
+    issue_key.add_argument("--source", required=True)
     ingest_file = subcommands.add_parser("ingest-file", help="Ingest a log file into a source")
     ingest_file.add_argument("--source", required=True)
     ingest_file.add_argument("--file", required=True, type=Path)
@@ -320,6 +397,15 @@ def main(argv: list[str] | None = None) -> int:
     subcommands.add_parser("seed-rules", help="Load the shipped rule library into the database")
     subcommands.add_parser("reconcile-batches", help="Mark batches a crash left without detection")
     subcommands.add_parser("rescore", help="Score open work again after a risk model change")
+    subcommands.add_parser(
+        "setup-app-role", help="Create or update the application's least-privilege DB role"
+    )
+    verify_audit = subcommands.add_parser(
+        "verify-audit", help="Check the audit log's hash chain (and log anchors)"
+    )
+    verify_audit.add_argument(
+        "--anchor", action="append", default=[], help="SEQ:HASH from an audit.chained log line"
+    )
     detect = subcommands.add_parser("run-detection", help="Run the enabled rules over a range")
     detect.add_argument("--from", dest="start", required=True, help="ISO 8601 with a zone")
     detect.add_argument("--to", dest="end", required=True, help="ISO 8601 with a zone")
@@ -330,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
         return _export_openapi()
     if args.command == "create-source":
         return _create_source(args.name, args.source_type, args.timezone, args.default_host)
+    if args.command == "issue-ingest-key":
+        return _issue_ingest_key(args.source)
     if args.command == "ingest-file":
         return _ingest_file(args.source, args.file)
     if args.command == "demo-ingest":
@@ -342,6 +430,10 @@ def main(argv: list[str] | None = None) -> int:
         return _reconcile_batches()
     if args.command == "rescore":
         return _rescore()
+    if args.command == "setup-app-role":
+        return _setup_app_role()
+    if args.command == "verify-audit":
+        return _verify_audit(args.anchor)
     if args.command == "run-detection":
         return _run_detection(args.start, args.end)
     return _create_admin(args.email)

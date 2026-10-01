@@ -32,7 +32,13 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # json: one JSON object per line (containers, log shippers). text: readable local output.
     log_format: Literal["json", "text"] = "json"
-    database_url: str
+    database_url: str  # the application's least-privilege role (app/database/roles.py)
+    # The database owner, for migrations and for setting up the application's role. Unset:
+    # DATABASE_URL is used for both (local runs and tests, where one user does everything).
+    migration_database_url: str | None = None
+    # The least-privilege role `cli setup-app-role` creates or updates (as the owner).
+    app_db_user: str | None = None
+    app_db_password: str | None = None
     secret_key: str  # signs access tokens (JWT)
     cors_origins: str = "http://localhost:5174"  # comma-separated list
 
@@ -56,6 +62,10 @@ class Settings(BaseSettings):
     ingest_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
     ingest_max_records: int = Field(default=5000, ge=1, le=50_000)
 
+    # Ingest requests per log source per minute, whoever sends them (Phase 13): a flooding
+    # shipper or a stolen key cannot bury the pipeline.
+    ingest_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
+
     # Threat hunting: each hunt query is cancelled after this long (docs/threat-hunting.md).
     hunt_timeout_ms: int = Field(default=5000, ge=100, le=60_000)
 
@@ -68,12 +78,17 @@ class Settings(BaseSettings):
             raise ValueError("INTERNAL_NETWORKS must be a comma-separated list of CIDRs") from None
         return value
 
-    @field_validator("database_url")
+    @field_validator("database_url", "migration_database_url")
     @classmethod
-    def _database_url_uses_psycopg(cls, value: str) -> str:
-        if not value.startswith(DATABASE_URL_PREFIX):
+    def _database_url_uses_psycopg(cls, value: str | None) -> str | None:
+        if value is not None and not value.startswith(DATABASE_URL_PREFIX):
             raise ValueError(f"DATABASE_URL must start with {DATABASE_URL_PREFIX}")
         return value
+
+    @property
+    def owner_database_url(self) -> str:
+        """Migrations and role setup run as the owner; the application never does."""
+        return self.migration_database_url or self.database_url
 
     @field_validator("secret_key")
     @classmethod

@@ -1,39 +1,68 @@
-import threading
-import time
-from collections import defaultdict, deque
+"""Rate limits kept in PostgreSQL (Phase 13), so they hold across restarts and replicas.
 
-_MAX_TRACKED_KEYS = 10_000
+Before Phase 13 the counters lived in process memory: a restart reset them and each replica
+counted separately (docs/security.md, residual risks). Now each limited key has one counter
+row per window (a minute by default), incremented with a single atomic upsert, and the
+decision uses a sliding-window estimate: the current window's count plus the previous
+window's, weighted by how much of it still overlaps the last `window_seconds`. That avoids
+the double burst a plain fixed window allows at its boundary, without storing every event.
+"""
+
+import random
+from datetime import UTC, datetime, timedelta
+
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
+
+from app.models.rate_limit import RateLimitCounter
+
+CLEANUP_PROBABILITY = 0.02  # about one call in fifty also removes counters past use
 
 
-class SlidingWindowRateLimiter:
-    """Allows at most `max_events` per `window_seconds` for each key.
+def sliding_count(previous: int, current: int, elapsed_fraction: float) -> float:
+    """Events in the last window, estimated from two fixed windows: the share of the previous
+    window that still overlaps it, plus all of the current one."""
+    return previous * (1.0 - elapsed_fraction) + current
 
-    Kept in process memory: fine for a single backend container, but each replica would count
-    separately and a restart resets the counters. A shared store (for example Redis) would be
-    the next step if the app were scaled out (docs/security.md, residual risks).
-    """
 
-    def __init__(self, max_events: int, window_seconds: float = 60.0) -> None:
-        self._max_events = max_events
-        self._window = window_seconds
-        self._events: dict[str, deque[float]] = defaultdict(deque)
-        self._lock = threading.Lock()
+class RateLimiter:
+    """At most `max_events` per `window_seconds` for each key of one `scope` ("login",
+    "ingest"). The counter change is committed with the caller's transaction."""
 
-    def allow(self, key: str, now: float | None = None) -> bool:
-        current = time.monotonic() if now is None else now
-        cutoff = current - self._window
-        with self._lock:
-            if len(self._events) > _MAX_TRACKED_KEYS:
-                self._purge(cutoff)
-            events = self._events[key]
-            while events and events[0] <= cutoff:
-                events.popleft()
-            if len(events) >= self._max_events:
-                return False
-            events.append(current)
-            return True
+    def __init__(self, scope: str, max_events: int, window_seconds: int = 60) -> None:
+        self.scope = scope
+        self.max_events = max_events
+        self.window = timedelta(seconds=window_seconds)
 
-    def _purge(self, cutoff: float) -> None:
-        stale = [key for key, events in self._events.items() if not events or events[-1] <= cutoff]
-        for key in stale:
-            del self._events[key]
+    def _window_start(self, now: datetime) -> datetime:
+        seconds = int(self.window.total_seconds())
+        epoch = int(now.timestamp())
+        return datetime.fromtimestamp(epoch - epoch % seconds, tz=UTC)
+
+    def allow(self, db: Session, key: str, now: datetime | None = None) -> bool:
+        now = now or datetime.now(UTC)
+        name = f"{self.scope}:{key}"[:200]
+        start = self._window_start(now)
+        previous = db.scalar(
+            select(RateLimitCounter.count).where(
+                RateLimitCounter.key == name, RateLimitCounter.window_start == start - self.window
+            )
+        )
+        current = db.scalar(
+            insert(RateLimitCounter)
+            .values(key=name, window_start=start, count=1)
+            .on_conflict_do_update(
+                index_elements=["key", "window_start"],
+                set_={"count": RateLimitCounter.count + 1},
+            )
+            .returning(RateLimitCounter.count)
+        )
+        if random.random() < CLEANUP_PROBABILITY:  # noqa: S311 (not security relevant)
+            db.execute(
+                delete(RateLimitCounter).where(
+                    RateLimitCounter.window_start < start - 2 * self.window
+                )
+            )
+        elapsed = (now - start) / self.window
+        return sliding_count(previous or 0, current or 0, elapsed) <= self.max_events

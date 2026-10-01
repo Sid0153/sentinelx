@@ -24,7 +24,8 @@ its rules always apply:
 | 9 Dashboard and investigation workspace | Done, green in CI (1028 backend tests, 98% coverage; 74 frontend tests; dashboard, events, assets, identities, detections checked on the live stack at phone width) |
 | 10 Threat hunting | Done, green in CI (1133 backend tests, 98% coverage; 82 frontend tests; hunts and templates checked on the live stack at desktop and phone widths) |
 | 11 Risk, context, coverage | Done, green in CI (1153 backend tests, 98% coverage; 87 frontend tests; risk model 3; coverage, metrics and context checked on the live stack) |
-| 12 Advanced detection engineering | Done (1178 backend tests, 98% coverage; 95 frontend tests; playground examples fire their rules on the live stack; ADR-0013) |
+| 12 Advanced detection engineering | Done, green in CI (1178 backend tests, 98% coverage; 95 frontend tests; playground examples fire their rules on the live stack; ADR-0013) |
+| 13 Security hardening | Done (1254 backend, 105 frontend tests, 98% coverage; nine-area review in docs/security.md; least-privilege DB role, ingest keys, body limits; then every listed residual risk fixed or mitigated: 2FA, admin reset, shared rate limits, audit hash chain, host allowlist, raw text analyst-only, DB TLS, HSTS, digest pins) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -57,6 +58,22 @@ update the doc (and add an ADR for decisions) in the same change.
 - Every API route in the RBAC access table test; backend is authoritative.
 - Security-relevant actions call `audit.record()` in the same transaction; never log secrets
   or raw event bodies at INFO.
+- The app connects as a least-privilege DB role (`APP_DB_USER`, rows only; Phase 13);
+  migrations and `cli setup-app-role` use the owner (`MIGRATION_DATABASE_URL`). New tables are
+  granted automatically at startup; a new append-only table must also be added to
+  `APPEND_ONLY_TABLES` in `app/database/roles.py`. Request bodies are capped at 1 MiB by the
+  backend (`BodyLimitMiddleware`); every request model must forbid unknown fields and bound
+  every string (`tests/api/test_security_review.py` checks both). nginx logs paths only.
+- Audit log is hash-chained by a trigger (`audit_chain()`, migration 0011): never set `seq`,
+  `prev_hash` or `entry_hash` from Python, and change `audit_entry_digest()` only with a new
+  migration that keeps old entries verifiable. `cli verify-audit` checks it.
+- Raw record text goes through `can_read_raw_records(user)` (analysts and admins); a new view
+  of raw text must withhold it from viewers the same way.
+- Users with `must_change_password` reach only `PASSWORD_CHANGE_ROUTES` (`auth/deps.py`). TOTP
+  secrets derive from `SECRET_KEY` (rotating it ends 2FA enrolments).
+- Compose database is TLS-only (`db/pg_hba.conf`; certificates from the `db-certs` service);
+  the backend URLs use `sslmode=verify-full&sslrootcert=/tls-ca/ca.crt`. Base images are
+  pinned by digest (Dependabot updates them): change tag and digest together.
 
 ## Environment (Windows)
 
@@ -69,6 +86,7 @@ SentinelX uses **5433 (db) / 8001 (backend) / 8081 (frontend) / 5174 (Vite dev)*
   (git-ignored) holds `TEST_DATABASE_URL`; in Git Bash: `export $(cat .env.test)`.
 - Use `127.0.0.1`, not `localhost`, in database URLs (IPv6-first lookup is slow here).
 - Never commit `.env` or `.env.*` (except `.env.example`).
+- The local `.env` needs `APP_DB_PASSWORD` (Compose refuses to start without it).
 - In Git Bash, `docker run -v` and `docker compose exec` paths need `MSYS_NO_PATHCONV=1`.
 
 ## Checks before every commit

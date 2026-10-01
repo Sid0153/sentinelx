@@ -165,7 +165,10 @@ def test_evidence_comes_with_its_raw_records(
     first = page["items"][0]
     # Sent through the ingest API, not demo-ingest: real data as far as SentinelX knows.
     assert first["event_outcome"] == "failure" and not first["simulated"]
-    assert "Failed password for root from 203.0.113.45" in first["raw_text"]
+    # Viewers see the normalized evidence; the raw text is for analysts (Phase 13).
+    assert (first["raw_text"], first["raw_withheld"]) == (None, True)
+    as_admin = db_client.get(f"/api/alerts/{alert['id']}/events?limit=5", headers=admin).json()
+    assert "Failed password for root from 203.0.113.45" in as_admin["items"][0]["raw_text"]
     times = [e["timestamp"] for e in page["items"]]
     assert times == sorted(times)
     # From the event, back to the alerts citing it.

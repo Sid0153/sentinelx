@@ -55,6 +55,7 @@ class IngestRequest:
     submitted_by: User | None
     simulated: bool = False
     detect: bool = True  # run detection after storing (tests may switch it off)
+    ingest_key_prefix: str | None = None  # the key that sent it, when a shipper did
 
 
 def reject(db: Session, actor: User | None, source_id: uuid.UUID | None, reason: str) -> None:
@@ -71,6 +72,12 @@ def reject(db: Session, actor: User | None, source_id: uuid.UUID | None, reason:
     db.commit()
 
 
+def _host_allowed(source: LogSource, host: str | None) -> bool:
+    """A source with an allowlist may only speak for those hosts (a record naming no host
+    is not accepted from it either)."""
+    return not source.allowed_hosts or host in source.allowed_hosts
+
+
 def ingest(db: Session, request: IngestRequest, settings: Settings) -> IngestionBatch:
     source = request.source
     if not source.enabled:
@@ -85,6 +92,7 @@ def ingest(db: Session, request: IngestRequest, settings: Settings) -> Ingestion
         id=uuid.uuid4(),
         source_id=source.id,
         submitted_by=request.submitted_by.id if request.submitted_by else None,
+        ingest_key_prefix=request.ingest_key_prefix,
         channel=request.channel,
         status=BatchStatus.STORED,
         received_count=len(request.records),
@@ -136,6 +144,12 @@ def ingest(db: Session, request: IngestRequest, settings: Settings) -> Ingestion
         seen.add(key)
 
         outcome = parse_record(source_type, raw, context)
+        if isinstance(outcome, NormalizedEvent) and not _host_allowed(source, outcome.host):
+            # Kept as evidence of the attempt, never as an event (Phase 13).
+            store(raw, ParseStatus.FAILED, "host_not_allowed")
+            counts["failed"] += 1
+            note(index, "FAILED", "host_not_allowed")
+            continue
         if isinstance(outcome, NormalizedEvent):
             parsed.append((store(raw, ParseStatus.PARSED, None), outcome))
             counts["parsed"] += 1

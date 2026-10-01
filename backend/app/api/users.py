@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DbSession
+from app.auth import account
 from app.auth.deps import AdminUser
 from app.schemas.common import Page, error_responses
-from app.schemas.users import UserCreate, UserPublic, UserUpdate
+from app.schemas.users import TemporaryPassword, UserCreate, UserPublic, UserUpdate
 from app.users.service import create_user, list_users, update_user
 
 router = APIRouter(prefix="/users", tags=["users"], responses=error_responses(401, 403))
@@ -44,3 +45,21 @@ def update_existing_user(
     Users are never deleted, and admins cannot change their own role or status."""
     user = update_user(db, admin, user_id, payload.role, payload.is_active)
     return UserPublic.model_validate(user)
+
+
+@router.post(
+    "/{user_id}/reset-password",
+    response_model=TemporaryPassword,
+    responses=error_responses(400, 404),
+)
+def reset_user_password(user_id: uuid.UUID, admin: AdminUser, db: DbSession) -> TemporaryPassword:
+    """A temporary password, shown once; the user must change it at next sign-in. Their
+    sessions end and a lockout is lifted. Not for your own account."""
+    return TemporaryPassword(temporary_password=account.reset_password(db, admin, user_id))
+
+
+@router.post("/{user_id}/reset-mfa", response_model=UserPublic, responses=error_responses(400, 404))
+def reset_user_mfa(user_id: uuid.UUID, admin: AdminUser, db: DbSession) -> UserPublic:
+    """Turns off two-factor sign-in for a user who lost their device and recovery codes.
+    Their sessions end. Not for your own account."""
+    return UserPublic.model_validate(account.reset_mfa(db, admin, user_id))

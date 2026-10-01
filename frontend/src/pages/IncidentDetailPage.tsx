@@ -470,7 +470,10 @@ function TimelineRow({
             ))}
         </div>
       )}
-      {e && open && (
+      {e && open && e.raw_text === null && (
+        <p className="mt-1 text-xs text-slate-400">Raw record withheld: raw log text is shown to analysts and admins only.</p>
+      )}
+      {e && open && e.raw_text !== null && (
         // Log content is rendered as text, never as HTML.
         <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-slate-950 p-2 text-xs text-slate-300">
           {e.raw_text}
