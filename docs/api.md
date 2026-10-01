@@ -2,7 +2,7 @@
 
 > Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
 > identities, sources, ingestion, events, detections, ATT&CK techniques, alerts, incidents,
-> settings, dashboard). Everything else is planned in the phase shown. OpenAPI is served at
+> settings, dashboard, hunt). Everything else is planned in the phase shown. OpenAPI is served at
 > `/api/docs` (disabled in production unless enabled explicitly) and exported to
 > `docs/openapi.json`. A test fails if the export is stale.
 
@@ -67,9 +67,11 @@ with every role plus an unauthenticated call.
 | GET `/api/mitre/coverage` | V | 11 | Coverage view (tactics × techniques) |
 | GET `/api/dashboard/summary` | V | 9 ✅ | Counted from the database on each request: records processed, events stored and today (UTC), alerts today, open alerts (and how many simulated), open critical/high, severity distribution, open incidents and those under investigation, hosts that sent events in 24 h, inventory assets, active and library rules, top 5 rules and source IPs (alerts, 7 days), 8 recent alerts, 5 recent incidents |
 | GET `/api/dashboard/trends?days=` | V | 9 ✅ | Per UTC day, zero-filled: alerts created by severity, incidents opened, events (by event time). `days` 1–90, default 14 |
-| POST `/api/hunt/query` | V | 10 | Structured query → events page |
-| GET `/api/hunt/templates` · POST `/api/hunt/templates/{id}/run` | V | 10 | Parameterized hunts |
-| GET/POST/DELETE `/api/hunt/saved…` | A (own) | 10 | Saved hunts |
+| GET `/api/hunt/fields` | V | 10 ✅ | Fields a hunt may filter on, with their type and operators (for the query builder) |
+| POST `/api/hunt/query` | V | 10 ✅ | Structured query ([threat-hunting.md](threat-hunting.md)): `time_range` (required, ≤ 31 days, `from`/`to` or `last`), ≤ 20 `filters`, optional `alert` filters, `sort` newest/oldest, `limit` ≤ 200, keyset `cursor`. Returns events, `total` (counted up to 10,000, `total_capped` beyond), the resolved `from`/`to`. 422 for an invalid query, 400 for a bad cursor, 503 `hunt_timeout` after the statement timeout (5 s) |
+| GET `/api/hunt/templates` · POST `/api/hunt/templates/{template_id}/run` | V | 10 ✅ | Four reviewed SQL templates with typed, bounded parameters; `{params, time_range}`; ≤ 200 rows (`truncated`). 404 unknown template, 422 bad parameters, 503 timeout |
+| GET `/api/hunt/saved` · GET `/api/hunt/saved/{hunt_id}` | V | 10 ✅ | Your saved hunts and those shared by others; each with `valid` and `problem` (a definition from an older version is flagged, never run). A private hunt of someone else is 404 |
+| POST `/api/hunt/saved` · PATCH · DELETE `/api/hunt/saved/{hunt_id}` | A (owner) | 10 ✅ | Save (201; name unique per owner, 409), change name, description, definition or `shared`, delete (204). Owner only (403). Audited `HUNT_SAVED` / `HUNT_UPDATED` / `HUNT_DELETED` with name, kind and sharing, never filter values |
 | GET/PATCH `/api/settings` | AD | 8 ✅ | Correlation window (15–1,440 min) and sequence window (5–240 min, not longer). Audited as `SETTINGS_CHANGED`. Internal networks stay environment configuration (reviewed with deployments) |
 | GET `/api/demo/scenarios` · POST `/api/demo/run` · POST `/api/demo/reset` | AD, only when `DEMO_ENABLED` | 16 | Simulated data |
 

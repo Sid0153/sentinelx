@@ -5,6 +5,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateIndex
 
 from app.database.base import Base
 
@@ -21,6 +22,8 @@ def test_models_and_migrations_describe_the_same_schema(db_engine: Engine) -> No
 # (query shape, index it must be able to use). Each is a question the product will ask:
 # docs/database-schema.md, "Indexes (from the queries we know we will run)".
 WINDOW = "timestamp BETWEEN now() - interval '1 day' AND now()"
+ALPHABETS = "'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'"
+
 QUERIES = [
     (
         f"SELECT id FROM events WHERE {WINDOW} ORDER BY timestamp DESC, id DESC LIMIT 50",
@@ -41,11 +44,17 @@ QUERIES = [
     ),
     (f"SELECT id FROM events WHERE username = 'root' AND {WINDOW}", "ix_events_username_ts"),
     (f"SELECT id FROM events WHERE host = 'web-01' AND {WINDOW}", "ix_events_host_ts"),
+    # Substring search as the application writes it (ASCII-folded, conditions._sql_fold).
+    # Until migration 0008 this checked an ILIKE the application never sends, and passed
+    # while the real queries could not use the index.
     (
-        "SELECT id FROM events WHERE command_line ILIKE '%certutil%'",
-        "ix_events_command_line_trgm",
+        f"SELECT id FROM events WHERE translate(command_line, {ALPHABETS}) LIKE '%certutil%'",
+        "ix_events_command_line_folded_trgm",
     ),
-    ("SELECT id FROM events WHERE message ILIKE '%Failed password%'", "ix_events_message_trgm"),
+    (
+        f"SELECT id FROM events WHERE translate(message, {ALPHABETS}) LIKE '%failed password%'",
+        "ix_events_message_folded_trgm",
+    ),
     ("SELECT id FROM raw_events WHERE fingerprint = 'abc'", "uq_raw_events_fingerprint"),
     ("SELECT id FROM audit_logs ORDER BY occurred_at DESC LIMIT 50", "ix_audit_logs_occurred_at"),
     (
@@ -83,3 +92,28 @@ def test_query_shape_can_use_its_index(db_session: Session, query: str, index: s
     if "BETWEEN" in query:
         index_condition = next(line for line in plan.splitlines() if "Index Cond" in line)
         assert '"timestamp" >=' in index_condition, plan
+
+
+def test_every_index_matches_its_model_definition(db_session: Session) -> None:
+    """compare_metadata only notices missing or extra indexes; it does not compare index
+    expressions (a changed translate() in a trigram index passed it). Here PostgreSQL renders
+    both versions: the index the migrations built, and the model's definition created under
+    a temporary name in this rolled-back transaction. They must be identical."""
+    differences = []
+    for table in Base.metadata.sorted_tables:
+        for index in table.indexes:
+            built = db_session.scalar(
+                text("SELECT pg_get_indexdef(:name ::regclass)"), {"name": index.name}
+            )
+            if built is None:
+                differences.append(f"{index.name}: missing in the database")
+                continue
+            ddl = str(CreateIndex(index).compile(dialect=db_session.get_bind().dialect))
+            probe = f"probe_{index.name}"[:63]
+            db_session.execute(text(ddl.replace(f"INDEX {index.name} ", f"INDEX {probe} ", 1)))
+            modelled = db_session.scalar(
+                text("SELECT pg_get_indexdef(:name ::regclass)"), {"name": probe}
+            )
+            if modelled.replace(probe, index.name) != built:
+                differences.append(f"{index.name}:\n  database: {built}\n  model:    {modelled}")
+    assert differences == []

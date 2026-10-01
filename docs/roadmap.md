@@ -15,7 +15,7 @@ starts only on "Proceed to Phase N".
 | 7 | Alerts: dedup, evidence, priority, workflow, alert API and UI | Dedup and transition tests; UI tests | **Done**, green in CI |
 | 8 | Correlation, incidents, state machine, notes, evidence pins, assignment, activity, timeline, settings | Chain → one incident; window edges; concurrency test | **Done**, green in CI |
 | 9 | SOC dashboard, alert and incident workspaces, event explorer, asset and identity views | All numbers from the DB; empty states; visual check desktop + phone | **Done** |
-| 10 | Threat hunting: structured queries, templates, pivots, saved hunts, `pg_trgm` | Query compiler tests (incl. injection attempts); pagination tests | Not started |
+| 10 | Threat hunting: structured queries, templates, pivots, saved hunts, `pg_trgm` | Query compiler tests (incl. injection attempts); pagination tests | **Done** |
 | 11 | Incident risk, context display, rule metrics (triggers, FP rate, time to resolve), ATT&CK implemented-coverage view | Metric queries tested against known fixtures | Not started |
 | 12 | Evaluate and build where justified: detection playground, version diff UI, suppression windows, alert grouping | Each item justified or explicitly deferred | Not started |
 | 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | Not started |

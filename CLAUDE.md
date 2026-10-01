@@ -21,7 +21,8 @@ its rules always apply:
 | 6 Detection engine | Done, green in CI (9 rules; 735 backend tests, 98% coverage; 39 frontend tests; every scenario triggers exactly its rules on the live stack; detection checked in the Compose smoke test) |
 | 7 Alerts | Done, green in CI (857 backend tests incl. real-concurrency tests, 98% coverage; 47 frontend tests; alerts checked in the Compose smoke test; alert pages checked at desktop and phone widths) |
 | 8 Correlation and incidents | Done, green in CI (1007 backend tests incl. real-concurrency tests, 98% coverage; 56 frontend tests; correlation checked in the Compose smoke test; pages checked at desktop and phone widths) |
-| 9 Dashboard and investigation workspace | Done (1028 backend tests, 98% coverage; 74 frontend tests; dashboard, events, assets, identities, detections checked on the live stack at phone width) |
+| 9 Dashboard and investigation workspace | Done, green in CI (1028 backend tests, 98% coverage; 74 frontend tests; dashboard, events, assets, identities, detections checked on the live stack at phone width) |
+| 10 Threat hunting | Done (1133 backend tests, 98% coverage; 82 frontend tests; hunts and templates checked on the live stack at desktop and phone widths) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until

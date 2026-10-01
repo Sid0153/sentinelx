@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { Asset, ContextActivity, EventDetail, EventRecord, Identity } from "../src/types/inventory";
+import { parseHunt } from "../src/services/hunt";
 import { mockApi, signedInAs } from "./mockApi";
 import { renderApp } from "./renderApp";
 
@@ -139,6 +140,15 @@ describe("Event explorer", () => {
     expect(document.querySelector("img")).toBeNull(); // log text is never rendered as HTML
     expect(screen.getByRole("link", { name: "Repeated failed logons" })).toHaveAttribute("href", "/alerts/a-1");
     expect(screen.getByRole("link", { name: "web-01 (high)" })).toHaveAttribute("href", "/assets/as-1");
+    // Pivot: a hunt on the same source, an hour either side of the event.
+    const hunt = screen.getByRole("link", { name: "Hunt this source" }).getAttribute("href") ?? "";
+    expect(parseHunt(new URL(hunt, "http://x").searchParams.get("q"))).toEqual({
+      kind: "query",
+      query: {
+        time_range: { from: "2026-09-27T08:00:00.000Z", to: "2026-09-27T10:00:00.000Z" },
+        filters: [{ field: "source_ip", op: "eq", value: "203.0.113.45" }],
+      },
+    });
   });
 });
 

@@ -5448,6 +5448,660 @@
           }
         }
       }
+    },
+    "/api/hunt/fields": {
+      "get": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "List Fields",
+        "description": "The fields a hunt may filter on and the operators each accepts (for the query\nbuilder). Any `attributes.<key>` is also accepted, with text operators.",
+        "operationId": "list_fields_api_hunt_fields_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HuntFields"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/hunt/query": {
+      "post": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Run Query",
+        "description": "Events matching every filter, in the time range (required, at most 31 days), newest\nor oldest first. Keyset-paged: pass `next_cursor` back as `cursor` with the same query.\n`total` counts matches up to 10,000 (`total_capped` beyond). A hunt that runs longer\nthan the statement timeout (5 s by default) is stopped: 503 `hunt_timeout`.",
+        "operationId": "run_query_api_hunt_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HuntRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HuntResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request not allowed in the current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/hunt/templates": {
+      "get": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "List Templates",
+        "description": "Reviewed hunts for questions a flat filter cannot ask, with their parameters.",
+        "operationId": "list_templates_api_hunt_templates_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateInfo"
+                  },
+                  "type": "array",
+                  "title": "Response List Templates Api Hunt Templates Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/hunt/templates/{template_id}/run": {
+      "post": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Run Template",
+        "description": "At most 200 rows (`truncated` when there were more).",
+        "operationId": "run_template_api_hunt_templates__template_id__run_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hunt/saved": {
+      "get": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "List Saved",
+        "description": "Your saved hunts and those shared by others. A hunt saved by an older version that no\nlonger validates is listed with `valid: false` and a `problem`, never run.",
+        "operationId": "list_saved_api_hunt_saved_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedHuntPublic"
+                  },
+                  "type": "array",
+                  "title": "Response List Saved Api Hunt Saved Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Create Saved",
+        "description": "Private unless `shared`. Names are unique per owner (409). Audited (`HUNT_SAVED`) with\nthe name, kind and sharing, never the filter values.",
+        "operationId": "create_saved_api_hunt_saved_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedHuntCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedHuntPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/hunt/saved/{hunt_id}": {
+      "get": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Get Saved",
+        "operationId": "get_saved_api_hunt_saved__hunt_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hunt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hunt Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedHuntPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Update Saved",
+        "description": "Owner only (403 for someone else's shared hunt). Audited as `HUNT_UPDATED`.",
+        "operationId": "update_saved_api_hunt_saved__hunt_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hunt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hunt Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedHuntUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedHuntPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with existing data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "hunt"
+        ],
+        "summary": "Delete Saved",
+        "description": "Owner only. Audited as `HUNT_DELETED`.",
+        "operationId": "delete_saved_api_hunt_saved__hunt_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hunt_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Hunt Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5549,6 +6203,63 @@
         ],
         "title": "AlertActivity",
         "description": "A status change, from the audit log."
+      },
+      "AlertContext": {
+        "properties": {
+          "in_alert": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Alert"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{3,5}-\\d{3}$"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Rule Ids"
+          },
+          "severities": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Severities"
+          },
+          "statuses": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "TRIAGED",
+                "IN_PROGRESS",
+                "RESOLVED",
+                "FALSE_POSITIVE"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Statuses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AlertContext",
+        "description": "Optional filters on the alerts an event is evidence in."
       },
       "AlertDetail": {
         "properties": {
@@ -6709,7 +7420,10 @@
           "INCIDENT_ALERT_LINKED",
           "INCIDENT_ALERT_UNLINKED",
           "INCIDENT_RENAMED",
-          "SETTINGS_CHANGED"
+          "SETTINGS_CHANGED",
+          "HUNT_SAVED",
+          "HUNT_UPDATED",
+          "HUNT_DELETED"
         ],
         "title": "AuditAction"
       },
@@ -7294,7 +8008,8 @@
           "DETECTION_RUN",
           "ALERT",
           "INCIDENT",
-          "SETTINGS"
+          "SETTINGS",
+          "SAVED_HUNT"
         ],
         "title": "EntityType"
       },
@@ -8588,6 +9303,251 @@
           "version"
         ],
         "title": "HealthResponse"
+      },
+      "HuntField": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "operators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "kind",
+          "operators"
+        ],
+        "title": "HuntField"
+      },
+      "HuntFields": {
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/HuntField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "attribute_operators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Attribute Operators"
+          },
+          "max_filters": {
+            "type": "integer",
+            "title": "Max Filters"
+          },
+          "max_range_days": {
+            "type": "integer",
+            "title": "Max Range Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "attribute_operators",
+          "max_filters",
+          "max_range_days"
+        ],
+        "title": "HuntFields"
+      },
+      "HuntFilter": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "in",
+              "not_in",
+              "contains",
+              "startswith",
+              "endswith",
+              "cidr",
+              "exists",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Op"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "field",
+          "op"
+        ],
+        "title": "HuntFilter",
+        "description": "One condition on an event field."
+      },
+      "HuntQuery": {
+        "properties": {
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/HuntFilter"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Filters"
+          },
+          "alert": {
+            "$ref": "#/components/schemas/AlertContext"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "oldest"
+            ],
+            "title": "Sort",
+            "default": "newest"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "time_range"
+        ],
+        "title": "HuntQuery"
+      },
+      "HuntResult": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EventPublic"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "total_capped": {
+            "type": "boolean",
+            "title": "Total Capped"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "total",
+          "total_capped",
+          "from",
+          "to",
+          "limit"
+        ],
+        "title": "HuntResult"
+      },
+      "HuntRunRequest": {
+        "properties": {
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/HuntFilter"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Filters"
+          },
+          "alert": {
+            "$ref": "#/components/schemas/AlertContext"
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "newest",
+              "oldest"
+            ],
+            "title": "Sort",
+            "default": "newest"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "time_range"
+        ],
+        "title": "HuntRunRequest"
       },
       "IdentityCreate": {
         "properties": {
@@ -10045,6 +11005,25 @@
         ],
         "title": "PrivilegeLevel"
       },
+      "QueryDefinition": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "query",
+            "title": "Kind",
+            "default": "query"
+          },
+          "query": {
+            "$ref": "#/components/schemas/HuntQuery"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "QueryDefinition"
+      },
       "RawRecordPublic": {
         "properties": {
           "id": {
@@ -10920,6 +11899,226 @@
         ],
         "title": "RunTrigger"
       },
+      "SavedHuntCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "definition": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QueryDefinition"
+              },
+              {
+                "$ref": "#/components/schemas/TemplateDefinition"
+              }
+            ],
+            "title": "Definition",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "query": "#/components/schemas/QueryDefinition",
+                "template": "#/components/schemas/TemplateDefinition"
+              }
+            }
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "SavedHuntCreate"
+      },
+      "SavedHuntPublic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "definition": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Definition"
+          },
+          "shared": {
+            "type": "boolean",
+            "title": "Shared"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "owner_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Email"
+          },
+          "is_owner": {
+            "type": "boolean",
+            "title": "Is Owner"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "kind",
+          "definition",
+          "shared",
+          "owner_id",
+          "owner_email",
+          "is_owner",
+          "valid",
+          "problem",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SavedHuntPublic"
+      },
+      "SavedHuntUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/QueryDefinition"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TemplateDefinition"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "query": "#/components/schemas/QueryDefinition",
+                    "template": "#/components/schemas/TemplateDefinition"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "shared": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SavedHuntUpdate",
+        "description": "PATCH: only the fields sent change. `description: null` clears it."
+      },
       "SettingsPublic": {
         "properties": {
           "correlation_window_minutes": {
@@ -11289,6 +12488,256 @@
           "indicator"
         ],
         "title": "TechniqueRef"
+      },
+      "TemplateColumn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "kind"
+        ],
+        "title": "TemplateColumn"
+      },
+      "TemplateDefinition": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "template",
+            "title": "Kind",
+            "default": "template"
+          },
+          "template_id": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Template Id"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "template_id",
+          "time_range"
+        ],
+        "title": "TemplateDefinition"
+      },
+      "TemplateInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "technique": {
+            "type": "string",
+            "title": "Technique"
+          },
+          "mirrors_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mirrors Rule"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateParam"
+            },
+            "type": "array",
+            "title": "Params"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "question",
+          "technique",
+          "mirrors_rule",
+          "params",
+          "columns"
+        ],
+        "title": "TemplateInfo"
+      },
+      "TemplateParam": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "default": {
+            "type": "integer",
+            "title": "Default"
+          },
+          "minimum": {
+            "type": "integer",
+            "title": "Minimum"
+          },
+          "maximum": {
+            "type": "integer",
+            "title": "Maximum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "default",
+          "minimum",
+          "maximum"
+        ],
+        "title": "TemplateParam"
+      },
+      "TemplateResult": {
+        "properties": {
+          "template_id": {
+            "type": "string",
+            "title": "Template Id"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template_id",
+          "columns",
+          "rows",
+          "truncated",
+          "from",
+          "to"
+        ],
+        "title": "TemplateResult"
+      },
+      "TemplateRunRequest": {
+        "properties": {
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "time_range"
+        ],
+        "title": "TemplateRunRequest"
+      },
+      "TimeRange": {
+        "properties": {
+          "from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TimeRange",
+        "description": "Either an absolute range (`from`, `to`) or a relative one (`last`: \"15m\", \"24h\",\n\"7d\"), which saved hunts use so they always look at recent data."
       },
       "TimelineEntry": {
         "properties": {
@@ -11760,6 +13209,10 @@
     {
       "name": "dashboard",
       "description": "SOC dashboard numbers, counted in the database."
+    },
+    {
+      "name": "hunt",
+      "description": "Threat hunting over stored events; saved hunts."
     }
   ]
 }

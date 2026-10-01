@@ -8,6 +8,7 @@ from app.api import (
     dashboard,
     detections,
     health,
+    hunt,
     incidents,
     ingestion,
     users,
@@ -30,3 +31,4 @@ api_router.include_router(incidents.escalation)
 api_router.include_router(incidents.incidents)
 api_router.include_router(incidents.settings)
 api_router.include_router(dashboard.dashboard)
+api_router.include_router(hunt.hunt)

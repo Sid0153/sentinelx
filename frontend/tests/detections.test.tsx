@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { isoSeconds, shortDuration } from "../src/pages/DetectionDetailPage";
@@ -26,7 +26,12 @@ const SUMMARY: RuleSummary = {
 const DETAIL: RuleDetail = {
   ...SUMMARY,
   description: "Many failed logons for one account from one source.",
-  definition: { id: "AUTH-001", threshold: 5, time_window: "PT5M" },
+  definition: {
+    id: "AUTH-001",
+    threshold: 5,
+    time_window: "PT5M",
+    exclusions: [{ field: "source_ip", value: "10.20.0.0/16", comment: "vulnerability scanner" }],
+  },
   overrides: {},
   tunable: {
     threshold: { min: 2, max: 1000 },
@@ -143,5 +148,55 @@ describe("Detection rules", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Save new version" }));
     expect(await within(form).findByRole("alert")).toHaveTextContent("from 1m to 1d");
     expect(api.callsTo("PATCH /api/detections/AUTH-001")).toHaveLength(0);
+  });
+  it("edits the exclusions as one list and shows why a value is refused", async () => {
+    let attempt = 0;
+    const api = rule("ADMIN", {
+      "PATCH /api/detections/AUTH-001": () => {
+        attempt += 1;
+        return attempt === 1
+          ? {
+              status: 422,
+              body: {
+                error: {
+                  code: "validation_error",
+                  message: "Request validation failed",
+                  request_id: "r",
+                  details: [{ loc: ["body", "exclusions", 1, "value"], msg: "Value error, does not appear to be an IPv4 or IPv6 network", type: "value_error" }],
+                },
+              },
+            }
+          : { body: { ...DETAIL, version: 2 } };
+      },
+    });
+    renderApp("/detections/AUTH-001");
+    // Read view lists the current allowlist.
+    expect(await screen.findByText(/source_ip = 10.20.0.0\/16 \(vulnerability scanner\)/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tune rule" }));
+    const form = screen.getByRole("form", { name: "Tune rule" });
+
+    fireEvent.change(within(form).getByLabelText("Exclusion field"), { target: { value: "username" } });
+    fireEvent.change(within(form).getByLabelText("Exclusion value"), { target: { value: "svc-backup" } });
+    fireEvent.change(within(form).getByLabelText("Exclusion comment"), { target: { value: "nightly job" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Add exclusion" }));
+    fireEvent.change(within(form).getByLabelText("Reason for the change"), { target: { value: "backup job is noisy" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Save new version" }));
+
+    expect(await within(form).findByRole("alert")).toHaveTextContent("exclusions → 1 → value: does not appear to be an IPv4 or IPv6 network");
+    expect(api.callsTo("PATCH /api/detections/AUTH-001")[0].body).toEqual({
+      exclusions: [
+        { field: "source_ip", value: "10.20.0.0/16", comment: "vulnerability scanner" },
+        { field: "username", value: "svc-backup", comment: "nightly job" },
+      ],
+      reason: "backup job is noisy",
+    });
+
+    // Removing the scanner entry sends the list without it.
+    fireEvent.click(within(form).getByRole("button", { name: "Remove exclusion source_ip 10.20.0.0/16" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save new version" }));
+    await waitFor(() => expect(api.callsTo("PATCH /api/detections/AUTH-001")).toHaveLength(2));
+    expect((api.callsTo("PATCH /api/detections/AUTH-001")[1].body as { exclusions: unknown[] }).exclusions).toEqual([
+      { field: "username", value: "svc-backup", comment: "nightly job" },
+    ]);
   });
 });

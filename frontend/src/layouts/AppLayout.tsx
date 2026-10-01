@@ -11,6 +11,7 @@ const NAV_ITEMS: { to: string; label: string; minimum: Role }[] = [
   { to: "/incidents", label: "Incidents", minimum: "VIEWER" },
   { to: "/alerts", label: "Alerts", minimum: "VIEWER" },
   { to: "/events", label: "Events", minimum: "VIEWER" },
+  { to: "/hunt", label: "Hunt", minimum: "VIEWER" },
   { to: "/assets", label: "Assets", minimum: "VIEWER" },
   { to: "/identities", label: "Identities", minimum: "VIEWER" },
   { to: "/detections", label: "Detections", minimum: "VIEWER" },

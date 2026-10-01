@@ -11,6 +11,7 @@ from app.models.detection import (
     MitreTechnique,
 )
 from app.models.event import Event, IngestionBatch, LogSource, RawEvent
+from app.models.hunt import SavedHunt
 from app.models.incident import (
     AppSetting,
     Incident,
@@ -45,5 +46,6 @@ __all__ = [
     "RawEvent",
     "RefreshToken",
     "Role",
+    "SavedHunt",
     "User",
 ]

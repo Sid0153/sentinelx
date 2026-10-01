@@ -49,6 +49,10 @@ class AuditAction(enum.StrEnum):
     INCIDENT_ALERT_UNLINKED = "INCIDENT_ALERT_UNLINKED"
     INCIDENT_RENAMED = "INCIDENT_RENAMED"
     SETTINGS_CHANGED = "SETTINGS_CHANGED"
+    # Threat hunting (Phase 10): saved hunts. Running a hunt is a read and is not audited.
+    HUNT_SAVED = "HUNT_SAVED"
+    HUNT_UPDATED = "HUNT_UPDATED"
+    HUNT_DELETED = "HUNT_DELETED"
 
 
 class AuditResult(enum.StrEnum):
@@ -68,3 +72,4 @@ class EntityType(enum.StrEnum):
     ALERT = "ALERT"
     INCIDENT = "INCIDENT"
     SETTINGS = "SETTINGS"
+    SAVED_HUNT = "SAVED_HUNT"

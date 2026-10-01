@@ -10,6 +10,90 @@ import { getRule, listRuleVersions, tuneRule } from "../services/inventory";
 import type { RuleDetail } from "../types/inventory";
 
 const LEVELS = ["critical", "high", "medium", "low"];
+const EXCLUSION_FIELDS = ["source_ip", "username", "target_username", "host"] as const;
+
+interface Exclusion {
+  field: (typeof EXCLUSION_FIELDS)[number];
+  value: string;
+  comment?: string | null;
+}
+
+function exclusionsOf(rule: RuleDetail): Exclusion[] {
+  const list = rule.definition.exclusions;
+  return Array.isArray(list) ? (list as Exclusion[]) : [];
+}
+
+const sameExclusions = (a: Exclusion[], b: Exclusion[]) =>
+  JSON.stringify(a.map((e) => [e.field, e.value, e.comment ?? null])) ===
+  JSON.stringify(b.map((e) => [e.field, e.value, e.comment ?? null]));
+
+/** The allowlist of a rule: events matching an entry are ignored by it. */
+function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (next: Exclusion[]) => void }) {
+  const [field, setField] = useState<Exclusion["field"]>("source_ip");
+  const [entry, setEntry] = useState("");
+  const [comment, setComment] = useState("");
+  return (
+    <fieldset className="space-y-2">
+      <legend className="mb-1 text-sm text-slate-300">Exclusions (events matching one are ignored by this rule)</legend>
+      {value.length === 0 ? (
+        <p className="text-xs text-slate-500">None.</p>
+      ) : (
+        <ul className="space-y-1 text-sm">
+          {value.map((e, i) => (
+            <li key={`${e.field}-${e.value}-${i}`} className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs text-slate-200">
+                {e.field} = {e.value}
+              </span>
+              {e.comment && <span className="text-xs text-slate-500">({e.comment})</span>}
+              <button
+                type="button"
+                className="text-xs text-rose-300 hover:underline"
+                aria-label={`Remove exclusion ${e.field} ${e.value}`}
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div role="group" aria-label="New exclusion" className="flex flex-wrap items-end gap-2">
+        <select aria-label="Exclusion field" value={field} onChange={(e) => setField(e.target.value as Exclusion["field"])} className={selectClass}>
+          {EXCLUSION_FIELDS.map((f) => (
+            <option key={f}>{f}</option>
+          ))}
+        </select>
+        <input
+          aria-label="Exclusion value"
+          value={entry}
+          placeholder={field === "source_ip" ? "10.20.0.0/16 or one address" : "value"}
+          onChange={(e) => setEntry(e.target.value)}
+          className={`${inputClass} w-48`}
+          maxLength={253}
+        />
+        <input
+          aria-label="Exclusion comment"
+          value={comment}
+          placeholder="why (optional)"
+          onChange={(e) => setComment(e.target.value)}
+          className={`${inputClass} w-48`}
+          maxLength={200}
+        />
+        <Button
+          variant="secondary"
+          disabled={!entry.trim() || value.length >= 100}
+          onClick={() => {
+            onChange([...value, { field, value: entry.trim(), comment: comment.trim() || null }]);
+            setEntry("");
+            setComment("");
+          }}
+        >
+          Add exclusion
+        </Button>
+      </div>
+    </fieldset>
+  );
+}
 const CONFIDENCES = ["high", "medium", "low"];
 
 /** ISO 8601 duration as stored ("PT5M", "P1D", "PT300S") -> seconds. */
@@ -46,6 +130,7 @@ function TuneForm({ rule, onSaved, onCancel }: { rule: RuleDetail; onSaved: () =
     time_window: window,
   };
   const [values, setValues] = useState(start);
+  const [exclusions, setExclusions] = useState<Exclusion[]>(exclusionsOf(rule));
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -75,6 +160,9 @@ function TuneForm({ rule, onSaved, onCancel }: { rule: RuleDetail; onSaved: () =
       }
       changes.time_window = values.time_window.trim();
     }
+    if (tunable.exclusions && !sameExclusions(exclusions, exclusionsOf(rule))) {
+      changes.exclusions = exclusions;
+    }
     if (Object.keys(changes).length === 0) {
       setError("Nothing changed.");
       return;
@@ -89,7 +177,11 @@ function TuneForm({ rule, onSaved, onCancel }: { rule: RuleDetail; onSaved: () =
       await tuneRule(rule.rule_id, { ...changes, reason: reason.trim() });
       onSaved();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save.");
+      if (err instanceof ApiError) {
+        // A 422 says which value was refused (e.g. an exclusion that is not a network).
+        const why = err.details.map((d) => `${d.loc.filter((p) => p !== "body").join(" → ")}: ${d.msg.replace(/^Value error, /, "")}`);
+        setError([err.message, ...why].join(". "));
+      } else setError("Could not save.");
       setSaving(false);
     }
   }
@@ -144,6 +236,7 @@ function TuneForm({ rule, onSaved, onCancel }: { rule: RuleDetail; onSaved: () =
           </Field>
         )}
       </div>
+      {tunable.exclusions && <ExclusionsEditor value={exclusions} onChange={setExclusions} />}
       <Field label="Reason for the change" hint="Required. Kept in the rule history and the audit log.">
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} maxLength={500} />
       </Field>
@@ -251,8 +344,15 @@ export function DetectionDetailPage() {
                 <p className="text-sm text-slate-400">
                   {Object.keys(rule.overrides).length === 0
                     ? "Running as defined in the library."
-                    : `Admin overrides: ${Object.keys(rule.overrides).join(", ")}.`}{" "}
-                  Exclusions can be changed through the API (PATCH /api/detections/{"{rule_id}"}).
+                    : `Admin overrides: ${Object.keys(rule.overrides).join(", ")}.`}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Exclusions:{" "}
+                  {exclusionsOf(rule).length === 0
+                    ? "none"
+                    : exclusionsOf(rule)
+                        .map((e) => `${e.field} = ${e.value}${e.comment ? ` (${e.comment})` : ""}`)
+                        .join("; ")}
                 </p>
                 {canTune && (
                   <div className="mt-3">

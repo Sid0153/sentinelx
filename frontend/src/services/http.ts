@@ -7,6 +7,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly requestId: string | null = null,
+    /** Validation errors (422): where and why, never the submitted value. */
+    readonly details: NonNullable<ApiErrorBody["error"]["details"]> = [],
   ) {
     super(message);
     this.name = "ApiError";
@@ -101,6 +103,7 @@ async function toResult<T>(response: Response, options: RequestOptions): Promise
       body.error.code,
       body.error.message,
       body.error.request_id,
+      body.error.details ?? [],
     );
   }
   // Not our error shape: a proxy or gateway answered (e.g. nginx 502 while the API restarts).

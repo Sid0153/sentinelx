@@ -33,6 +33,16 @@ from app.events.schema import (
 MAX_RAW_BYTES = 65_536
 
 
+def _folded(column: str) -> sa.ColumnElement[str]:
+    """The ASCII case folding of app/detection/conditions.py, as an index expression."""
+    folded: sa.ColumnElement[str] = sa.func.translate(
+        sa.literal_column(column),
+        sa.literal_column("'ABCDEFGHIJKLMNOPQRSTUVWXYZ'"),
+        sa.literal_column("'abcdefghijklmnopqrstuvwxyz'"),
+    )
+    return folded
+
+
 class ParseStatus(enum.StrEnum):
     PARSED = "PARSED"  # became a normalized event
     SKIPPED = "SKIPPED"  # understood, deliberately not normalized (parse_detail says why)
@@ -190,17 +200,16 @@ class Event(Base):
         sa.Index("ix_events_destination_ip_ts", "destination_ip", "timestamp"),
         sa.Index("ix_events_username_ts", "username", "timestamp"),
         sa.Index("ix_events_host_ts", "host", "timestamp"),
-        sa.Index(
-            "ix_events_command_line_trgm",
-            "command_line",
-            postgresql_using="gin",
-            postgresql_ops={"command_line": "gin_trgm_ops"},
-        ),
-        sa.Index(
-            "ix_events_message_trgm",
-            "message",
-            postgresql_using="gin",
-            postgresql_ops={"message": "gin_trgm_ops"},
+        # Substring search (hunts, rule prefilters) compares ASCII-folded text: the trigram
+        # indexes are on exactly that expression (conditions._sql_fold), or they go unused.
+        *(
+            sa.Index(
+                f"ix_events_{column}_folded_trgm",
+                _folded(column).label(f"{column}_folded"),
+                postgresql_using="gin",
+                postgresql_ops={f"{column}_folded": "gin_trgm_ops"},
+            )
+            for column in ("command_line", "message")
         ),
     )
 

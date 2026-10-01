@@ -56,7 +56,7 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `incident_notes` ✅ | 8 | incident_id, author_id, body (check: 1–10,000 characters), created_at. **Append-only** |
 | `incident_evidence` ✅ | 8 | incident_id, event_id or alert_id (check: exactly one), tag, comment, action (PIN/UNPIN), actor_id, created_at. **Append-only** |
 | `incident_activity` ✅ | 8 | incident_id, seq (identity: insertion order), actor_id (null: the engine), kind (CREATED/LINK/UNLINK/STATUS/ASSIGN/NOTE/EVIDENCE/RENAME), details JSONB, created_at. **Append-only** |
-| `saved_hunts` | 10 | owner_id, name, definition JSONB (validated structured query), shared bool |
+| `saved_hunts` ✅ | 10 | owner_id (FK users), name (unique per owner), description, kind (check: query/template), definition JSONB (validated again on every load), shared (indexed), created_at, updated_at |
 | `app_settings` ✅ | 8 | key, value JSONB, updated_at, updated_by: the correlation and sequence windows; changes audited |
 
 `log_sources` moved from Phase 5 to Phase 4: every event references its source, so the event
@@ -91,7 +91,7 @@ Phase 5.
 | ✅ `events (username, timestamp)` | Pivots, AUTH-004 history |
 | ✅ `events (host, timestamp)` | Pivots, host views |
 | ✅ `events (destination_ip, timestamp)` | Hunts, NET-001 |
-| ✅ `events USING gin (command_line gin_trgm_ops)`, same on `message` | Substring hunt search (`pg_trgm`) |
+| ✅ `events USING gin (translate(command_line, 'A..Z', 'a..z') gin_trgm_ops)`, same on `message` | Substring search in hunts and rule prefilters (`pg_trgm`), on the ASCII-folded text the queries compare. Migration 0008 replaced the Phase 4 indexes on the raw columns, which no query could use |
 | ✅ `events (asset_id)`, `events (identity_id)` | Asset and identity views; FK checks |
 | ✅ `raw_events (fingerprint)` unique | Duplicate detection |
 | ✅ `assets USING gin (ip_addresses)` | Enrichment: which asset owns this IP |

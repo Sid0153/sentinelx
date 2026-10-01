@@ -1,7 +1,7 @@
 """The SQL prefilter against the Python evaluation, on stored events with awkward values.
 
 The engine relies on one property: the rows the SQL prefilter selects include every event the
-Python condition accepts (it may select more, never fewer). Where `_exact` says a condition is
+Python condition accepts (it may select more, never fewer). Where `is_exact` says a condition is
 exact, which is what `Not` relies on, both must agree row for row. Checked here for every
 operator on text, IP, numeric, boolean and attribute fields, negated too, over values chosen
 to break naive implementations: mixed case, non-ASCII letters whose case folding differs
@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.detection import engine
-from app.detection.conditions import All, Any_, Condition, Not, Predicate, _exact, fold
+from app.detection.conditions import All, Any_, Condition, Not, Predicate, fold, is_exact
 from app.detection.events import DetectionEvent
 from app.events.schema import EventCategory, EventOutcome, NormalizedEvent, SourceType
 from app.events.store import Enrichment
@@ -141,7 +141,7 @@ def _disagreements(db: Session, events: list[DetectionEvent], raw: dict[str, Any
     sql = {str(i) for i in db.scalars(select(Event.id).where(condition.to_sql()))}
     if not python <= sql:
         return [f"prefilter dropped {len(python - sql)} matches of {raw}"]
-    if _exact(condition) and python != sql:
+    if is_exact(condition) and python != sql:
         return [f"{raw} is marked exact but SQL selects {len(sql - python)} more rows"]
     return []
 

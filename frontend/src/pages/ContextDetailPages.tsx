@@ -3,8 +3,10 @@ import { Link, useParams } from "react-router-dom";
 
 import { hasRole, useCurrentUser } from "../auth/AuthContext";
 import { ASSET_FIELDS, ActivityPanels, Fact, IDENTITY_FIELDS, InventoryForm } from "../components/context";
+import { HuntLink } from "../components/hunt";
 import { Button, ErrorMessage, Panel, formatUtc } from "../components/ui";
 import { useApi } from "../hooks/useApi";
+import { eq } from "../services/hunt";
 import {
   getAsset,
   getAssetActivity,
@@ -14,6 +16,12 @@ import {
   saveIdentity,
 } from "../services/inventory";
 import type { ContextActivity } from "../types/inventory";
+
+/** The last 7 days (pivotUrl adds an hour either side). */
+function lastWeek() {
+  const now = Date.now();
+  return { from: new Date(now - 7 * 24 * 3600 * 1000 + 3600 * 1000).toISOString(), to: new Date(now - 3600 * 1000).toISOString() };
+}
 
 function Activity({ load }: { load: (signal: AbortSignal) => Promise<ContextActivity> }) {
   const { data, error } = useApi(load);
@@ -99,6 +107,9 @@ export function AssetDetailPage() {
                   <Fact label="Updated">{formatUtc(asset.updated_at)}</Fact>
                 </dl>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  <HuntLink filters={[eq("host", asset.hostname)]} around={lastWeek()}>
+                    Hunt this host
+                  </HuntLink>
                   <Link
                     to={`/events?host=${encodeURIComponent(asset.hostname)}&range=7d`}
                     className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
@@ -175,6 +186,9 @@ export function IdentityDetailPage() {
                   <Fact label="Updated">{formatUtc(identity.updated_at)}</Fact>
                 </dl>
                 <div className="mt-3 flex flex-wrap gap-2">
+                  <HuntLink filters={[eq("username", identity.username)]} around={lastWeek()}>
+                    Hunt this account
+                  </HuntLink>
                   <Link
                     to={`/events?username=${encodeURIComponent(identity.username)}&range=7d`}
                     className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"

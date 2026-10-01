@@ -50,6 +50,7 @@ OPENAPI_TAGS = [
     {"name": "incidents", "description": "Correlated incidents: workspace, timeline, actions."},
     {"name": "settings", "description": "Correlation settings (ADMIN)."},
     {"name": "dashboard", "description": "SOC dashboard numbers, counted in the database."},
+    {"name": "hunt", "description": "Threat hunting over stored events; saved hunts."},
 ]
 
 

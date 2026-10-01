@@ -19,6 +19,7 @@ import {
   inputClass,
   selectClass,
 } from "../components/ui";
+import { HuntLink } from "../components/hunt";
 import { useApi } from "../hooks/useApi";
 import { ApiError } from "../services/http";
 import {
@@ -746,6 +747,25 @@ export function IncidentDetailPage() {
                 <dd className="text-slate-200">{shortList(incident.source_ips, 20) || "—"}</dd>
               </div>
             </dl>
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Pivot to threat hunting">
+              {(
+                [
+                  ["host", incident.hosts, "Hunt these hosts"],
+                  ["username", incident.usernames, "Hunt these accounts"],
+                  ["source_ip", incident.source_ips, "Hunt these sources"],
+                ] as const
+              )
+                .filter(([, values]) => values.length > 0)
+                .map(([field, values, label]) => (
+                  <HuntLink
+                    key={field}
+                    filters={[{ field, op: "in", value: values.slice(0, 100) }]}
+                    around={{ from: incident.first_activity_at, to: incident.last_activity_at }}
+                  >
+                    {label}
+                  </HuntLink>
+                ))}
+            </div>
           </Panel>
           <Evidence incident={incident} canAct={canAct} onChanged={reload} />
           <Panel title="MITRE ATT&CK">

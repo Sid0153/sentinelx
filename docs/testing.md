@@ -124,6 +124,16 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
   rule tuning sending only changed fields with the required reason, bounds refused before
   sending.
 
+**Threat hunting** ✅ (Phase 10; details in [threat-hunting.md](threat-hunting.md#tests))
+- Hunt SQL selects exactly what the condition language accepts, row for row, for every
+  allowed operator; injection-shaped values match literally; text search can use the
+  trigram indexes (this found that the Phase 4 indexes were never usable).
+- Every index the migrations build matches its model definition, expressions included
+  (`test_schema.py`; Alembic's comparison only notices missing or extra indexes).
+- The brief's example question on ingested data, stable keyset paging while events arrive,
+  the capped count, alert filters, every template against its scenario and benign data, the
+  statement timeout, saved-hunt access and audit.
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.

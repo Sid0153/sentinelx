@@ -30,7 +30,7 @@ from functools import cached_property
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from sqlalchemy import ColumnElement, and_, false, func, not_, or_, true
+from sqlalchemy import ColumnElement, and_, false, func, literal_column, not_, or_, true
 
 from app.detection.events import DERIVED_FIELDS, DetectionEvent
 from app.models.event import Event
@@ -126,9 +126,44 @@ def fold(value: Any) -> str:
     return str(value).translate(_ASCII_LOWER)
 
 
+# The folding as SQL, with the alphabets written into the statement (constants, never user
+# input) rather than bound: the expression must match the trigram indexes on folded
+# command_line and message exactly for PostgreSQL to use them (migration 0008).
+SQL_UPPER: ColumnElement[str] = literal_column(f"'{_UPPER}'")
+SQL_LOWER: ColumnElement[str] = literal_column(f"'{_LOWER}'")
+
+
 def _sql_fold(column: ColumnElement[Any]) -> ColumnElement[str]:
-    folded: ColumnElement[str] = func.translate(column, _UPPER, _LOWER)
+    folded: ColumnElement[str] = func.translate(column, SQL_UPPER, SQL_LOWER)
     return folded
+
+
+def text_sql(
+    op: str, value: Any, column: ColumnElement[Any], *, stored_lowercase: bool = False
+) -> ColumnElement[bool]:
+    """Exactly Predicate.evaluate() for a text value (NULL is "absent", like None). Shared
+    with threat hunting, so a hunt and a rule compare text the same way."""
+    if op == "exists":
+        present: ColumnElement[bool] = and_(column.isnot(None), column != "")
+        return present if value in (None, True) else not_(present) | column.is_(None)
+    # Folding a column that holds no ASCII capitals changes nothing, and comparing the
+    # column itself lets PostgreSQL use its indexes (event_category, event_action, ...).
+    folded = column if stored_lowercase else _sql_fold(column)
+    if op == "eq":
+        return folded == fold(value)
+    if op == "ne":
+        return (folded != fold(value)) | column.is_(None)
+    if op == "in":
+        return folded.in_([fold(v) for v in value])
+    if op == "not_in":
+        return folded.notin_([fold(v) for v in value]) | column.is_(None)
+    pattern = fold(value).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    wildcard = {
+        "contains": f"%{pattern}%",
+        "startswith": f"{pattern}%",
+        "endswith": f"%{pattern}",
+    }
+    return folded.like(wildcard[op], escape="\\")
 
 
 class Predicate(BaseModel):
@@ -247,29 +282,7 @@ class Predicate(BaseModel):
     def _text_sql(
         self, column: ColumnElement[Any], *, stored_lowercase: bool = False
     ) -> ColumnElement[bool]:
-        """Exactly evaluate() for a text value (NULL is "absent", like None)."""
-        op, value = self.op, self.value
-        if op == "exists":
-            present: ColumnElement[bool] = and_(column.isnot(None), column != "")
-            return present if value in (None, True) else not_(present) | column.is_(None)
-        # Folding a column that holds no ASCII capitals changes nothing, and comparing the
-        # column itself lets PostgreSQL use its indexes (event_category, event_action, ...).
-        folded = column if stored_lowercase else _sql_fold(column)
-        if op == "eq":
-            return folded == fold(value)
-        if op == "ne":
-            return (folded != fold(value)) | column.is_(None)
-        if op == "in":
-            return folded.in_([fold(v) for v in value])
-        if op == "not_in":
-            return folded.notin_([fold(v) for v in value]) | column.is_(None)
-        pattern = fold(value).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        wildcard = {
-            "contains": f"%{pattern}%",
-            "startswith": f"{pattern}%",
-            "endswith": f"%{pattern}",
-        }
-        return folded.like(wildcard[op], escape="\\")
+        return text_sql(self.op, self.value, column, stored_lowercase=stored_lowercase)
 
     def _attribute_sql(self) -> ColumnElement[bool]:
         """Attributes are JSON scalars. Only string values are compared in SQL (their text is
@@ -334,7 +347,7 @@ class Not(BaseModel):
         # SQL has three-valued logic: `username = 'root'` is NULL (not FALSE) for a missing
         # username, and NOT NULL is NULL, which would drop the row. Python says False there,
         # so its negation is True: COALESCE makes SQL agree.
-        if _exact(self.not_):
+        if is_exact(self.not_):
             return not_(func.coalesce(self.not_.to_sql(), false()))
         return true()
 
@@ -345,7 +358,7 @@ Any_.model_rebuild()
 Not.model_rebuild()
 
 
-def _exact(condition: "All | Any_ | Not | Predicate") -> bool:
+def is_exact(condition: "All | Any_ | Not | Predicate") -> bool:
     """True when to_sql() selects exactly the rows evaluate() accepts."""
     if isinstance(condition, Predicate):
         inexact = condition.op == "matches" or (
@@ -360,10 +373,10 @@ def _exact(condition: "All | Any_ | Not | Predicate") -> bool:
         inexact |= condition.field.startswith("attributes.") and condition.op != "exists"
         return not inexact
     if isinstance(condition, All):
-        return all(_exact(c) for c in condition.all)
+        return all(is_exact(c) for c in condition.all)
     if isinstance(condition, Any_):
-        return all(_exact(c) for c in condition.any)
-    return _exact(condition.not_)
+        return all(is_exact(c) for c in condition.any)
+    return is_exact(condition.not_)
 
 
 def depth(condition: "All | Any_ | Not | Predicate") -> int:

@@ -13,6 +13,7 @@ import { DetectionDetailPage } from "./pages/DetectionDetailPage";
 import { DetectionsPage } from "./pages/DetectionsPage";
 import { EventDetailPage } from "./pages/EventDetailPage";
 import { EventsPage } from "./pages/EventsPage";
+import { HuntPage } from "./pages/HuntPage";
 import { IdentitiesPage } from "./pages/IdentitiesPage";
 import { IncidentDetailPage } from "./pages/IncidentDetailPage";
 import { IncidentsPage } from "./pages/IncidentsPage";
@@ -37,6 +38,7 @@ export function App() {
           <Route path="incidents/:incidentId" element={<IncidentDetailPage />} />
           <Route path="events" element={<EventsPage />} />
           <Route path="events/:eventId" element={<EventDetailPage />} />
+          <Route path="hunt" element={<HuntPage />} />
           <Route path="assets" element={<AssetsPage />} />
           <Route path="assets/:assetId" element={<AssetDetailPage />} />
           <Route path="identities" element={<IdentitiesPage />} />

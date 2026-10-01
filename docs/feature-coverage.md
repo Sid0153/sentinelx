@@ -25,18 +25,18 @@ Last updated: **Phase 8**.
 | 12 | Incident creation | 8 | ✅ by correlation (high-severity alert, or multi-stage partners) and by analysts (escalation); not one incident per alert |
 | 13 | Incident investigation | 8, 9 | ✅ incident workspace (8); pivots from the dashboard, events, assets and identities to alerts and incidents (9) |
 | 14 | Timeline reconstruction | 8 | ✅ from stored events, alerts and activity, paged by keyset |
-| 15 | Threat hunting | 10 | ⬜ structured queries, templates, pivots, saved hunts |
+| 15 | Threat hunting | 10 | ✅ structured queries over the real event store (every field the brief lists, plus alert severity, detection and status), four reviewed templates, pivots from results and from alert, incident, event, asset and identity pages, saved and shared hunts ([threat-hunting.md](threat-hunting.md)) |
 | 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7 ✅) and incidents with links and the rules mapping to each (8 ✅); coverage view (11) |
 | 17 | Evidence management | 7, 8 | ✅ alert evidence with raw records, events → alerts citing them, incident evidence pins (append-only, tagged) |
 | 18 | Analyst notes | 8 | ✅ append-only (database triggers) |
 | 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection and alert; grouped per finding and de-duplicated on incidents ✅ |
-| 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window. Exclusions: API only. Version diff: Phase 12 |
-| 21 | Search and filtering | 5, 10 | ◐ events API: time range, source, batch, category, action, outcome, host, user, source IP, keyset paging. Full hunting: Phase 10 |
+| 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window and of the exclusion allowlist (10). Version diff: Phase 12 |
+| 21 | Search and filtering | 5, 10 | ✅ events API filters (5); hunting: allowlisted fields and operators, time ranges, alert filters, keyset paging, capped counts, statement timeout, indexed substring search (10) |
 | 22 | Security analytics | 9, 11 | ◐ dashboard aggregates and trends (9 ✅); rule metrics such as false-positive rate and time to resolve (11) |
 | 23 | Risk/context scoring | 7, 11 | ⬜ |
 | 24 | RBAC | 3 | ✅ ADMIN / ANALYST / VIEWER enforced by the API; route × role matrix test |
 | 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); alert status changes (7); every incident action and settings change (8) |
-| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings, dashboard, asset/identity activity done; hunt, coverage in their phases |
+| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings, dashboard, asset/identity activity, hunt done; coverage in its phase |
 | 27 | SOC dashboard | 9 | ✅ every metric of §19 from the database, with empty states (see below) |
 | 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
@@ -84,7 +84,7 @@ Last updated: **Phase 8**.
 | /login | 3 | ✅ |
 | /dashboard | 9 | ✅ the default page; tiles link to the filtered pages; trends with table view; checked on desktop and phone widths |
 | /events, /events/:id | 9 | ✅ explorer with time range, category, outcome, host, user and source filters in the URL, keyset paging; event page with enrichment, citing alerts and the raw record as text |
-| /hunt | 10 | ⬜ |
+| /hunt | 10 | ✅ query builder, templates, results with pivot menus, saved hunts; the whole hunt in the URL; checked on desktop and phone widths |
 | /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); coverage (11) and version diff / playground (12) ⬜ |
 | /alerts, /alerts/:id | 7 | ✅ queue with filters; alert page with the brief's §20 content (incident association: Phase 8); checked on desktop and phone widths |
 | /incidents, /incidents/:id | 8 | ✅ queue, workspace (actions for analysts), checked on desktop and phone widths |
@@ -104,7 +104,7 @@ Last updated: **Phase 8**.
 | /api/alerts | ✅ (7) |
 | /api/incidents, /api/settings | ✅ (8) |
 | /api/dashboard | ✅ (9) |
-| /api/hunt | ⬜ (10) |
+| /api/hunt | ✅ (10) |
 
 ## SOC dashboard metrics (brief §19)
 
@@ -120,7 +120,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 |---|---|---|
 | Login, logout, failed login | 3 | ✅ (plus lockout, rate limit, token reuse, access denied) |
 | User creation, role modification | 3 | ✅ (plus deactivate / reactivate) |
-| Configuration changes | 4, 5, 8 | ✅ assets, identities, log sources, correlation settings |
+| Configuration changes | 4, 5, 8, 10 | ✅ assets, identities, log sources, correlation settings, saved hunts (`HUNT_SAVED` / `HUNT_UPDATED` / `HUNT_DELETED`) |
 | Rule modification | 6 | ✅ `RULE_UPDATED` with from/to values and reason; library add/update/retire; manual runs |
 | Alert status change | 7 | ✅ `ALERT_STATUS_CHANGED` with from/to, disposition, reason |
 | Incident status change, assignment, note creation | 8 | ✅ plus evidence, links, rename, escalation (note ID only, never its text) |

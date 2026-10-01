@@ -2,8 +2,10 @@ import { useCallback, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { SimulatedTag } from "../components/alerts";
+import { HuntLink } from "../components/hunt";
 import { ErrorMessage, Panel, formatUtc } from "../components/ui";
 import { useApi } from "../hooks/useApi";
+import { eq } from "../services/hunt";
 import { getEvent } from "../services/inventory";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -75,6 +77,26 @@ export function EventDetailPage() {
             <Row label="Message">{event.message}</Row>
             <Row label="Ingested">{formatUtc(event.ingested_at)}</Row>
           </dl>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="Pivot to threat hunting">
+            {(
+              [
+                ["host", event.host, "Hunt this host"],
+                ["username", event.username, "Hunt this user"],
+                ["source_ip", event.source_ip, "Hunt this source"],
+                ["process_name", event.process_name, "Hunt this process"],
+              ] as const
+            )
+              .filter(([, value]) => Boolean(value))
+              .map(([field, value, label]) => (
+                <HuntLink
+                  key={field}
+                  filters={[eq(field, value as string)]}
+                  around={{ from: event.timestamp, to: event.timestamp }}
+                >
+                  {label}
+                </HuntLink>
+              ))}
+          </div>
           {attributes.length > 0 && (
             <>
               <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Attributes</h3>

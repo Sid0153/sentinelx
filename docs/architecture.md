@@ -85,7 +85,8 @@ backend/app/
                     actions), queries.py (queue, workspace, timeline), settings.py
   risk/             (Phases 7, 11) priority/risk model (pure, versioned)
   mitre/            (Phases 6, 11) ATT&CK reference data (pinned version) and coverage
-  hunting/          (Phase 10) structured query compiler, hunt templates, saved hunts
+  hunting/          (Phase 10) ✅ query.py (structured query, exact SQL compiler),
+                    templates.py (reviewed SQL), service.py (timeout, count cap, saved hunts)
   dashboard/        (Phase 9) aggregate queries
 ```
 
@@ -180,8 +181,8 @@ Design points:
 ## Threat hunting (Phase 10)
 
 Hunts are **structured queries** (a required time range of at most 31 days, allowlisted
-fields and operators, keyset pagination), compiled to parameterized SQL by the same compiler
-as detection conditions. Reviewed SQL templates cover questions that flat filters cannot
+fields and operators, keyset pagination), compiled to parameterized SQL that reuses the
+detection condition language's exact SQL (built in Phase 10). Reviewed SQL templates cover questions that flat filters cannot
 answer. Full design, trade-offs and limits: [threat-hunting.md](threat-hunting.md).
 
 ## Frontend architecture

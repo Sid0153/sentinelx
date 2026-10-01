@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     ingest_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024, le=50 * 1024 * 1024)
     ingest_max_records: int = Field(default=5000, ge=1, le=50_000)
 
+    # Threat hunting: each hunt query is cancelled after this long (docs/threat-hunting.md).
+    hunt_timeout_ms: int = Field(default=5000, ge=100, le=60_000)
+
     @field_validator("internal_networks")
     @classmethod
     def _internal_networks_are_networks(cls, value: str) -> str:

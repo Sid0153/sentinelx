@@ -9,6 +9,7 @@ import {
   SimulatedTag,
   StatusText,
 } from "../components/alerts";
+import { HuntLink } from "../components/hunt";
 import { incidentRef } from "../components/incidents";
 import {
   Button,
@@ -22,11 +23,32 @@ import {
 } from "../components/ui";
 import { useApi } from "../hooks/useApi";
 import { getAlert, listEvidence, transitionAlert } from "../services/alerts";
+import { eq } from "../services/hunt";
 import { escalateAlert } from "../services/incidents";
 import { ApiError } from "../services/http";
 import type { AlertDetail, AlertStatus, Disposition, EvidenceEvent } from "../types/api";
 
 const EVIDENCE_PAGE = 25;
+
+/** Hunts around the alert's activity (an hour either side of its evidence). */
+function AlertPivots({ alert }: { alert: AlertDetail }) {
+  const around = { from: alert.first_event_at, to: alert.last_event_at };
+  const pivots = [
+    { field: "host", value: alert.host, label: "Hunt this host" },
+    { field: "username", value: alert.username, label: "Hunt this user" },
+    { field: "source_ip", value: alert.source_ip, label: "Hunt this source" },
+  ].filter((p): p is { field: string; value: string; label: string } => Boolean(p.value));
+  if (pivots.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2" aria-label="Pivot to threat hunting">
+      {pivots.map((p) => (
+        <HuntLink key={p.field} filters={[eq(p.field, p.value)]} around={around}>
+          {p.label}
+        </HuntLink>
+      ))}
+    </div>
+  );
+}
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -488,6 +510,7 @@ export function AlertDetailPage() {
               <Row label="Asset">{alert.asset_hostname ?? "not in the inventory"}</Row>
               <Row label="Identity">{alert.identity_username ?? "not in the inventory"}</Row>
             </dl>
+            <AlertPivots alert={alert} />
           </Panel>
           <Panel title="MITRE ATT&CK">
             <ul className="space-y-2 text-sm">
