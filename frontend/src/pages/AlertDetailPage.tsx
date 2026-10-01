@@ -9,6 +9,7 @@ import {
   SimulatedTag,
   StatusText,
 } from "../components/alerts";
+import { InventoryPanel } from "../components/context";
 import { HuntLink } from "../components/hunt";
 import { incidentRef } from "../components/incidents";
 import {
@@ -500,6 +501,7 @@ export function AlertDetailPage() {
             </Panel>
           )}
           <Breakdown alert={alert} />
+          <InventoryPanel inventory={alert.inventory} />
           <Panel title="Entities">
             <dl>
               <Row label="Host">{alert.host ?? entity("host")}</Row>

@@ -131,3 +131,17 @@ export function formatUtc(iso: string | null): string {
   if (Number.isNaN(date.getTime())) return "—";
   return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
+
+/** A duration for people: "45 s", "12 min", "3.5 h", "2.1 days". */
+export function formatDuration(seconds: number | null): string {
+  if (seconds === null || Number.isNaN(seconds)) return "—";
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1).replace(/\.0$/, "")} h`;
+  return `${(seconds / 86400).toFixed(1).replace(/\.0$/, "")} days`;
+}
+
+/** A share as a percentage, or a dash when there is nothing to divide. */
+export function formatRate(rate: number | null): string {
+  return rate === null ? "—" : `${Math.round(rate * 100)} %`;
+}

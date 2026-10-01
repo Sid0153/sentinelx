@@ -9,6 +9,7 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import DbSession
 from app.auth.deps import AdminUser, AnalystUser, CurrentUser
+from app.context.lookup import inventory_context
 from app.core.errors import AppError
 from app.incidents import queries, service, workflow
 from app.incidents import settings as settings_service
@@ -19,6 +20,7 @@ from app.models.incident import EvidenceTag, Incident, IncidentDisposition, Inci
 from app.models.user import User
 from app.schemas.alert import AlertSummary, PriorityFactor
 from app.schemas.common import Page, error_responses
+from app.schemas.context import InventoryContextPublic
 from app.schemas.incident import (
     ActivityPublic,
     AssignRequest,
@@ -103,6 +105,14 @@ def _detail(db: DbSession, incident: Incident) -> IncidentDetail:
         )
         if related
         else None,
+        inventory=InventoryContextPublic.build(
+            inventory_context(
+                db,
+                incident.hosts,
+                incident.usernames,
+                [t for a in alerts for t in a.entities.get("target_username", [])],
+            )
+        ),
         alerts=[
             LinkedAlert(
                 alert=AlertSummary.model_validate(alert),

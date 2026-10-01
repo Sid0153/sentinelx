@@ -14,7 +14,7 @@ Last updated: **Phase 8**.
 | 1 | Multi-source security log ingestion | 5 | ✅ Linux auth, Windows security (JSON), HTTP access, application JSON, generic JSON; API (JSON / text), file (CLI), batch import, demo generator |
 | 2 | Event parsing | 5 | ✅ five parsers, fuzzed and linear-time |
 | 3 | Event normalization | 4, 5 | ✅ `NormalizedEvent`, controlled vocabulary, DB checks |
-| 4 | Event enrichment | 5 | ✅ normalized users, host → asset, source classification, internal/external IP, categorization, asset criticality, identity context (actor). ◐ target-account context: Phase 11 |
+| 4 | Event enrichment | 5 | ✅ normalized users, host → asset, source classification, internal/external IP, categorization, asset criticality, identity context (actor). ✅ target-account context (11): matched at scoring time, counts in priority |
 | 5 | Detection engineering | 6 | ✅ rule library as reviewed YAML, validated at startup; versions; tests per rule and per scenario |
 | 6 | Rule-based detection | 6 | ✅ declarative YAML rules, safe condition language (Python authoritative, SQL prefilter proven a superset) |
 | 7 | Temporal detection | 6 | ✅ threshold, distinct, sequence (with max gap) and new-value windows on event time |
@@ -26,14 +26,14 @@ Last updated: **Phase 8**.
 | 13 | Incident investigation | 8, 9 | ✅ incident workspace (8); pivots from the dashboard, events, assets and identities to alerts and incidents (9) |
 | 14 | Timeline reconstruction | 8 | ✅ from stored events, alerts and activity, paged by keyset |
 | 15 | Threat hunting | 10 | ✅ structured queries over the real event store (every field the brief lists, plus alert severity, detection and status), four reviewed templates, pivots from results and from alert, incident, event, asset and identity pages, saved and shared hunts ([threat-hunting.md](threat-hunting.md)) |
-| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7 ✅) and incidents with links and the rules mapping to each (8 ✅); coverage view (11) |
+| 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7 ✅) and incidents with links and the rules mapping to each (8 ✅); implemented-coverage view with every tactic (11 ✅) |
 | 17 | Evidence management | 7, 8 | ✅ alert evidence with raw records, events → alerts citing them, incident evidence pins (append-only, tagged) |
 | 18 | Analyst notes | 8 | ✅ append-only (database triggers) |
 | 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection and alert; grouped per finding and de-duplicated on incidents ✅ |
 | 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window and of the exclusion allowlist (10). Version diff: Phase 12 |
 | 21 | Search and filtering | 5, 10 | ✅ events API filters (5); hunting: allowlisted fields and operators, time ranges, alert filters, keyset paging, capped counts, statement timeout, indexed substring search (10) |
-| 22 | Security analytics | 9, 11 | ◐ dashboard aggregates and trends (9 ✅); rule metrics such as false-positive rate and time to resolve (11) |
-| 23 | Risk/context scoring | 7, 11 | ⬜ |
+| 22 | Security analytics | 9, 11 | ✅ dashboard aggregates and trends (9); per-rule outcomes, false-positive rate, median time to triage and to close (11) |
+| 23 | Risk/context scoring | 7, 8, 11 | ✅ documented, versioned alert priority and incident risk (model 3: privileged target accounts), every brief input accounted for, inventory context shown with the score, open work rescored after a model change ([risk-model.md](risk-model.md)) |
 | 24 | RBAC | 3 | ✅ ADMIN / ANALYST / VIEWER enforced by the API; route × role matrix test |
 | 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); alert status changes (7); every incident action and settings change (8) |
 | 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings, dashboard, asset/identity activity, hunt done; coverage in its phase |
@@ -64,9 +64,9 @@ Last updated: **Phase 8**.
 | Incident fields and statuses OPEN / TRIAGED / INVESTIGATING / CONTAINED / RESOLVED / CLOSED | 8 | ✅ every brief field (mapping in `correlation.md`); workflow tested over all 36 status pairs |
 | Correlation on source IP, host, user, time window, sequence, detection relationships | 8 | ✅ (sequence and detection relationships: a new kind of finding after a foothold on the same host, within the sequence window); standalone alerts are swept in when an incident grows, and manual runs backfill |
 | Timeline from stored events and actions | 8 | ✅ |
-| Explainable risk level and score | 7, 8, 11 | ✅ alert priority (7) and incident risk (8), breakdowns shown; context display: Phase 11 |
+| Explainable risk level and score | 7, 8, 11 | ✅ alert priority (7) and incident risk (8), breakdowns shown; inventory context next to the score (11) |
 | Defensive response recommendations, never automatic actions | 6, 8 | ✅ per alert and per incident; nothing is ever executed |
-| False-positive handling (confirmed / false positive / resolved, counts, resolution times) | 7, 11, 12 | ◐ analyst actions tracked: disposition, false positive with reason, who and when, audit ✅; counts and resolution times shown: Phase 11. No machine-learning feedback (none claimed) |
+| False-positive handling (confirmed / false positive / resolved, counts, resolution times) | 7, 11, 12 | ✅ analyst actions tracked: disposition, false positive with reason, who and when, audit; false-positive counts and rate, trigger counts and resolution times shown per rule (11). No machine-learning feedback (none claimed) |
 
 ## Context (brief §17–§18)
 
@@ -75,7 +75,7 @@ Last updated: **Phase 8**.
 | Asset model: id, hostname, IP addresses, type, environment, criticality, owner, tags, status | 4 | ✅ API (read all, ADMIN writes, audited) |
 | Identity model: id, username, display name, role (as `title`), department, privilege level, status, tags | 4 | ✅ API |
 | Events reference assets | 4, 5 | ✅ enrichment links `events.asset_id` |
-| Incidents reference assets | 8, 11 | ◐ through their alerts (asset of the evidence) and affected hosts; asset context on the incident page: Phase 11 |
+| Incidents reference assets | 8, 11 | ✅ through their alerts and affected hosts; the assets and identities behind them shown on the incident page (11) |
 
 ## Frontend pages (brief §29)
 
@@ -85,7 +85,7 @@ Last updated: **Phase 8**.
 | /dashboard | 9 | ✅ the default page; tiles link to the filtered pages; trends with table view; checked on desktop and phone widths |
 | /events, /events/:id | 9 | ✅ explorer with time range, category, outcome, host, user and source filters in the URL, keyset paging; event page with enrichment, citing alerts and the raw record as text |
 | /hunt | 10 | ✅ query builder, templates, results with pivot menus, saved hunts; the whole hunt in the URL; checked on desktop and phone widths |
-| /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); coverage (11) and version diff / playground (12) ⬜ |
+| /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); outcomes and false-positive rates, `/coverage` (11); version diff / playground (12) ⬜ |
 | /alerts, /alerts/:id | 7 | ✅ queue with filters; alert page with the brief's §20 content (incident association: Phase 8); checked on desktop and phone widths |
 | /incidents, /incidents/:id | 8 | ✅ queue, workspace (actions for analysts), checked on desktop and phone widths |
 | /assets, /identities (+ /:id) | 9 | ✅ lists with open alerts and last event, filters; detail with alerts, incidents and events; admin create and edit |
@@ -100,7 +100,7 @@ Last updated: **Phase 8**.
 | /api/auth, /api/users, /api/audit | ✅ (3) |
 | /api/assets, /api/identities | ✅ (4) |
 | /api/events (+ /api/sources, /api/ingest) | ✅ (5) |
-| /api/detections, /api/mitre/techniques | ✅ (6); /api/mitre/coverage ⬜ (11) |
+| /api/detections, /api/mitre/techniques | ✅ (6); /api/detections/metrics, /api/mitre/coverage ✅ (11) |
 | /api/alerts | ✅ (7) |
 | /api/incidents, /api/settings | ✅ (8) |
 | /api/dashboard | ✅ (9) |
@@ -148,7 +148,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 | Docker: health checks, env config, persistent volume, documented start (§35) | ✅ |
 | ADR-001 … ADR-007 (§38) | ✅ plus 0008–0010 |
 | Performance: indexes, pagination, bounded responses, batch ingestion (§33) | ✅ so far (index-fit tests, keyset paging, batched inserts); measured benchmarks: Phase 14 |
-| Detection coverage view, labelled "Implemented coverage" (§43) | ⬜ Phase 11 |
+| Detection coverage view, labelled "Implemented coverage" (§43) | ✅ `/coverage`: active rules, categories, severity, mappings, trigger counts, last triggered; every tactic with gaps stated (11) |
 | Detection testing playground (§44) | ⬜ Phase 12 |
 | Real-world extension plan (§49) | ✅ `architecture.md` |
 | Interview and portfolio package (§48, Phase 19) | ⬜ |

@@ -180,3 +180,81 @@ export interface TrendDay {
   incidents: number;
   events: number;
 }
+
+// ---------- Phase 11: context, detection metrics, implemented coverage ----------
+
+export interface InventoryContext {
+  assets: Asset[];
+  identities: (Identity & { roles: ("actor" | "target")[] })[];
+  unknown_hosts: string[];
+  unknown_accounts: string[];
+}
+
+export interface RuleMetrics {
+  rule_id: string;
+  name: string;
+  category: string;
+  severity: Level;
+  enabled: boolean;
+  in_library: boolean;
+  alerts: number;
+  open: number;
+  confirmed: number;
+  benign: number;
+  false_positives: number;
+  closed: number;
+  false_positive_rate: number | null;
+  median_triage_seconds: number | null;
+  median_resolve_seconds: number | null;
+  match_count: number;
+  last_match_at: string | null;
+}
+
+export interface DetectionMetrics {
+  days: number;
+  from: string;
+  to: string;
+  items: RuleMetrics[];
+}
+
+export interface CoverageRule {
+  rule_id: string;
+  name: string;
+  category: string;
+  severity: Level;
+  enabled: boolean;
+  indicator: string | null;
+  reason: string;
+  alerts: number;
+  last_triggered_at: string | null;
+}
+
+export interface CoverageTechnique {
+  technique_id: string;
+  name: string;
+  url: string;
+  tactics: string[];
+  active: boolean;
+  alerts: number;
+  last_triggered_at: string | null;
+  rules: CoverageRule[];
+}
+
+export interface Coverage {
+  label: string;
+  attack_version: string;
+  checked_on: string;
+  days: number;
+  from: string;
+  to: string;
+  summary: {
+    tactics_total: number;
+    tactics_covered: number;
+    techniques_covered: number;
+    rules_in_library: number;
+    rules_enabled: number;
+    categories: Record<string, number>;
+  };
+  tactics: { id: string; name: string; url: string; techniques: string[]; active: boolean }[];
+  techniques: CoverageTechnique[];
+}

@@ -134,6 +134,17 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
   the capped count, alert filters, every template against its scenario and benign data, the
   statement timeout, saved-hunt access and audit.
 
+**Risk, context and coverage** ✅ (Phase 11; `tests/api/test_insights.py`, `test_priority.py`,
+`tests/integration/test_alerts.py`, `frontend/tests/coverage.test.tsx`)
+- Metrics against alerts with known outcomes and times: counts, false-positive rate,
+  median times, the period boundary, every rule listed (no rate until one is closed).
+- Coverage: all 15 tactics in order, only mapped techniques, indicator attribution, a
+  disabled rule not counting as coverage.
+- A privileged target account counts once (unit and with the inventory); an inventory change
+  updates the open incident's risk; `rescore` brings open work to the current model and leaves
+  closed work alone. Mutation-checked: the rate's denominator, indicator attribution, target
+  reprioritization and the incident refresh each have a test that fails without them.
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.

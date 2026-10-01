@@ -7,6 +7,7 @@
     python -m app.cli ingest-file --source web-01-auth --file /var/log/auth.log
     python -m app.cli seed-rules       # load the rule library (run by docker-entrypoint.sh)
     python -m app.cli reconcile-batches  # mark batches a crash left undetected (entrypoint)
+    python -m app.cli rescore            # score open work with the current risk model (entrypoint)
     python -m app.cli run-detection --from 2026-09-25T00:00:00Z --to 2026-09-26T00:00:00Z
     python -m app.cli demo-scenarios   # SIMULATED scenarios and the options each accepts
     python -m app.cli demo-ingest --scenario brute_force --source web-01-auth \
@@ -225,6 +226,16 @@ def _reconcile_batches() -> int:
     return 0
 
 
+def _rescore() -> int:
+    from app.alerts.service import rescore_outdated
+    from app.database.session import get_session_factory
+
+    with get_session_factory()() as db:
+        alerts, incidents = rescore_outdated(db)
+    print(f"{alerts} open alerts and {incidents} open incidents scored with the current risk model")
+    return 0
+
+
 def _seed_rules() -> int:
     from app.database.session import get_session_factory
     from app.detection.library import LibraryError, load_library
@@ -308,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     subcommands.add_parser("demo-scenarios", help="List SIMULATED scenarios and their options")
     subcommands.add_parser("seed-rules", help="Load the shipped rule library into the database")
     subcommands.add_parser("reconcile-batches", help="Mark batches a crash left without detection")
+    subcommands.add_parser("rescore", help="Score open work again after a risk model change")
     detect = subcommands.add_parser("run-detection", help="Run the enabled rules over a range")
     detect.add_argument("--from", dest="start", required=True, help="ISO 8601 with a zone")
     detect.add_argument("--to", dest="end", required=True, help="ISO 8601 with a zone")
@@ -328,6 +340,8 @@ def main(argv: list[str] | None = None) -> int:
         return _seed_rules()
     if args.command == "reconcile-batches":
         return _reconcile_batches()
+    if args.command == "rescore":
+        return _rescore()
     if args.command == "run-detection":
         return _run_detection(args.start, args.end)
     return _create_admin(args.email)

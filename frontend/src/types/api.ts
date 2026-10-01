@@ -1,6 +1,8 @@
 // Mirrors the backend response schemas (backend/app/schemas/*). Keep in sync with
 // docs/openapi.json.
 
+import type { InventoryContext } from "./inventory";
+
 export interface ApiErrorBody {
   error: {
     code: string;
@@ -139,6 +141,7 @@ export interface AlertHistoryEntry {
 }
 
 export interface AlertDetail extends AlertSummary {
+  inventory?: InventoryContext | null; // hosts and accounts involved (Phase 11)
   rule_version: number;
   indicator: string | null;
   kind: string;
@@ -285,6 +288,7 @@ export interface IncidentTechnique {
 }
 
 export interface IncidentDetail extends IncidentSummary {
+  inventory?: InventoryContext | null; // hosts and accounts involved (Phase 11)
   summary: string;
   created_reason: string;
   risk_breakdown: PriorityFactor[];

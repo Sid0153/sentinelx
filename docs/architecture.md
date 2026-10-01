@@ -78,13 +78,16 @@ backend/app/
                     engine.py, service.py
   alerts/           (Phase 7) dedup.py, workflow.py (pure), service.py (the only writer of
                     alerts), queries.py
-  risk/             (Phase 7) priority.py: the SentinelX priority score (pure)
   correlation/      (Phase 8) scoring.py (pure link strength), service.py (runs in the
                     detection transaction)
   incidents/        (Phase 8) records.py (writes), workflow.py (pure), service.py (analyst
                     actions), queries.py (queue, workspace, timeline), settings.py
-  risk/             (Phases 7, 11) priority/risk model (pure, versioned)
-  mitre/            (Phases 6, 11) ATT&CK reference data (pinned version) and coverage
+  risk/             (Phases 7, 8, 11) priority.py: alert priority and incident risk (pure,
+                    versioned; model 3)
+  (ATT&CK)          (Phases 6, 11) ✅ reference data in detection/library/attack_techniques.yaml
+                    (pinned version, tactics and techniques); coverage and rule metrics in
+                    detection/insights.py; inventory context for alerts and incidents in
+                    context/lookup.py
   hunting/          (Phase 10) ✅ query.py (structured query, exact SQL compiler),
                     templates.py (reviewed SQL), service.py (timeout, count cap, saved hunts)
   dashboard/        (Phase 9) aggregate queries

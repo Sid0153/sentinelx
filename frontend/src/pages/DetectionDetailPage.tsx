@@ -3,10 +3,21 @@ import { Link, useParams } from "react-router-dom";
 
 import { hasRole, useCurrentUser } from "../auth/AuthContext";
 import { LevelBadge } from "../components/alerts";
-import { Button, ErrorMessage, Field, Panel, formatUtc, inputClass, selectClass } from "../components/ui";
+import {
+  Button,
+  ErrorMessage,
+  Field,
+  Panel,
+  formatDuration,
+  formatRate,
+  formatUtc,
+  inputClass,
+  selectClass,
+} from "../components/ui";
 import { useApi } from "../hooks/useApi";
 import { ApiError } from "../services/http";
-import { getRule, listRuleVersions, tuneRule } from "../services/inventory";
+import { getDetectionMetrics, getRule, listRuleVersions, tuneRule } from "../services/inventory";
+import { PERIODS } from "./DetectionsPage";
 import type { RuleDetail } from "../types/inventory";
 
 const LEVELS = ["critical", "high", "medium", "low"];
@@ -281,6 +292,50 @@ function Versions({ ruleId, attempt }: { ruleId: string; attempt: number }) {
   );
 }
 
+/** How analysts closed this rule's alerts (brief §45): counted, never estimated. */
+function RuleOutcomes({ ruleId }: { ruleId: string }) {
+  const [days, setDays] = useState(30);
+  const load = useCallback((signal: AbortSignal) => getDetectionMetrics(days, signal), [days]);
+  const { data, error } = useApi(load);
+  const m = data?.items.find((item) => item.rule_id === ruleId);
+  const row = (label: string, value: string) => (
+    <div className="flex gap-3">
+      <dt className="w-40 shrink-0 text-slate-500">{label}</dt>
+      <dd className="font-mono text-slate-200">{value}</dd>
+    </div>
+  );
+  return (
+    <Panel title="Analyst outcomes">
+      <label className="mb-2 flex items-center gap-2 text-sm text-slate-400">
+        Alerts created in
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className={selectClass}>
+          {PERIODS.map((d) => (
+            <option key={d} value={d}>
+              the last {d} days
+            </option>
+          ))}
+        </select>
+      </label>
+      {error ? (
+        <ErrorMessage>{error.message}</ErrorMessage>
+      ) : !m ? (
+        <p className="text-sm text-slate-400">Loading…</p>
+      ) : m.alerts === 0 ? (
+        <p className="text-sm text-slate-400">No alerts from this rule in this period.</p>
+      ) : (
+        <dl className="text-sm">
+          {row("Alerts", `${m.alerts} (${m.open} open)`)}
+          {row("Confirmed malicious", String(m.confirmed))}
+          {row("Benign or expected", String(m.benign))}
+          {row("False positives", `${m.false_positives} · ${formatRate(m.false_positive_rate)} of closed`)}
+          {row("Median time to triage", formatDuration(m.median_triage_seconds))}
+          {row("Median time to close", formatDuration(m.median_resolve_seconds))}
+        </dl>
+      )}
+    </Panel>
+  );
+}
+
 export function DetectionDetailPage() {
   const { ruleId = "" } = useParams();
   const user = useCurrentUser();
@@ -400,6 +455,7 @@ export function DetectionDetailPage() {
               Alerts from this rule
             </Link>
           </Panel>
+          <RuleOutcomes ruleId={rule.rule_id} />
         </div>
         <div className="min-w-0 space-y-4">
           <Panel title="Definition (as it runs)">

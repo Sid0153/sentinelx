@@ -2,7 +2,9 @@ import type { Page } from "../types/api";
 import type {
   Asset,
   ContextActivity,
+  Coverage,
   DashboardSummary,
+  DetectionMetrics,
   EventDetail,
   EventPage,
   Identity,
@@ -123,4 +125,14 @@ export function tuneRule(ruleId: string, changes: Record<string, unknown>) {
     method: "PATCH",
     body: changes,
   });
+}
+
+// ---------- detection metrics and coverage ----------
+
+export function getDetectionMetrics(days: number, signal?: AbortSignal) {
+  return apiRequest<DetectionMetrics>("/detections/metrics", { query: { days }, signal });
+}
+
+export function getCoverage(days: number, signal?: AbortSignal) {
+  return apiRequest<Coverage>("/mitre/coverage", { query: { days }, signal });
 }

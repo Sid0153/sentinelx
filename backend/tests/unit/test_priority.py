@@ -11,7 +11,7 @@ from app.risk.priority import AssetContext, IdentityContext, alert_priority, ban
 # The weights each model version stands for. Changing a weight without bumping
 # RISK_MODEL_VERSION (and adding its fingerprint here) fails the test below: old scores are
 # stored with their version and must stay explainable.
-WEIGHTS_BY_VERSION = {"1": "8ed872d86dc7", "2": "8cbc82b4385e"}
+WEIGHTS_BY_VERSION = {"1": "8ed872d86dc7", "2": "8cbc82b4385e", "3": "722ac026143e"}
 
 
 def fingerprint() -> str:
@@ -125,3 +125,21 @@ def test_the_score_is_capped_at_100() -> None:
 def test_the_lowest_possible_score() -> None:
     result = score(severity="low", confidence="low", asset=AssetContext("x", "low"))
     assert (result.score, result.band) == (10, "low")
+
+
+def test_a_privileged_target_account_counts_once() -> None:
+    """Risk model 3: privilege counts for the account acted on too (a root shell, a new
+    admin account), but an alert gets the +10 once, the actor first."""
+    base = score().score
+    target = score(target=IdentityContext("root", privileged=True))
+    assert target.score == base + 10
+    assert ("identity", "root privileged (target account)", 10) in [
+        (f.name, f.value, f.points) for f in target.factors
+    ]
+    assert score(target=IdentityContext("bob", privileged=False)).score == base
+    both = score(
+        identity=IdentityContext("deploy", privileged=True),
+        target=IdentityContext("root", privileged=True),
+    )
+    assert both.score == base + 10
+    assert [f.value for f in both.factors if f.name == "identity"] == ["deploy privileged"]

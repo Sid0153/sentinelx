@@ -137,7 +137,7 @@ def test_an_alert_explains_itself(
     assert (alert["asset_hostname"], alert["identity_username"]) == ("web-01", "root")
     # A priority anyone can recompute.
     assert sum(f["points"] for f in alert["priority_breakdown"]) == alert["priority_score"]
-    assert alert["risk_model_version"] == "2"
+    assert alert["risk_model_version"] == "3"
     # ATT&CK, with links.
     assert {m["technique"] for m in alert["mitre"]} == {"T1110", "T1078"}
     assert all(m["url"].startswith("https://attack.mitre.org/techniques/") for m in alert["mitre"])

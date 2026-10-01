@@ -2,7 +2,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../services/http";
-import type { ContextActivity } from "../types/inventory";
+import type { ContextActivity, InventoryContext } from "../types/inventory";
 import { PriorityBadge, SimulatedTag, StatusText } from "./alerts";
 import { IncidentStatusText, incidentRef } from "./incidents";
 import { Button, ErrorMessage, Field, Panel, formatUtc, inputClass, selectClass } from "./ui";
@@ -250,3 +250,61 @@ export const IDENTITY_FIELDS: FieldSpec[] = [
   { name: "tags", label: "Tags", kind: "list", hint: "Separate with commas or spaces." },
   { name: "status", label: "Status", kind: "select", options: ["active", "disabled"], editOnly: true },
 ];
+
+/** The inventory behind the hosts and accounts an alert or incident involves: what the
+ * score's "asset" and "identity" factors stand for, and who to call (Phase 11). */
+export function InventoryPanel({ inventory }: { inventory: InventoryContext | null | undefined }) {
+  if (!inventory) return null;
+  const empty =
+    inventory.assets.length + inventory.identities.length + inventory.unknown_hosts.length +
+      inventory.unknown_accounts.length === 0;
+  return (
+    <Panel title="Inventory context">
+      {empty ? (
+        <p className="text-sm text-slate-400">No hosts or accounts involved.</p>
+      ) : (
+        <div className="space-y-3 text-sm">
+          {inventory.assets.map((a) => (
+            <div key={a.id}>
+              <Link to={`/assets/${a.id}`} className="font-mono text-sky-300">
+                {a.hostname}
+              </Link>{" "}
+              <span className="text-slate-300">
+                {a.criticality} criticality · {a.asset_type.replace("_", " ")} · {a.environment}
+              </span>
+              <div className="text-xs text-slate-500">
+                {a.owner ? `Owner: ${a.owner}` : "No owner recorded"}
+                {a.status === "retired" && " · retired"}
+                {a.tags.length > 0 && ` · ${a.tags.join(", ")}`}
+              </div>
+            </div>
+          ))}
+          {inventory.identities.map((i) => (
+            <div key={i.id}>
+              <Link to={`/identities/${i.id}`} className="font-mono text-sky-300">
+                {i.username}
+              </Link>{" "}
+              <span className={i.privilege_level === "privileged" ? "text-amber-300" : "text-slate-300"}>
+                {i.privilege_level}
+              </span>{" "}
+              <span className="text-xs text-slate-400">({i.roles.join(" and ")})</span>
+              <div className="text-xs text-slate-500">
+                {[i.display_name, i.department, i.title].filter(Boolean).join(" · ") || "No details recorded"}
+                {i.status === "disabled" && " · disabled"}
+              </div>
+            </div>
+          ))}
+          {(inventory.unknown_hosts.length > 0 || inventory.unknown_accounts.length > 0) && (
+            <p className="text-xs text-slate-400">
+              Not in the inventory:{" "}
+              <span className="font-mono">
+                {[...inventory.unknown_hosts, ...inventory.unknown_accounts].join(", ")}
+              </span>
+              . Registering them adds their context to the score.
+            </p>
+          )}
+        </div>
+      )}
+    </Panel>
+  );
+}

@@ -283,7 +283,12 @@ times and actors; `disposition`; `status_note`.
   database): a run blocked on an alert the analyst closes opens a new alert instead of
   extending the closed one; an analyst blocked on a run's extension keeps it; two batches of
   the same activity at once make one alert. Removing either lock makes a test fail.
-- These fields feed per-rule false-positive counts and time-to-resolve (shown in Phase 11).
+- These fields feed the per-rule metrics (`GET /api/detections/metrics`, Phase 11): for the
+  alerts a rule created in a period (1–365 days), how many are open, confirmed malicious,
+  benign or expected, and false positives; the false-positive rate (false positives / closed,
+  shown as "—" until one is closed, never as 0 %); the median time to first triage and to
+  closing. Shown on the rule list and each rule's page; tested against alerts with known
+  outcomes and times.
 - There is no machine-learning feedback: false-positive rates are shown to people who tune
   rules. They do not tune anything automatically.
 

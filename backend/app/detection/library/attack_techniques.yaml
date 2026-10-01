@@ -5,6 +5,24 @@
 attack_version: "19.2"
 checked_on: "2026-09-25"
 source: "https://attack.mitre.org/"
+# Every Enterprise tactic, in ATT&CK's own order (attack.mitre.org/tactics/enterprise/,
+# checked 2026-10-01 against v19.2). The coverage view shows them all, covered or not.
+tactics:
+  - {id: TA0043, name: Reconnaissance}
+  - {id: TA0042, name: Resource Development}
+  - {id: TA0001, name: Initial Access}
+  - {id: TA0002, name: Execution}
+  - {id: TA0003, name: Persistence}
+  - {id: TA0004, name: Privilege Escalation}
+  - {id: TA0005, name: Stealth}
+  - {id: TA0112, name: Defense Impairment}
+  - {id: TA0006, name: Credential Access}
+  - {id: TA0007, name: Discovery}
+  - {id: TA0008, name: Lateral Movement}
+  - {id: TA0009, name: Collection}
+  - {id: TA0011, name: Command and Control}
+  - {id: TA0010, name: Exfiltration}
+  - {id: TA0040, name: Impact}
 techniques:
   - id: T1110
     name: Brute Force

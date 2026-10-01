@@ -31,12 +31,20 @@ from app.audit.service import record
 from app.core.errors import AppError
 from app.detection.library import Library
 from app.detection.model import Detection
+from app.incidents import records
 from app.ingestion.enrich import Snapshot, asset_for, load_snapshot
 from app.models.alert import ACTIVE_STATUSES, Alert, AlertEvent, AlertStatus, Disposition
 from app.models.context import Asset, Identity, PrivilegeLevel
 from app.models.event import Event
+from app.models.incident import ACTIVE_INCIDENT_STATUSES, Incident, IncidentAlert
 from app.models.user import User
-from app.risk.priority import AssetContext, IdentityContext, Priority, alert_priority
+from app.risk.priority import (
+    RISK_MODEL_VERSION,
+    AssetContext,
+    IdentityContext,
+    Priority,
+    alert_priority,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +95,7 @@ def _mitre(detection: Detection, library: Library) -> list[dict[str, Any]]:
 class EvidenceContext:
     asset: Asset | None
     identity: Identity | None
+    target: Identity | None  # a target account in the inventory (privileged first)
     simulated: bool
     first_event_at: datetime
     last_event_at: datetime
@@ -94,8 +103,9 @@ class EvidenceContext:
 
 def _context(db: Session, alert_id: uuid.UUID, inventory: Snapshot) -> EvidenceContext:
     """From all linked evidence: its time span, whether it is simulated, and the current
-    inventory context: the most critical asset, and a privileged actor if any (else any
-    known actor).
+    inventory context: the most critical asset, a privileged actor if any (else any known
+    actor), and likewise for target accounts. Target accounts are matched against the
+    current inventory only: enrichment records the identity of the actor, not the target.
 
     Assets and identities are found both through what enrichment recorded on the events
     and by matching the events' hosts and users against the current inventory (the same
@@ -109,6 +119,7 @@ def _context(db: Session, alert_id: uuid.UUID, inventory: Snapshot) -> EvidenceC
             Event.host,
             Event.host_ip,
             Event.username,
+            Event.target_username,
             Event.simulated,
             Event.timestamp,
         ).where(Event.id.in_(evidence))
@@ -120,36 +131,50 @@ def _context(db: Session, alert_id: uuid.UUID, inventory: Snapshot) -> EvidenceC
             asset_ids.add(found.id)
         if r.username and (ref := inventory.identities.get(r.username)):
             identity_ids.add(ref.id)
+    target_ids = {
+        ref.id
+        for r in rows
+        if r.target_username and (ref := inventory.identities.get(r.target_username))
+    }
     simulated = any(r.simulated for r in rows)
     assets = list(db.scalars(select(Asset).where(Asset.id.in_(asset_ids)))) if asset_ids else []
-    identities = (
-        list(db.scalars(select(Identity).where(Identity.id.in_(identity_ids))))
-        if identity_ids
-        else []
+    known = identity_ids | target_ids
+    by_id = (
+        {i.id: i for i in db.scalars(select(Identity).where(Identity.id.in_(known)))}
+        if known
+        else {}
     )
     asset = max(assets, key=lambda a: (_CRITICALITY_ORDER[a.criticality], a.hostname), default=None)
-    identity = max(
+    identity = _most_privileged([by_id[i] for i in identity_ids if i in by_id])
+    target = _most_privileged([by_id[i] for i in target_ids if i in by_id])
+    times = [r.timestamp for r in rows]
+    return EvidenceContext(asset, identity, target, simulated, min(times), max(times))
+
+
+def _most_privileged(identities: list[Identity]) -> Identity | None:
+    return max(
         identities,
         key=lambda i: (i.privilege_level == PrivilegeLevel.PRIVILEGED, i.username),
         default=None,
     )
-    times = [r.timestamp for r in rows]
-    return EvidenceContext(asset, identity, simulated, min(times), max(times))
 
 
-def _priority(alert: Alert, asset: Asset | None, identity: Identity | None) -> Priority:
+def _identity_context(identity: Identity | None) -> IdentityContext | None:
+    if identity is None:
+        return None
+    privileged = identity.privilege_level == PrivilegeLevel.PRIVILEGED
+    return IdentityContext(identity.username, privileged)
+
+
+def _priority(alert: Alert, context: EvidenceContext) -> Priority:
     threshold = alert.facts.get("threshold") if alert.kind in ("threshold", "distinct") else None
+    asset = context.asset
     return alert_priority(
         severity=alert.severity,
         confidence=alert.confidence,
         asset=AssetContext(asset.hostname, asset.criticality) if asset else None,
-        identity=(
-            IdentityContext(
-                identity.username, identity.privilege_level == PrivilegeLevel.PRIVILEGED
-            )
-            if identity
-            else None
-        ),
+        identity=_identity_context(context.identity),
+        target=_identity_context(context.target),
         peak_count=alert.peak_count,
         threshold=threshold if isinstance(threshold, int) else None,
     )
@@ -242,7 +267,7 @@ def _refresh(db: Session, alert: Alert, inventory: Snapshot) -> bool:
     """Recomputes what an alert derives from its evidence and the current inventory.
     Returns whether the priority changed."""
     context = _context(db, alert.id, inventory)
-    priority = _priority(alert, context.asset, context.identity)
+    priority = _priority(alert, context)
     changed = (alert.priority_score, alert.priority_breakdown) != (
         priority.score,
         priority.breakdown(),
@@ -281,7 +306,13 @@ def reprioritize_for_asset(
 def reprioritize_for_identity(db: Session, identity: Identity, now: datetime | None = None) -> int:
     """After an identity is created or changed: as reprioritize_for_asset."""
     return _reprioritize(
-        db, or_(Event.identity_id == identity.id, Event.username == identity.username), now
+        db,
+        or_(
+            Event.identity_id == identity.id,
+            Event.username == identity.username,
+            Event.target_username == identity.username,
+        ),
+        now,
     )
 
 
@@ -303,23 +334,63 @@ def _reprioritize(db: Session, involves: ColumnElement[bool], now: datetime | No
     if not affected:
         return 0
     inventory = load_snapshot(db, ())
-    changed = 0
-    for alert in affected:
-        before = alert.priority_score
-        if _refresh(db, alert, inventory):
-            changed += 1
-            alert.updated_at = now or datetime.now(UTC)
-            logger.info(
-                "alert.reprioritized",
-                extra={
-                    "fields": {
-                        "alert_id": str(alert.id),
-                        "from": before,
-                        "to": alert.priority_score,
-                    }
-                },
-            )
-    return changed
+    changed = [alert for alert in affected if _rescore(db, alert, inventory, now)]
+    _refresh_incidents(db, [a.id for a in changed], now)
+    return len(changed)
+
+
+def _rescore(db: Session, alert: Alert, inventory: Snapshot, now: datetime | None) -> bool:
+    before = alert.priority_score
+    if not _refresh(db, alert, inventory):
+        return False
+    alert.updated_at = now or datetime.now(UTC)
+    logger.info(
+        "alert.reprioritized",
+        extra={"fields": {"alert_id": str(alert.id), "from": before, "to": alert.priority_score}},
+    )
+    return True
+
+
+def _refresh_incidents(
+    db: Session, alert_ids: Sequence[uuid.UUID], now: datetime | None, *, outdated: bool = False
+) -> int:
+    """Open incidents follow their alerts: incident risk is the highest alert priority plus
+    bonuses, so an alert scored again changes it. With `outdated`, also every open incident
+    scored by an older risk model. Closed incidents keep the risk they were closed with."""
+    linked = select(IncidentAlert.incident_id).where(IncidentAlert.alert_id.in_(alert_ids))
+    involves: list[ColumnElement[bool]] = [Incident.id.in_(linked)]
+    if outdated:
+        involves.append(Incident.risk_model_version != RISK_MODEL_VERSION)
+    if not alert_ids and not outdated:
+        return 0
+    incidents = db.scalars(
+        select(Incident)
+        .where(Incident.status.in_(ACTIVE_INCIDENT_STATUSES), or_(*involves))
+        .order_by(Incident.id)
+        .with_for_update()
+    ).all()
+    for incident in incidents:
+        records.refresh(db, incident, now or datetime.now(UTC))
+    return len(incidents)
+
+
+def rescore_outdated(db: Session, now: datetime | None = None) -> tuple[int, int]:
+    """After a risk model change (RISK_MODEL_VERSION): open alerts and incidents scored by an
+    older model are scored again, so the queue is ordered by one model. Run at container
+    start (`cli rescore`); a no-op when everything is current. Returns (alerts, incidents)
+    rescored. Closed work keeps the score it was handled with."""
+    outdated = db.scalars(
+        select(Alert)
+        .where(Alert.status.in_(ACTIVE_STATUSES), Alert.risk_model_version != RISK_MODEL_VERSION)
+        .order_by(Alert.id)
+        .with_for_update()
+    ).all()
+    inventory = load_snapshot(db, ())
+    for alert in outdated:
+        _rescore(db, alert, inventory, now)
+    incidents = _refresh_incidents(db, [a.id for a in outdated], now, outdated=True)
+    db.commit()
+    return len(outdated), incidents
 
 
 def _create(db: Session, detection: Detection, key: str, library: Library, now: datetime) -> Alert:

@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { isoSeconds, shortDuration } from "../src/pages/DetectionDetailPage";
-import type { RuleDetail, RuleSummary, RuleVersion } from "../src/types/inventory";
+import type { RuleDetail, RuleMetrics, RuleSummary, RuleVersion } from "../src/types/inventory";
 import { mockApi, signedInAs } from "./mockApi";
 import { renderApp } from "./renderApp";
 
@@ -65,9 +65,47 @@ const VERSIONS: RuleVersion[] = [
   },
 ];
 
+function metrics(overrides: Partial<RuleMetrics> = {}): RuleMetrics {
+  return {
+    rule_id: "AUTH-001",
+    name: "Repeated failed logons",
+    category: "authentication",
+    severity: "medium",
+    enabled: true,
+    in_library: true,
+    alerts: 12,
+    open: 2,
+    confirmed: 6,
+    benign: 1,
+    false_positives: 3,
+    closed: 10,
+    false_positive_rate: 0.3,
+    median_triage_seconds: 300,
+    median_resolve_seconds: 5400,
+    match_count: 14,
+    last_match_at: "2026-09-27T08:55:00Z",
+    ...overrides,
+  };
+}
+
+const METRICS = {
+  "GET /api/detections/metrics": (call: { url: URL }) => ({
+    body: {
+      days: Number(call.url.searchParams.get("days")),
+      from: "2026-09-01T00:00:00Z",
+      to: "2026-10-01T00:00:00Z",
+      items: [
+        metrics(),
+        metrics({ rule_id: "PROC-001", alerts: 0, open: 0, confirmed: 0, benign: 0, false_positives: 0, closed: 0, false_positive_rate: null, median_triage_seconds: null, median_resolve_seconds: null }),
+      ],
+    },
+  }),
+};
+
 function rule(role: "ADMIN" | "VIEWER", extra = {}) {
   return mockApi({
     ...signedInAs(role),
+    ...METRICS,
     "GET /api/detections/AUTH-001": { body: DETAIL },
     "GET /api/detections/AUTH-001/versions": { body: VERSIONS },
     ...extra,
@@ -84,17 +122,37 @@ describe("Detection rules", () => {
     expect(shortDuration(7200)).toBe("2h");
   });
 
-  it("lists rules with their state and statistics", async () => {
-    mockApi({
+  it("lists rules with their state and how analysts closed their alerts", async () => {
+    const api = mockApi({
       ...signedInAs("VIEWER"),
+      ...METRICS,
       "GET /api/detections": { body: [SUMMARY, { ...SUMMARY, rule_id: "PROC-001", name: "Odd process", enabled: false }] },
     });
     renderApp("/detections");
     const row = (await screen.findByRole("link", { name: /AUTH-001/ })).closest("tr") as HTMLElement;
     expect(row).toHaveTextContent("enabled");
-    expect(row).toHaveTextContent("14");
+    await waitFor(() => expect(row).toHaveTextContent("12"));
+    expect(row).toHaveTextContent("2 open");
+    expect(row).toHaveTextContent("30 %");
+    expect(row).toHaveTextContent("3 of 10 closed");
+    expect(row).toHaveTextContent("1.5 h"); // median time to close: 5,400 s
     const other = screen.getByRole("link", { name: /PROC-001/ }).closest("tr") as HTMLElement;
     expect(other).toHaveTextContent("disabled");
+    expect(other).toHaveTextContent("—"); // no closed alerts: no rate, not 0 %
+    expect(api.callsTo("GET /api/detections/metrics")[0].url.searchParams.get("days")).toBe("30");
+    fireEvent.change(screen.getByLabelText("Alerts created in"), { target: { value: "90" } });
+    await waitFor(() => expect(api.callsTo("GET /api/detections/metrics")).toHaveLength(2));
+    expect(api.callsTo("GET /api/detections/metrics")[1].url.searchParams.get("days")).toBe("90");
+  });
+
+  it("shows a rule's analyst outcomes", async () => {
+    rule("VIEWER");
+    renderApp("/detections/AUTH-001");
+    const panel = (await screen.findByRole("heading", { name: "Analyst outcomes" })).parentElement as HTMLElement;
+    await waitFor(() => expect(panel).toHaveTextContent("12 (2 open)"));
+    expect(panel).toHaveTextContent("Confirmed malicious6");
+    expect(panel).toHaveTextContent("False positives3 · 30 % of closed");
+    expect(panel).toHaveTextContent("Median time to triage5 min");
   });
 
   it("shows the definition, ATT&CK mapping and history; viewers cannot tune", async () => {

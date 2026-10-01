@@ -1,6 +1,8 @@
 """Detection rules (read, tune), detection runs (history, manual runs) and ATT&CK reference."""
 
 import uuid
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, status
@@ -8,7 +10,8 @@ from sqlalchemy import select
 
 from app.api.deps import DbSession
 from app.auth.deps import AdminUser, CurrentUser
-from app.detection import service
+from app.detection import insights, service
+from app.detection.library import get_library
 from app.detection.storage import RuleChanges, effective, get_rule, update_rule
 from app.models.detection import (
     DetectionRule,
@@ -19,7 +22,14 @@ from app.models.detection import (
 )
 from app.schemas.common import Page, error_responses
 from app.schemas.detection import (
+    Coverage,
+    CoverageRule,
+    CoverageSummary,
+    CoverageTactic,
+    CoverageTechnique,
+    DetectionMetrics,
     RuleDetail,
+    RuleMetricsPublic,
     RuleSummary,
     RuleVersionPublic,
     RunDetail,
@@ -125,6 +135,48 @@ def run_detection(payload: RunRequest, admin: AdminUser, db: DbSession) -> RunDe
     return RunDetail.model_validate(service.run_manual(db, payload.start, payload.end, admin))
 
 
+Days = Annotated[int, Query(ge=1, le=365)]
+
+
+def _period(days: int) -> tuple[datetime, datetime]:
+    end = datetime.now(UTC)
+    return end - timedelta(days=days), end
+
+
+@detections.get("/metrics", response_model=DetectionMetrics, responses=error_responses(422))
+def detection_metrics(_user: CurrentUser, db: DbSession, days: Days = 30) -> DetectionMetrics:
+    """Per rule, for the alerts it created in the last `days` (1–365, default 30): how many,
+    how analysts closed them (confirmed, benign, false positive), the false-positive rate,
+    and the median time to triage and to close. Counted from the alerts, never estimated."""
+    start, end = _period(days)
+    measured = insights.rule_metrics(db, start, end)
+    items = []
+    for row in db.scalars(select(DetectionRule).order_by(DetectionRule.rule_id)):
+        m = measured.get(row.rule_id, insights.RuleMetrics(row.rule_id))
+        items.append(
+            RuleMetricsPublic(
+                rule_id=row.rule_id,
+                name=row.name,
+                category=row.category,
+                severity=str(effective(row).severity),
+                enabled=row.enabled,
+                in_library=row.in_library,
+                alerts=m.alerts,
+                open=m.open,
+                confirmed=m.confirmed,
+                benign=m.benign,
+                false_positives=m.false_positives,
+                closed=m.closed,
+                false_positive_rate=m.false_positive_rate,
+                median_triage_seconds=m.median_triage_seconds,
+                median_resolve_seconds=m.median_resolve_seconds,
+                match_count=row.match_count,
+                last_match_at=row.last_match_at,
+            )
+        )
+    return DetectionMetrics(days=days, start=start, end=end, items=items)
+
+
 @detections.get("", response_model=list[RuleSummary])
 def list_rules(_user: CurrentUser, db: DbSession) -> list[RuleSummary]:
     rows = db.scalars(select(DetectionRule).order_by(DetectionRule.rule_id))
@@ -157,6 +209,63 @@ def tune_rule(rule_id: RuleId, payload: RuleChanges, admin: AdminUser, db: DbSes
     """Change tunable values only (threshold, time window, severity, confidence, enabled,
     exclusions), within the rule's bounds, with a reason. Creates a version; audited."""
     return _detail(db, update_rule(db, rule_id, payload, admin))
+
+
+@mitre.get("/coverage", response_model=Coverage, responses=error_responses(422))
+def implemented_coverage(_user: CurrentUser, db: DbSession, days: Days = 30) -> Coverage:
+    """Implemented coverage: the ATT&CK techniques SentinelX's own rules map to, under every
+    Enterprise tactic (covered or not), with each rule's state, severity, alerts in the last
+    `days` and last trigger. Not a claim of complete ATT&CK coverage."""
+    attack = get_library().attack
+    start, end = _period(days)
+    found = insights.coverage(db, attack, start, end)
+    techniques = [
+        CoverageTechnique(
+            technique_id=t.technique_id,
+            name=t.name,
+            url=_technique_url(t.technique_id),
+            tactics=t.tactics,
+            active=t.active,
+            alerts=sum(r.alerts for r in t.rules),
+            last_triggered_at=max(
+                (r.last_triggered_at for r in t.rules if r.last_triggered_at), default=None
+            ),
+            rules=[CoverageRule(**vars(r)) for r in t.rules],
+        )
+        for t in found
+    ]
+    tactics = []
+    for tactic in attack.tactics:
+        under = [t for t in techniques if tactic.name in t.tactics]
+        tactics.append(
+            CoverageTactic(
+                id=tactic.id,
+                name=tactic.name,
+                url=tactic.url,
+                techniques=[t.technique_id for t in under],
+                active=any(t.active for t in under),
+            )
+        )
+    rules = list(db.scalars(select(DetectionRule).where(DetectionRule.in_library.is_(True))))
+    enabled = [r for r in rules if r.enabled]
+    return Coverage(
+        label="Implemented coverage",
+        attack_version=attack.attack_version,
+        checked_on=attack.checked_on,
+        days=days,
+        start=start,
+        end=end,
+        summary=CoverageSummary(
+            tactics_total=len(attack.tactics),
+            tactics_covered=sum(1 for t in tactics if t.active),
+            techniques_covered=sum(1 for t in techniques if t.active),
+            rules_in_library=len(rules),
+            rules_enabled=len(enabled),
+            categories=dict(sorted(Counter(r.category for r in enabled).items())),
+        ),
+        tactics=tactics,
+        techniques=techniques,
+    )
 
 
 @mitre.get("/techniques", response_model=list[TechniquePublic])

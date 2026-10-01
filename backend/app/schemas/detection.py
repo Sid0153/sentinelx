@@ -91,3 +91,82 @@ class TechniquePublic(BaseModel):
     attack_version: str
     url: str
     rules: list[str]  # SentinelX rules mapped to it: implemented coverage, not all of ATT&CK
+
+
+class RuleMetricsPublic(BaseModel):
+    rule_id: str
+    name: str
+    category: str
+    severity: str
+    enabled: bool
+    in_library: bool
+    alerts: int  # alerts the rule created in the period
+    open: int
+    confirmed: int  # resolved as confirmed malicious
+    benign: int  # resolved as benign or expected
+    false_positives: int
+    closed: int
+    false_positive_rate: float | None  # false positives / closed; null until one is closed
+    median_triage_seconds: float | None  # creation to first triage
+    median_resolve_seconds: float | None  # creation to closing (resolved or false positive)
+    match_count: int  # detections, all time
+    last_match_at: datetime | None
+
+
+class DetectionMetrics(BaseModel):
+    days: int
+    start: datetime = Field(serialization_alias="from")
+    end: datetime = Field(serialization_alias="to")
+    items: list[RuleMetricsPublic]
+
+
+class CoverageRule(BaseModel):
+    rule_id: str
+    name: str
+    category: str
+    severity: str
+    enabled: bool
+    indicator: str | None
+    reason: str
+    alerts: int
+    last_triggered_at: datetime | None
+
+
+class CoverageTechnique(BaseModel):
+    technique_id: str
+    name: str
+    url: str
+    tactics: list[str]
+    active: bool  # at least one enabled rule
+    alerts: int
+    last_triggered_at: datetime | None
+    rules: list[CoverageRule]
+
+
+class CoverageTactic(BaseModel):
+    id: str
+    name: str
+    url: str
+    techniques: list[str]  # technique IDs covered under this tactic
+    active: bool  # at least one of them has an enabled rule
+
+
+class CoverageSummary(BaseModel):
+    tactics_total: int
+    tactics_covered: int
+    techniques_covered: int
+    rules_in_library: int
+    rules_enabled: int
+    categories: dict[str, int]  # enabled rules per category
+
+
+class Coverage(BaseModel):
+    label: str  # always "Implemented coverage"
+    attack_version: str
+    checked_on: str
+    days: int
+    start: datetime = Field(serialization_alias="from")
+    end: datetime = Field(serialization_alias="to")
+    summary: CoverageSummary
+    tactics: list[CoverageTactic]
+    techniques: list[CoverageTechnique]

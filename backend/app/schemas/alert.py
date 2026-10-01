@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.alert import AlertStatus, Disposition
+from app.schemas.context import InventoryContextPublic
 from app.schemas.ingestion import EventPublic
 
 
@@ -113,6 +114,7 @@ class AlertDetail(AlertSummary):
     related: list[RelatedAlert]
     incident_id: uuid.UUID | None = None
     incident_number: int | None = None
+    inventory: InventoryContextPublic | None = None  # hosts and accounts involved
 
 
 class EvidenceEvent(EventPublic):

@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { AlertDetail, AlertSummary, EvidenceEvent } from "../src/types/api";
+import type { InventoryContext } from "../src/types/inventory";
 import { mockApi, signedInAs } from "./mockApi";
 import { renderApp } from "./renderApp";
 
@@ -298,5 +299,58 @@ describe("Alert page", () => {
     });
     renderApp("/alerts/nope");
     expect(await screen.findByText("This alert does not exist.")).toBeInTheDocument();
+  });
+});
+
+describe("Inventory context", () => {
+  const inventory: InventoryContext = {
+    assets: [
+      {
+        id: "as-1",
+        hostname: "web-01",
+        ip_addresses: [],
+        asset_type: "server",
+        environment: "production",
+        criticality: "critical",
+        owner: "Platform team",
+        description: null,
+        tags: ["dmz"],
+        status: "active",
+        created_at: "2026-09-01T00:00:00Z",
+        updated_at: "2026-09-01T00:00:00Z",
+      },
+    ],
+    identities: [
+      {
+        id: "id-1",
+        username: "root",
+        display_name: null,
+        department: "IT",
+        title: null,
+        privilege_level: "privileged",
+        status: "active",
+        tags: [],
+        created_at: "2026-09-01T00:00:00Z",
+        updated_at: "2026-09-01T00:00:00Z",
+        roles: ["target"],
+      },
+    ],
+    unknown_hosts: [],
+    unknown_accounts: ["deploy"],
+  };
+
+  it("shows the asset and identity behind an alert, and what is not in the inventory", async () => {
+    mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/alerts/a-1": { body: detail({ inventory }) },
+      "GET /api/alerts/a-1/events": page([]),
+    });
+    renderApp("/alerts/a-1");
+    const panel = (await screen.findByRole("heading", { name: "Inventory context" })).parentElement as HTMLElement;
+    expect(within(panel).getByRole("link", { name: "web-01" })).toHaveAttribute("href", "/assets/as-1");
+    expect(panel).toHaveTextContent("critical criticality · server · production");
+    expect(panel).toHaveTextContent("Owner: Platform team");
+    expect(panel).toHaveTextContent("root privileged (target)");
+    expect(panel).toHaveTextContent("Not in the inventory: deploy");
   });
 });

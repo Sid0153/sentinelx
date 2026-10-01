@@ -6,6 +6,7 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.context.lookup import InventoryContext
 from app.events.schema import Criticality, canonical_hostname, canonical_ip
 from app.models.context import (
     AssetStatus,
@@ -205,3 +206,32 @@ class IdentityUpdate(_Updatable):
     @classmethod
     def _tags(cls, value: list[str] | None) -> list[str] | None:
         return None if value is None else clean_tags(value)
+
+
+# ---------- context shown next to alerts and incidents (Phase 11) ----------
+
+
+class IdentityInContext(IdentityPublic):
+    roles: list[str]  # "actor", "target"
+
+
+class InventoryContextPublic(BaseModel):
+    """The inventory behind the hosts and accounts involved; the unknown ones are listed too,
+    because "not in the inventory" is context as well."""
+
+    assets: list[AssetPublic]
+    identities: list[IdentityInContext]
+    unknown_hosts: list[str]
+    unknown_accounts: list[str]
+
+    @classmethod
+    def build(cls, found: InventoryContext) -> "InventoryContextPublic":
+        return cls(
+            assets=[AssetPublic.model_validate(a) for a in found.assets],
+            identities=[
+                IdentityInContext(**IdentityPublic.model_validate(i).model_dump(), roles=roles)
+                for i, roles in found.identities
+            ],
+            unknown_hosts=found.unknown_hosts,
+            unknown_accounts=found.unknown_accounts,
+        )

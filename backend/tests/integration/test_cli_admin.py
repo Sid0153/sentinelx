@@ -49,3 +49,10 @@ def test_create_admin_prompts_and_checks_the_repeat(
 def test_create_admin_rejects_an_invalid_email(capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["create-admin", "--email", "not-an-email"]) == 1
     assert "valid email" in capsys.readouterr().err
+
+
+def test_rescore_reports_what_it_scored_again(
+    cli_sessions: Session, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["rescore"]) == 0
+    assert "0 open alerts and 0 open incidents scored" in capsys.readouterr().out

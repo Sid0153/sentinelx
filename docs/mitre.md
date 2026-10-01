@@ -1,7 +1,8 @@
 # MITRE ATT&CK mapping
 
 > Status: reference file, stored mappings and `GET /api/mitre/techniques` **IMPLEMENTED and
-> TESTED (Phase 6)**. Shown on alerts and incidents: Phases 7–8. Coverage view: Phase 11.
+> TESTED (Phase 6)**. Shown on alerts and incidents: Phases 7–8. Coverage view
+> (`GET /api/mitre/coverage`, `/coverage`) **IMPLEMENTED and TESTED (Phase 11)**.
 
 ## Rules for mapping
 
@@ -13,7 +14,8 @@
   to start if a rule references a technique that is not in it. Updating the version is a
   deliberate change reviewed against the MITRE changelog.
 - The UI says **"Implemented coverage"** and shows only mapped techniques. It never shows a
-  full ATT&CK matrix with implied gaps or implied completeness.
+  full ATT&CK technique matrix. It does show all 15 Enterprise tactics, with the empty ones
+  labelled "No SentinelX rule": a gap is stated, not implied.
 
 ## Verified mappings (attack.mitre.org, checked 2026-09-25, ATT&CK v19.2)
 
@@ -50,8 +52,19 @@ attack.mitre.org pages and match the file; T1110, T1110.001 and T1059.001 were c
 2026-09-25. The library loader refuses a rule that names a technique missing from the file,
 and a mapping is stored per indicator where a rule has several (PROC-001, PRIV-001).
 
-## Coverage view (Phase 11)
+## Coverage view (Phase 11, `/coverage`)
 
-For each mapped technique: rules, enabled/disabled, trigger count, last triggered, and
-false-positive count. Tactics are grouped in ATT&CK order. The view is labelled
-"Implemented coverage: N techniques across M tactics mapped by SentinelX's own rules".
+- **Tactics**: the 15 Enterprise tactics of v19.2 in ATT&CK's order, pinned in the same
+  reference file (`tactics:`, checked against attack.mitre.org/tactics/enterprise/ on
+  2026-10-01; the loader refuses a technique whose tactic is not listed). Each shows the
+  techniques covered under it, or "No SentinelX rule".
+- **Techniques**: only those the library's rules map to, each with its rules (name,
+  category, severity, enabled, the indicator mapped where a rule has several), the alerts in
+  the chosen period and the last trigger. An alert counts for a technique when its rule maps
+  to it as a whole or its own indicator does: an encoded-PowerShell alert of PROC-001 does
+  not count for T1105 (tested).
+- **Covered** means at least one *enabled* rule: disabling the only rule for a technique
+  shows it as "rules disabled", and its tactic stops counting (tested).
+- Summary: tactics with a rule (of 15), techniques covered, active rules, rule categories.
+- False-positive counts and resolution times are per rule, on the detection pages (one
+  click from each technique), not repeated per technique.

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query
 from app.alerts import queries, service, workflow
 from app.api.deps import DbSession
 from app.auth.deps import AnalystUser, CurrentUser
+from app.context.lookup import inventory_context
 from app.core.errors import AppError
 from app.events.queries import DISPLAY_LIMIT
 from app.incidents.queries import alert_incident
@@ -28,6 +29,7 @@ from app.schemas.alert import (
     TransitionRequest,
 )
 from app.schemas.common import Page, error_responses
+from app.schemas.context import InventoryContextPublic
 from app.schemas.ingestion import EventPublic
 
 alerts = APIRouter(prefix="/alerts", tags=["alerts"], responses=error_responses(401, 403))
@@ -85,6 +87,14 @@ def _detail(db: DbSession, alert: Alert) -> AlertDetail:
         activity=[AlertActivity(**a) for a in queries.activity(db, alert.id)],
         incident_id=incident.id if (incident := alert_incident(db, alert.id)) else None,
         incident_number=incident.number if incident else None,
+        inventory=InventoryContextPublic.build(
+            inventory_context(
+                db,
+                alert.entities.get("host", []),
+                alert.entities.get("username", []),
+                alert.entities.get("target_username", []),
+            )
+        ),
         related=[
             RelatedAlert(
                 id=other.id,

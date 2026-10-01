@@ -21,7 +21,9 @@ from app.models.alert import Alert, AlertEvent, AlertStatus, Disposition
 from app.models.context import Asset, Identity
 from app.models.detection import DetectionRun
 from app.models.event import BatchChannel, BatchStatus, IngestionBatch, LogSource
+from app.models.incident import Incident
 from app.models.user import Role, User
+from app.risk.priority import RISK_MODEL_VERSION
 from app.schemas.context import AssetCreate, AssetUpdate, IdentityCreate, IdentityUpdate
 from tests.helpers import audit_entries, make_asset, make_source, make_user
 
@@ -359,3 +361,81 @@ def test_a_change_that_does_not_affect_priority_does_not_recompute(
     )
     (entry,) = audit_entries(db_session, "ASSET_UPDATED")
     assert entry.details["open_alerts_reprioritized"] == 0
+
+
+def test_a_privileged_target_account_raises_the_priority(
+    db_session: Session, seeded_rules: Library, admin: User
+) -> None:
+    """deploy (standard) opens a root shell: root is the target account. Registering root as
+    privileged reprioritizes the alert through its target; making deploy privileged too does
+    not add a second +10."""
+    send(db_session, generate("privilege_escalation", START))
+    (alert,) = alerts(db_session, username="deploy")
+    before = alert.priority_score
+    context.create_identity(
+        db_session,
+        IdentityCreate.model_validate({"username": "root", "privilege_level": "privileged"}),
+        admin,
+    )
+    db_session.refresh(alert)
+    assert alert.priority_score == before + 10
+    assert {
+        "factor": "identity",
+        "value": "root privileged (target account)",
+        "points": 10,
+    } in alert.priority_breakdown
+    assert alert.risk_model_version == "3"
+    (entry,) = audit_entries(db_session, "IDENTITY_CREATED")
+    assert entry.details["open_alerts_reprioritized"] >= 1
+
+    context.create_identity(
+        db_session,
+        IdentityCreate.model_validate({"username": "deploy", "privilege_level": "privileged"}),
+        admin,
+    )
+    db_session.refresh(alert)
+    assert alert.priority_score == before + 10
+    identity_factors = [f["value"] for f in alert.priority_breakdown if f["factor"] == "identity"]
+    assert identity_factors == ["deploy privileged"]
+
+
+def test_an_inventory_change_also_updates_the_incident_risk(
+    db_session: Session, seeded_rules: Library, admin: User
+) -> None:
+    """Incident risk is the highest alert priority plus bonuses: when an inventory change
+    scores an alert again, its open incident follows (it kept the old risk before Phase 11)."""
+    send(db_session, generate("brute_force_success", START))
+    (incident,) = db_session.scalars(select(Incident)).all()
+    before = incident.risk_score
+    new_asset(db_session, admin, "web-01", "critical")
+    db_session.refresh(incident)
+    top = max(a.priority_score for a in alerts(db_session))
+    assert incident.risk_score > before
+    assert incident.risk_breakdown[0]["points"] == top  # "highest alert" is the new score
+
+
+def test_rescore_brings_open_work_to_the_current_model(
+    db_session: Session, seeded_rules: Library, analyst: User
+) -> None:
+    send(db_session, generate("brute_force_success", START))
+    send(db_session, generate("password_spray", START))
+    (spray,) = alerts(db_session, rule_id="AUTH-003")
+    close(db_session, spray, analyst)
+    expected = {a.id: a.priority_score for a in alerts(db_session)}
+    # Pretend everything was scored by model 2, with other numbers.
+    db_session.execute(update(Alert).values(risk_model_version="2", priority_score=1))
+    db_session.execute(update(Incident).values(risk_model_version="2", risk_score=1))
+    db_session.flush()
+
+    assert service.rescore_outdated(db_session) == (2, 1)  # the two open alerts, one incident
+    for alert in alerts(db_session):
+        db_session.refresh(alert)
+        if alert.id == spray.id:  # closed: keeps the score it was handled with
+            assert (alert.risk_model_version, alert.priority_score) == ("2", 1)
+        else:
+            assert alert.risk_model_version == RISK_MODEL_VERSION
+            assert alert.priority_score == expected[alert.id]
+    (incident,) = db_session.scalars(select(Incident)).all()
+    db_session.refresh(incident)
+    assert incident.risk_model_version == RISK_MODEL_VERSION and incident.risk_score > 1
+    assert service.rescore_outdated(db_session) == (0, 0)  # nothing left to do

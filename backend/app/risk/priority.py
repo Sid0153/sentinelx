@@ -12,13 +12,17 @@ from dataclasses import dataclass
 from typing import Any
 
 # 1: alert priority (Phase 7). 2: adds incident risk (Phase 8); alert weights unchanged.
-RISK_MODEL_VERSION = "2"
+# 3: a privileged target account counts like a privileged actor (Phase 11), once per alert.
+RISK_MODEL_VERSION = "3"
 
 SEVERITY_POINTS = {"low": 10, "medium": 25, "high": 40, "critical": 55}
 CONFIDENCE_POINTS = {"low": 0, "medium": 8, "high": 15}
 ASSET_POINTS = {"low": 0, "medium": 5, "high": 10, "critical": 15}
 UNKNOWN_ASSET_POINTS = 5  # not in the inventory: neither reassuring nor alarming
 PRIVILEGED_IDENTITY_POINTS = 10
+# Whose privilege counts: the account acting, and the account acted on (the target of a
+# privilege change, an account creation). Once per alert, the actor first.
+PRIVILEGED_ROLES = ("actor", "target")
 VOLUME_POINTS = 5  # evidence at least VOLUME_FACTOR times the rule's threshold
 VOLUME_FACTOR = 2
 # Incident risk: the highest alert priority, plus these.
@@ -78,9 +82,11 @@ def alert_priority(
     identity: IdentityContext | None,
     peak_count: int,
     threshold: int | None,
+    target: IdentityContext | None = None,
 ) -> Priority:
     """`asset` is the most critical known asset among the evidence (None: none is in the
-    inventory); `identity` a privileged actor if there is one, else any known actor.
+    inventory); `identity` a privileged actor if there is one, else any known actor;
+    `target` likewise for target accounts.
     `peak_count` is the largest evidence count (events, or distinct values for distinct
     rules) of one detection; `threshold` the rule's threshold (None for kinds without one)."""
     factors = [
@@ -98,6 +104,14 @@ def alert_priority(
     if identity is not None and identity.privileged:
         factors.append(
             Factor("identity", f"{identity.username} privileged", PRIVILEGED_IDENTITY_POINTS)
+        )
+    elif target is not None and target.privileged:
+        factors.append(
+            Factor(
+                "identity",
+                f"{target.username} privileged (target account)",
+                PRIVILEGED_IDENTITY_POINTS,
+            )
         )
     if threshold is not None and peak_count >= VOLUME_FACTOR * threshold:
         factors.append(
@@ -118,7 +132,7 @@ def weights() -> dict[str, Any]:
         "confidence": CONFIDENCE_POINTS,
         "asset": ASSET_POINTS,
         "unknown_asset": UNKNOWN_ASSET_POINTS,
-        "privileged_identity": PRIVILEGED_IDENTITY_POINTS,
+        "privileged_identity": [PRIVILEGED_IDENTITY_POINTS, PRIVILEGED_ROLES],
         "volume": [VOLUME_POINTS, VOLUME_FACTOR],
         "incident": [
             CHAIN_POINTS_PER_STAGE,

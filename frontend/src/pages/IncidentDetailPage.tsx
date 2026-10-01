@@ -19,6 +19,7 @@ import {
   inputClass,
   selectClass,
 } from "../components/ui";
+import { InventoryPanel } from "../components/context";
 import { HuntLink } from "../components/hunt";
 import { useApi } from "../hooks/useApi";
 import { ApiError } from "../services/http";
@@ -732,6 +733,7 @@ export function IncidentDetailPage() {
               industry standard.
             </p>
           </Panel>
+          <InventoryPanel inventory={incident.inventory} />
           <Panel title="Affected">
             <dl className="space-y-1 text-sm">
               <div>

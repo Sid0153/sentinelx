@@ -8,6 +8,7 @@ import { AssetsPage } from "./pages/AssetsPage";
 import { AuditPage } from "./pages/AuditPage";
 import { AssetDetailPage, IdentityDetailPage } from "./pages/ContextDetailPages";
 import { CorrelationSettingsPage } from "./pages/CorrelationSettingsPage";
+import { CoveragePage } from "./pages/CoveragePage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DetectionDetailPage } from "./pages/DetectionDetailPage";
 import { DetectionsPage } from "./pages/DetectionsPage";
@@ -44,6 +45,7 @@ export function App() {
           <Route path="identities" element={<IdentitiesPage />} />
           <Route path="identities/:identityId" element={<IdentityDetailPage />} />
           <Route path="detections" element={<DetectionsPage />} />
+          <Route path="coverage" element={<CoveragePage />} />
           <Route path="detections/:ruleId" element={<DetectionDetailPage />} />
           <Route path="status" element={<StatusPage />} />
           <Route path="settings" element={<SettingsPage />} />

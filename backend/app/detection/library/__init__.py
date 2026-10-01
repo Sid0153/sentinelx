@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from app.detection.model import TECHNIQUE_ID, Rule
 
@@ -38,13 +38,34 @@ class Technique(BaseModel):
         return "https://attack.mitre.org/techniques/" + self.id.replace(".", "/") + "/"
 
 
+class Tactic(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(pattern=r"^TA\d{4}$")
+    name: str = Field(min_length=3, max_length=64)
+
+    @property
+    def url(self) -> str:
+        return f"https://attack.mitre.org/tactics/{self.id}/"
+
+
 class AttackReference(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     attack_version: str
     checked_on: str
     source: str
+    tactics: list[Tactic] = Field(min_length=1)  # in ATT&CK's order
     techniques: list[Technique]
+
+    @model_validator(mode="after")
+    def _known_tactics(self) -> "AttackReference":
+        names = {t.name for t in self.tactics}
+        for technique in self.techniques:
+            unknown = set(technique.tactics) - names
+            if unknown:
+                raise ValueError(f"{technique.id}: unknown tactic {sorted(unknown)}")
+        return self
 
     def by_id(self) -> dict[str, Technique]:
         return {t.id: t for t in self.techniques}

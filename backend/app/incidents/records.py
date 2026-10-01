@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.correlation.scoring import ACCESS_TACTICS, Link, Subject
@@ -279,12 +279,20 @@ def _stages(alerts: list[Alert]) -> list[str]:
 
 
 def _privileged_identity(db: Session, alerts: list[Alert]) -> str | None:
+    """A privileged account involved in any alert, as actor or as target (the same rule as
+    alert priority, risk model 3)."""
     ids = {a.identity_id for a in alerts if a.identity_id}
-    if not ids:
-        return None
+    targets = (
+        select(Event.target_username)
+        .join(AlertEvent, AlertEvent.event_id == Event.id)
+        .where(AlertEvent.alert_id.in_([a.id for a in alerts]), Event.target_username.isnot(None))
+    )
     return db.scalar(
         select(Identity.username)
-        .where(Identity.id.in_(ids), Identity.privilege_level == PrivilegeLevel.PRIVILEGED)
+        .where(
+            Identity.privilege_level == PrivilegeLevel.PRIVILEGED,
+            or_(Identity.id.in_(ids), Identity.username.in_(targets)),
+        )
         .order_by(Identity.username)
         .limit(1)
     )

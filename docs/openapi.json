@@ -2999,6 +2999,77 @@
         ]
       }
     },
+    "/api/detections/metrics": {
+      "get": {
+        "tags": [
+          "detections"
+        ],
+        "summary": "Detection Metrics",
+        "description": "Per rule, for the alerts it created in the last `days` (1\u2013365, default 30): how many,\nhow analysts closed them (confirmed, benign, false positive), the false-positive rate,\nand the median time to triage and to close. Counted from the alerts, never estimated.",
+        "operationId": "detection_metrics_api_detections_metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionMetrics"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/detections": {
       "get": {
         "tags": [
@@ -3310,6 +3381,77 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mitre/coverage": {
+      "get": {
+        "tags": [
+          "mitre"
+        ],
+        "summary": "Implemented Coverage",
+        "description": "Implemented coverage: the ATT&CK techniques SentinelX's own rules map to, under every\nEnterprise tactic (covered or not), with each rule's state, severity, alerts in the last\n`days` and last trigger. Not a claim of complete ATT&CK coverage.",
+        "operationId": "implemented_coverage_api_mitre_coverage_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coverage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6661,6 +6803,16 @@
               }
             ],
             "title": "Incident Number"
+          },
+          "inventory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InventoryContextPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7852,6 +8004,273 @@
         "title": "ContextActivity",
         "description": "An asset's or an identity's alerts, incidents and latest activity."
       },
+      "Coverage": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "attack_version": {
+            "type": "string",
+            "title": "Attack Version"
+          },
+          "checked_on": {
+            "type": "string",
+            "title": "Checked On"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CoverageSummary"
+          },
+          "tactics": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageTactic"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "techniques": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageTechnique"
+            },
+            "type": "array",
+            "title": "Techniques"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "attack_version",
+          "checked_on",
+          "days",
+          "from",
+          "to",
+          "summary",
+          "tactics",
+          "techniques"
+        ],
+        "title": "Coverage"
+      },
+      "CoverageRule": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "indicator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicator"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "last_triggered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Triggered At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "category",
+          "severity",
+          "enabled",
+          "indicator",
+          "reason",
+          "alerts",
+          "last_triggered_at"
+        ],
+        "title": "CoverageRule"
+      },
+      "CoverageSummary": {
+        "properties": {
+          "tactics_total": {
+            "type": "integer",
+            "title": "Tactics Total"
+          },
+          "tactics_covered": {
+            "type": "integer",
+            "title": "Tactics Covered"
+          },
+          "techniques_covered": {
+            "type": "integer",
+            "title": "Techniques Covered"
+          },
+          "rules_in_library": {
+            "type": "integer",
+            "title": "Rules In Library"
+          },
+          "rules_enabled": {
+            "type": "integer",
+            "title": "Rules Enabled"
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Categories"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tactics_total",
+          "tactics_covered",
+          "techniques_covered",
+          "rules_in_library",
+          "rules_enabled",
+          "categories"
+        ],
+        "title": "CoverageSummary"
+      },
+      "CoverageTactic": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "techniques": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Techniques"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "url",
+          "techniques",
+          "active"
+        ],
+        "title": "CoverageTactic"
+      },
+      "CoverageTechnique": {
+        "properties": {
+          "technique_id": {
+            "type": "string",
+            "title": "Technique Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "tactics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tactics"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "last_triggered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Triggered At"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageRule"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "technique_id",
+          "name",
+          "url",
+          "tactics",
+          "active",
+          "alerts",
+          "last_triggered_at",
+          "rules"
+        ],
+        "title": "CoverageTechnique"
+      },
       "Criticality": {
         "type": "string",
         "enum": [
@@ -7986,6 +8405,39 @@
         ],
         "title": "DashboardSummary",
         "description": "Every number is counted in the database when requested (definitions in docs/api.md)."
+      },
+      "DetectionMetrics": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "From"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time",
+            "title": "To"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RuleMetricsPublic"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "from",
+          "to",
+          "items"
+        ],
+        "title": "DetectionMetrics"
       },
       "Disposition": {
         "type": "string",
@@ -9612,6 +10064,97 @@
         ],
         "title": "IdentityCreate"
       },
+      "IdentityInContext": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "privilege_level": {
+            "$ref": "#/components/schemas/PrivilegeLevel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IdentityStatus"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "department",
+          "title",
+          "privilege_level",
+          "status",
+          "tags",
+          "created_at",
+          "updated_at",
+          "roles"
+        ],
+        "title": "IdentityInContext"
+      },
       "IdentityListItem": {
         "properties": {
           "id": {
@@ -10122,6 +10665,16 @@
             },
             "type": "array",
             "title": "Allowed Transitions"
+          },
+          "inventory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InventoryContextPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -10405,6 +10958,47 @@
           "status"
         ],
         "title": "IncidentTransition"
+      },
+      "InventoryContextPublic": {
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetPublic"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "identities": {
+            "items": {
+              "$ref": "#/components/schemas/IdentityInContext"
+            },
+            "type": "array",
+            "title": "Identities"
+          },
+          "unknown_hosts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Hosts"
+          },
+          "unknown_accounts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Accounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets",
+          "identities",
+          "unknown_hosts",
+          "unknown_accounts"
+        ],
+        "title": "InventoryContextPublic",
+        "description": "The inventory behind the hosts and accounts involved; the unknown ones are listed too,\nbecause \"not in the inventory\" is context as well."
       },
       "LinkRequest": {
         "properties": {
@@ -11496,6 +12090,128 @@
           "mitre"
         ],
         "title": "RuleDetail"
+      },
+      "RuleMetricsPublic": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "in_library": {
+            "type": "boolean",
+            "title": "In Library"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          },
+          "confirmed": {
+            "type": "integer",
+            "title": "Confirmed"
+          },
+          "benign": {
+            "type": "integer",
+            "title": "Benign"
+          },
+          "false_positives": {
+            "type": "integer",
+            "title": "False Positives"
+          },
+          "closed": {
+            "type": "integer",
+            "title": "Closed"
+          },
+          "false_positive_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Positive Rate"
+          },
+          "median_triage_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Triage Seconds"
+          },
+          "median_resolve_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Resolve Seconds"
+          },
+          "match_count": {
+            "type": "integer",
+            "title": "Match Count"
+          },
+          "last_match_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Match At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "category",
+          "severity",
+          "enabled",
+          "in_library",
+          "alerts",
+          "open",
+          "confirmed",
+          "benign",
+          "false_positives",
+          "closed",
+          "false_positive_rate",
+          "median_triage_seconds",
+          "median_resolve_seconds",
+          "match_count",
+          "last_match_at"
+        ],
+        "title": "RuleMetricsPublic"
       },
       "RuleSummary": {
         "properties": {

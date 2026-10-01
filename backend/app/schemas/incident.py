@@ -11,6 +11,7 @@ from app.models.incident import (
     IncidentStatus,
 )
 from app.schemas.alert import AlertSummary, PriorityFactor
+from app.schemas.context import InventoryContextPublic
 
 
 def _blank_is_none(value: object) -> object:
@@ -122,6 +123,7 @@ class IncidentDetail(IncidentSummary):
     mitre: list[IncidentTechnique]
     response: list[ResponseGroup]
     allowed_transitions: list[IncidentStatus]
+    inventory: InventoryContextPublic | None = None  # hosts and accounts involved
 
 
 class TimelineEntry(BaseModel):
