@@ -92,6 +92,11 @@ class AssetPublic(BaseModel):
         return [str(v) for v in value]
 
 
+class AssetListItem(AssetPublic):
+    open_alerts: int  # open alerts that involve the asset (docs/api.md)
+    last_seen_at: datetime | None  # latest event from it
+
+
 class AssetCreate(_Strict):
     hostname: str = Field(max_length=253)
     ip_addresses: list[str] = Field(default_factory=list, max_length=MAX_IPS)
@@ -160,6 +165,11 @@ class IdentityPublic(BaseModel):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+
+
+class IdentityListItem(IdentityPublic):
+    open_alerts: int
+    last_seen_at: datetime | None
 
 
 class IdentityCreate(_Strict):

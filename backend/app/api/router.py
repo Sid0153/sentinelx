@@ -5,6 +5,7 @@ from app.api import (
     audit,
     auth,
     context,
+    dashboard,
     detections,
     health,
     incidents,
@@ -28,3 +29,4 @@ api_router.include_router(alerts.alerts)
 api_router.include_router(incidents.escalation)
 api_router.include_router(incidents.incidents)
 api_router.include_router(incidents.settings)
+api_router.include_router(dashboard.dashboard)

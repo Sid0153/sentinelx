@@ -7,12 +7,6 @@ import { renderApp } from "./renderApp";
 const SIGNED_IN = signedInAs("VIEWER");
 
 describe("System status page", () => {
-  it("is where a signed-in user starts", async () => {
-    mockApi({ ...SIGNED_IN, ...HEALTHY });
-    renderApp("/");
-    expect(await screen.findByRole("heading", { name: "System status" })).toBeInTheDocument();
-  });
-
   it("shows a healthy platform from the live checks", async () => {
     mockApi({ ...SIGNED_IN, ...HEALTHY });
     renderApp("/status");
@@ -83,9 +77,9 @@ describe("Routing", () => {
     mockApi({ ...SIGNED_IN });
     renderApp("/no-such-page");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Go to system status" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Go to the dashboard" })).toHaveAttribute(
       "href",
-      "/status",
+      "/dashboard",
     );
   });
 });

@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { dashboardRoutes } from "./fixtures";
 import { HEALTHY, makeUser, mockApi, signedInAs, signedOut, unauthorized } from "./mockApi";
 import { renderApp } from "./renderApp";
 
@@ -75,6 +76,7 @@ describe("Sign-in", () => {
     mockApi({
       ...signedOut(),
       ...HEALTHY,
+      ...dashboardRoutes(),
       "POST /api/auth/login": {
         body: { access_token: "t-1", expires_in: 900, user: makeUser("VIEWER") },
       },
@@ -83,7 +85,7 @@ describe("Sign-in", () => {
     await screen.findByRole("heading", { name: "Sign in" });
     fillLogin("viewer@example.com", "correct-horse-battery-staple");
     // No "from" state: lands on the default page inside the app.
-    expect(await screen.findByRole("heading", { name: "System status" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "SOC dashboard" })).toBeInTheDocument();
   });
 
   it("signs out, telling the server to end the session", async () => {

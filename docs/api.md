@@ -2,7 +2,7 @@
 
 > Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
 > identities, sources, ingestion, events, detections, ATT&CK techniques, alerts, incidents,
-> settings). Everything else is planned in the phase shown. OpenAPI is served at
+> settings, dashboard). Everything else is planned in the phase shown. OpenAPI is served at
 > `/api/docs` (disabled in production unless enabled explicitly) and exported to
 > `docs/openapi.json`. A test fails if the export is stale.
 
@@ -34,9 +34,10 @@ with every role plus an unauthenticated call.
 | POST `/api/auth/change-password` | V | 3 ✅ | Needs the current password (400 if wrong); ends every session of the user |
 | GET/POST `/api/users` · PATCH `/api/users/{user_id}` | AD | 3 ✅ | List (paged), create, change role / deactivate / reactivate. Never delete; not yourself (400) |
 | GET `/api/audit` | AD | 3 ✅ | Audit log, newest first. Filters: `action` (repeatable), `result`, `actor_id`, `entity_type`, `entity_id`, `since`, `until` |
-| GET `/api/assets` · GET `/api/assets/{asset_id}` | V | 4 ✅ | Inventory. Filters: `criticality`, `environment`, `status`, `tag`, `search` (literal substring of hostname, owner or description). Alert and incident counts added in Phase 9 |
+| GET `/api/assets` · GET `/api/assets/{asset_id}` | V | 4 ✅ | Inventory. Filters: `criticality`, `environment`, `status`, `tag`, `search` (literal substring of hostname, owner or description). List items add `open_alerts` (open alerts involving the host) and `last_seen_at` (its latest event) |
 | POST `/api/assets` · PATCH `/api/assets/{asset_id}` | AD | 4 ✅ | Create (409 on a duplicate hostname), change the fields sent. Hostname is fixed; retire with `status: retired`. Unknown fields → 422. Audited with before/after values |
-| GET `/api/identities` · GET `/api/identities/{identity_id}` | V | 4 ✅ | Filters: `privilege_level`, `status`, `tag`, `search` (username, display name, department) |
+| GET `/api/identities` · GET `/api/identities/{identity_id}` | V | 4 ✅ | Filters: `privilege_level`, `status`, `tag`, `search` (username, display name, department). List items add `open_alerts` (actor or target) and `last_seen_at` |
+| GET `/api/assets/{asset_id}/activity` · GET `/api/identities/{identity_id}/activity` | V | 9 ✅ | Open and total alerts and incidents that involve it, its latest event, the 10 most recent alerts and incidents. An asset matches by asset ID, hostname or short hostname (events that arrived before it was registered count too); an identity by ID, username or target username |
 | POST `/api/identities` · PATCH `/api/identities/{identity_id}` | AD | 4 ✅ | Same rules as assets; disable with `status: disabled` |
 | GET `/api/sources` · GET `/api/sources/{source_id}` | V | 5 ✅ | Log sources (paged) |
 | POST `/api/sources` · PATCH `/api/sources/{source_id}` | AD | 5 ✅ | Create (409 on a duplicate name), change name / description / default host / time zone (IANA) / enabled. The source type is fixed after creation. Audited |
@@ -64,7 +65,8 @@ with every role plus an unauthenticated call.
 | POST `/api/incidents/{incident_id}/alerts` · `/alerts/{alert_id}/unlink` · PATCH `/api/incidents/{incident_id}` | A | 8 ✅ | Link an alert by hand, unlink it (both with a reason; an unlinked alert is never linked back by the engine), rename (the title then stays) |
 | GET `/api/mitre/techniques` | V | 6 ✅ | The ATT&CK techniques (pinned v19.2) SentinelX rules map to, with the rules mapped to each. Implemented coverage only, not all of ATT&CK |
 | GET `/api/mitre/coverage` | V | 11 | Coverage view (tactics × techniques) |
-| GET `/api/dashboard/summary` · `/api/dashboard/trends` | V | 9 | SOC dashboard aggregates |
+| GET `/api/dashboard/summary` | V | 9 ✅ | Counted from the database on each request: records processed, events stored and today (UTC), alerts today, open alerts (and how many simulated), open critical/high, severity distribution, open incidents and those under investigation, hosts that sent events in 24 h, inventory assets, active and library rules, top 5 rules and source IPs (alerts, 7 days), 8 recent alerts, 5 recent incidents |
+| GET `/api/dashboard/trends?days=` | V | 9 ✅ | Per UTC day, zero-filled: alerts created by severity, incidents opened, events (by event time). `days` 1–90, default 14 |
 | POST `/api/hunt/query` | V | 10 | Structured query → events page |
 | GET `/api/hunt/templates` · POST `/api/hunt/templates/{id}/run` | V | 10 | Parameterized hunts |
 | GET/POST/DELETE `/api/hunt/saved…` | A (own) | 10 | Saved hunts |

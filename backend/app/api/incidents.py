@@ -56,7 +56,7 @@ def _user_ref(db: DbSession, user_id: uuid.UUID | None) -> UserRef | None:
     return UserRef(id=user.id, email=user.email) if user else None
 
 
-def _summary(db: DbSession, incident: Incident) -> IncidentSummary:
+def incident_summary(db: DbSession, incident: Incident) -> IncidentSummary:
     fields = {n: getattr(incident, n) for n in IncidentSummary.model_fields if n != "assigned_to"}
     return IncidentSummary(**fields, assigned_to=_user_ref(db, incident.assigned_to))
 
@@ -83,7 +83,7 @@ def _detail(db: DbSession, incident: Incident) -> IncidentDetail:
     )
     resolved_by = _user_ref(db, incident.resolved_by)
     return IncidentDetail(
-        **_summary(db, incident).model_dump(),
+        **incident_summary(db, incident).model_dump(),
         summary=incident.summary,
         created_reason=incident.created_reason,
         risk_breakdown=[PriorityFactor(**f) for f in incident.risk_breakdown],
@@ -180,7 +180,9 @@ def list_incidents(
         sort=sort,
     )
     rows, total = queries.list_incidents(db, filters, limit, offset)
-    return Page(items=[_summary(db, i) for i in rows], total=total, limit=limit, offset=offset)
+    return Page(
+        items=[incident_summary(db, i) for i in rows], total=total, limit=limit, offset=offset
+    )
 
 
 @incidents.get("/assignees", response_model=list[UserRef])

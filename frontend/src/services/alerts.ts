@@ -11,6 +11,7 @@ import { apiRequest } from "./http";
 export interface AlertQuery {
   status: AlertStatus[];
   severity?: string;
+  rule_id?: string;
   sort: "priority" | "recent";
   offset: number;
   limit: number;
@@ -21,6 +22,7 @@ export function listAlerts(query: AlertQuery, signal?: AbortSignal) {
     query: {
       status: query.status,
       severity: query.severity || undefined,
+      rule_id: query.rule_id || undefined,
       sort: query.sort,
       offset: query.offset,
       limit: query.limit,

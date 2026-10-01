@@ -23,21 +23,21 @@ Last updated: **Phase 8**.
 | 10 | Alert deduplication | 7 | ✅ dedup key, evidence-based idempotence, one open alert per key enforced by the database (ADR-0011) |
 | 11 | Alert prioritization | 7 | ✅ SentinelX priority score with stored breakdown and model version (`risk-model.md`) |
 | 12 | Incident creation | 8 | ✅ by correlation (high-severity alert, or multi-stage partners) and by analysts (escalation); not one incident per alert |
-| 13 | Incident investigation | 8, 9 | ⬜ |
+| 13 | Incident investigation | 8, 9 | ✅ incident workspace (8); pivots from the dashboard, events, assets and identities to alerts and incidents (9) |
 | 14 | Timeline reconstruction | 8 | ✅ from stored events, alerts and activity, paged by keyset |
 | 15 | Threat hunting | 10 | ⬜ structured queries, templates, pivots, saved hunts |
 | 16 | MITRE ATT&CK mapping | 6, 8, 11 | ◐ pinned v19.2 reference file, re-checked on attack.mitre.org; stored per rule and per indicator, `GET /api/mitre/techniques`. Shown on alerts (7 ✅) and incidents with links and the rules mapping to each (8 ✅); coverage view (11) |
 | 17 | Evidence management | 7, 8 | ✅ alert evidence with raw records, events → alerts citing them, incident evidence pins (append-only, tagged) |
 | 18 | Analyst notes | 8 | ✅ append-only (database triggers) |
 | 19 | Response recommendations | 6, 8 | ◐ per-rule investigation and response steps, filled from the evidence, on every detection and alert; grouped per finding and de-duplicated on incidents ✅ |
-| 20 | Detection-rule management | 6, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI: Phase 9/12 |
+| 20 | Detection-rule management | 6, 9, 12 | ◐ API: tunable fields within bounds, reason required, versions (append-only), audit, retire on library removal. UI (9): list with statistics, definition, ATT&CK, history, admin tuning of enabled/severity/confidence/threshold/window. Exclusions: API only. Version diff: Phase 12 |
 | 21 | Search and filtering | 5, 10 | ◐ events API: time range, source, batch, category, action, outcome, host, user, source IP, keyset paging. Full hunting: Phase 10 |
-| 22 | Security analytics | 9, 11 | ⬜ dashboard aggregates, rule metrics |
+| 22 | Security analytics | 9, 11 | ◐ dashboard aggregates and trends (9 ✅); rule metrics such as false-positive rate and time to resolve (11) |
 | 23 | Risk/context scoring | 7, 11 | ⬜ |
 | 24 | RBAC | 3 | ✅ ADMIN / ANALYST / VIEWER enforced by the API; route × role matrix test |
 | 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); alert status changes (7); every incident action and settings change (8) |
-| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings done; hunt, coverage, dashboard in their phases |
-| 27 | SOC dashboard | 9 | ⬜ |
+| 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings, dashboard, asset/identity activity done; hunt, coverage in their phases |
+| 27 | SOC dashboard | 9 | ✅ every metric of §19 from the database, with empty states (see below) |
 | 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
 | 30 | CI/CD | 2, 15 | ✅ CI (lint, types, tests, audits, gitleaks, Compose smoke). ⬜ production-style configuration and deployment docs: Phase 15 |
@@ -82,13 +82,13 @@ Last updated: **Phase 8**.
 | Page | Phase | Status |
 |---|---|---|
 | /login | 3 | ✅ |
-| /dashboard | 9 | ⬜ |
-| /events | 9 | ⬜ (API ready) |
+| /dashboard | 9 | ✅ the default page; tiles link to the filtered pages; trends with table view; checked on desktop and phone widths |
+| /events, /events/:id | 9 | ✅ explorer with time range, category, outcome, host, user and source filters in the URL, keyset paging; event page with enrichment, citing alerts and the raw record as text |
 | /hunt | 10 | ⬜ |
-| /detections | 9, 11, 12 | ⬜ list, detail and enable/disable (9); coverage (11); versions and playground (12) |
+| /detections, /detections/:id | 9, 11, 12 | ✅ list, detail, history and admin tuning (9); coverage (11) and version diff / playground (12) ⬜ |
 | /alerts, /alerts/:id | 7 | ✅ queue with filters; alert page with the brief's §20 content (incident association: Phase 8); checked on desktop and phone widths |
 | /incidents, /incidents/:id | 8 | ✅ queue, workspace (actions for analysts), checked on desktop and phone widths |
-| /assets, /identities | 9 | ⬜ (API ready) |
+| /assets, /identities (+ /:id) | 9 | ✅ lists with open alerts and last event, filters; detail with alerts, incidents and events; admin create and edit |
 | /audit | 3 | ✅ |
 | /settings | 3, 8 | ✅ account and password (3), users (3), correlation windows at `/correlation` (8). Internal networks stay environment configuration (decision in `api.md`) |
 | Status page (not in the brief; health at a glance) | 2 | ✅ |
@@ -103,15 +103,16 @@ Last updated: **Phase 8**.
 | /api/detections, /api/mitre/techniques | ✅ (6); /api/mitre/coverage ⬜ (11) |
 | /api/alerts | ✅ (7) |
 | /api/incidents, /api/settings | ✅ (8) |
-| /api/dashboard | ⬜ (9) |
+| /api/dashboard | ✅ (9) |
 | /api/hunt | ⬜ (10) |
 
 ## SOC dashboard metrics (brief §19)
 
-All ⬜ Phase 9, from the database, with empty states: events processed, events today, alerts
-today, critical and high alerts, open incidents, incidents under investigation, monitored
-hosts, active rules, top triggered rules, top source IPs, severity distribution, alert and
-incident trends, recent alerts and incidents.
+All ✅ (Phase 9), counted from the database on each request, with empty states: events
+processed, events today, alerts today, critical and high alerts, open incidents, incidents
+under investigation, monitored hosts (sent events in 24 h), active rules, top triggered rules,
+top source IPs, severity distribution, alert and incident trends (plus events), recent alerts
+and incidents. `tests/api/test_dashboard.py` checks each number against independent SQL.
 
 ## Audit actions (brief §25)
 

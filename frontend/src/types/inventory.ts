@@ -1,0 +1,182 @@
+// Events, inventory, detection rules and the dashboard (mirror backend/app/schemas: ingestion,
+// context, detection, dashboard).
+import type { AlertSummary, IncidentSummary, Level } from "./api";
+
+export interface EventRecord {
+  id: string;
+  raw_event_id: string;
+  source_id: string;
+  source_type: string;
+  timestamp: string;
+  ingested_at: string;
+  host: string | null;
+  host_ip: string | null;
+  event_category: string;
+  event_action: string;
+  event_outcome: string;
+  username: string | null;
+  user_domain: string | null;
+  target_username: string | null;
+  source_ip: string | null;
+  source_port: number | null;
+  destination_ip: string | null;
+  destination_port: number | null;
+  protocol: string | null;
+  service: string | null;
+  process_name: string | null;
+  parent_process_name: string | null;
+  command_line: string | null;
+  session_id: string | null;
+  message: string | null;
+  attributes: Record<string, unknown>;
+  source_ip_scope: string | null;
+  asset_id: string | null;
+  asset_criticality: string | null;
+  identity_id: string | null;
+  identity_privileged: boolean | null;
+  simulated: boolean;
+}
+
+export interface EventPage {
+  items: EventRecord[];
+  next_cursor: string | null;
+  limit: number;
+}
+
+export interface EventDetail extends EventRecord {
+  raw: {
+    id: string;
+    batch_id: string;
+    received_at: string;
+    parse_status: string;
+    parse_detail: string | null;
+    size_bytes: number;
+    text: string;
+    truncated: boolean;
+    simulated: boolean;
+  };
+  source_name: string;
+  alerts: { id: string; title: string; status: string; priority_band: Level }[];
+}
+
+export interface Asset {
+  id: string;
+  hostname: string;
+  ip_addresses: string[];
+  asset_type: string;
+  environment: string;
+  criticality: Level;
+  owner: string | null;
+  description: string | null;
+  tags: string[];
+  status: "active" | "retired";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Identity {
+  id: string;
+  username: string;
+  display_name: string | null;
+  department: string | null;
+  title: string | null;
+  privilege_level: "standard" | "privileged" | "service";
+  status: "active" | "disabled";
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WithActivity {
+  open_alerts: number;
+  last_seen_at: string | null;
+}
+
+export interface ContextActivity {
+  open_alerts: number;
+  total_alerts: number;
+  open_incidents: number;
+  total_incidents: number;
+  last_seen_at: string | null;
+  recent_alerts: AlertSummary[];
+  incidents: IncidentSummary[];
+}
+
+export interface RuleSummary {
+  rule_id: string;
+  name: string;
+  category: string;
+  kind: string;
+  severity: Level;
+  confidence: "low" | "medium" | "high";
+  enabled: boolean;
+  in_library: boolean;
+  version: number;
+  techniques: string[];
+  match_count: number;
+  error_count: number;
+  last_run_at: string | null;
+  last_match_at: string | null;
+}
+
+export interface RuleDetail extends RuleSummary {
+  description: string;
+  definition: Record<string, unknown>;
+  overrides: Record<string, unknown>;
+  tunable: {
+    threshold: { min: number; max: number } | null;
+    time_window: { min: string; max: string } | null;
+    severity: boolean;
+    confidence: boolean;
+    enabled: boolean;
+    exclusions: boolean;
+  };
+  mitre: {
+    technique_id: string;
+    name: string;
+    tactics: string[];
+    url: string;
+    reason: string;
+    indicator: string | null;
+  }[];
+}
+
+export interface RuleVersion {
+  version: number;
+  source: "library" | "admin";
+  changed_by: string | null;
+  change_reason: string | null;
+  overrides: Record<string, unknown>;
+  definition: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface DashboardSummary {
+  generated_at: string;
+  records_processed: number;
+  events_stored: number;
+  events_today: number;
+  alerts_today: number;
+  open_alerts: number;
+  open_alerts_simulated: number;
+  critical_alerts: number;
+  high_alerts: number;
+  severity_distribution: { severity: Level; count: number }[];
+  open_incidents: number;
+  incidents_under_investigation: number;
+  monitored_hosts: number;
+  inventory_assets: number;
+  active_rules: number;
+  library_rules: number;
+  top_rules: { rule_id: string; name: string; alerts: number }[];
+  top_source_ips: { source_ip: string; alerts: number }[];
+  recent_alerts: AlertSummary[];
+  recent_incidents: IncidentSummary[];
+}
+
+export interface TrendDay {
+  day: string;
+  alerts: Record<Level, number>;
+  incidents: number;
+  events: number;
+}

@@ -79,6 +79,10 @@ EXPECTED_ACCESS: dict[Route, Role] = {
     ("PATCH", "/api/incidents/{incident_id}"): Role.ANALYST,
     ("GET", "/api/settings"): Role.ADMIN,
     ("PATCH", "/api/settings"): Role.ADMIN,
+    ("GET", "/api/dashboard/summary"): Role.VIEWER,
+    ("GET", "/api/dashboard/trends"): Role.VIEWER,
+    ("GET", "/api/assets/{asset_id}/activity"): Role.VIEWER,
+    ("GET", "/api/identities/{identity_id}/activity"): Role.VIEWER,
 }
 
 _HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}

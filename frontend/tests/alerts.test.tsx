@@ -166,6 +166,17 @@ describe("Alert queue", () => {
     });
   });
 
+  it("filters by rule from a link, and can drop the filter", async () => {
+    const api = mockApi({ ...signedInAs("VIEWER"), "GET /api/alerts": page([summary()]) });
+    renderApp("/alerts?rule_id=AUTH-002");
+    await screen.findByText(/Successful authentication after/);
+    expect(api.callsTo("GET /api/alerts")[0].url.searchParams.get("rule_id")).toBe("AUTH-002");
+    fireEvent.click(screen.getByRole("button", { name: "show all rules" }));
+    await waitFor(() =>
+      expect(api.callsTo("GET /api/alerts").at(-1)!.url.searchParams.get("rule_id")).toBeNull(),
+    );
+  });
+
   it("explains an empty queue", async () => {
     mockApi({ ...signedInAs("VIEWER"), "GET /api/alerts": page([]) });
     renderApp("/alerts");

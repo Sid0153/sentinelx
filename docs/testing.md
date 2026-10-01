@@ -110,6 +110,20 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
 - Mutation-checked: partners, the unlink guard, the new-finding link and the incident row lock
   each have a test that fails without them.
 
+**Dashboard and investigation pages** ✅ (Phase 9; `tests/api/test_dashboard.py`,
+`frontend/tests/dashboard.test.tsx`, `inventory.test.tsx`, `detections.test.tsx`)
+- An empty system shows zeros; with ingested data every dashboard number equals an independent
+  SQL count; closed alerts and incidents stop counting; trends are zero-filled and add up to
+  the totals; `days` outside 1–90 → 422.
+- Asset and identity activity: an asset registered after its events still finds them by
+  hostname; an idle asset shows zeros.
+- Frontend: dashboard numbers, links, empty state, simulated note, chart table view and
+  keyboard focus; event filters from the URL, cursor paging, a new filter restarting from the
+  newest page (this test found a request sent with a stale cursor), raw log text never
+  rendered as HTML; admin create/edit sending only changed fields, viewers without controls;
+  rule tuning sending only changed fields with the required reason, bounds refused before
+  sending.
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.

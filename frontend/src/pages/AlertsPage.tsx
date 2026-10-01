@@ -64,14 +64,15 @@ export function AlertsPage() {
   const [params, setParams] = useSearchParams();
   const view = params.get("view") ?? "open";
   const severity = params.get("severity") ?? "";
+  const ruleId = params.get("rule_id") ?? "";
   const sort = params.get("sort") === "recent" ? "recent" : "priority";
   const offset = Number(params.get("offset") ?? "0") || 0;
   const statuses = (VIEWS[view] ?? VIEWS.open).statuses;
 
   const load = useCallback(
     (signal: AbortSignal) =>
-      listAlerts({ status: statuses, severity, sort, offset, limit: PAGE_SIZE }, signal),
-    [statuses, severity, sort, offset],
+      listAlerts({ status: statuses, severity, rule_id: ruleId, sort, offset, limit: PAGE_SIZE }, signal),
+    [statuses, severity, ruleId, sort, offset],
   );
   const { data, error, loading } = useApi(load);
 
@@ -113,6 +114,14 @@ export function AlertsPage() {
             <option value="recent">Most recent activity</option>
           </select>
         </Field>
+        {ruleId && (
+          <p className="flex items-end gap-2 pb-1.5 text-sm text-slate-300">
+            Rule <span className="font-mono">{ruleId}</span>
+            <button type="button" className="text-sky-300 hover:underline" onClick={() => setFilter("rule_id", "")}>
+              show all rules
+            </button>
+          </p>
+        )}
       </div>
       <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900 px-4">
         {error ? (

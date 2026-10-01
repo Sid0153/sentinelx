@@ -3,24 +3,29 @@ Nothing is deleted: past events and incidents still point to retired assets and 
 identities."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DbSession
+from app.api.incidents import incident_summary
 from app.auth.deps import AdminUser, CurrentUser
-from app.context import service
+from app.context import activity, service
 from app.events.schema import Criticality
 from app.models.context import AssetStatus, Environment, IdentityStatus, PrivilegeLevel
+from app.schemas.alert import AlertSummary
 from app.schemas.common import Page, error_responses
 from app.schemas.context import (
     AssetCreate,
+    AssetListItem,
     AssetPublic,
     AssetUpdate,
     IdentityCreate,
+    IdentityListItem,
     IdentityPublic,
     IdentityUpdate,
 )
+from app.schemas.dashboard import ContextActivity
 
 assets = APIRouter(prefix="/assets", tags=["assets"], responses=error_responses(401, 403))
 identities = APIRouter(
@@ -33,7 +38,15 @@ Search = Annotated[str | None, Query(max_length=100)]
 Tag = Annotated[str | None, Query(max_length=32)]
 
 
-@assets.get("", response_model=Page[AssetPublic])
+def _activity(db: DbSession, found: dict[str, Any]) -> ContextActivity:
+    return ContextActivity(
+        **{k: v for k, v in found.items() if k not in ("recent_alerts", "incidents")},
+        recent_alerts=[AlertSummary.model_validate(a) for a in found["recent_alerts"]],
+        incidents=[incident_summary(db, i) for i in found["incidents"]],
+    )
+
+
+@assets.get("", response_model=Page[AssetListItem])
 def list_assets(
     _user: CurrentUser,
     db: DbSession,
@@ -44,13 +57,21 @@ def list_assets(
     tag: Tag = None,
     limit: Limit = 50,
     offset: Offset = 0,
-) -> Page[AssetPublic]:
+) -> Page[AssetListItem]:
     """Filter by criticality, environment, status or tag; `search` matches part of the
     hostname, owner or description."""
     filters = service.AssetFilters(search, criticality, environment, status, tag)
     items, total = service.list_assets(db, filters, limit, offset)
+    alerts, seen = activity.open_alert_counts(db, items), activity.last_seen(db, items)
     return Page(
-        items=[AssetPublic.model_validate(a) for a in items],
+        items=[
+            AssetListItem(
+                **AssetPublic.model_validate(a).model_dump(),
+                open_alerts=alerts[a.id],
+                last_seen_at=seen[a.id],
+            )
+            for a in items
+        ],
         total=total,
         limit=limit,
         offset=offset,
@@ -80,7 +101,15 @@ def update_asset(
     return AssetPublic.model_validate(service.update_asset(db, asset_id, payload, admin))
 
 
-@identities.get("", response_model=Page[IdentityPublic])
+@assets.get("/{asset_id}/activity", response_model=ContextActivity, responses=error_responses(404))
+def get_asset_activity(asset_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> ContextActivity:
+    """The asset's alerts and incidents (counts, the latest ten of each) and its latest event:
+    the context an investigation needs. Alerts involve an asset through correlation or by its
+    host name (short name matching, as enrichment does)."""
+    return _activity(db, activity.for_asset(db, service.get_asset(db, asset_id)))
+
+
+@identities.get("", response_model=Page[IdentityListItem])
 def list_identities(
     _user: CurrentUser,
     db: DbSession,
@@ -90,12 +119,20 @@ def list_identities(
     tag: Tag = None,
     limit: Limit = 50,
     offset: Offset = 0,
-) -> Page[IdentityPublic]:
+) -> Page[IdentityListItem]:
     """`search` matches part of the username, display name or department."""
     filters = service.IdentityFilters(search, privilege_level, status, tag)
     items, total = service.list_identities(db, filters, limit, offset)
+    alerts, seen = activity.open_alert_counts(db, items), activity.last_seen(db, items)
     return Page(
-        items=[IdentityPublic.model_validate(i) for i in items],
+        items=[
+            IdentityListItem(
+                **IdentityPublic.model_validate(i).model_dump(),
+                open_alerts=alerts[i.id],
+                last_seen_at=seen[i.id],
+            )
+            for i in items
+        ],
         total=total,
         limit=limit,
         offset=offset,
@@ -105,6 +142,17 @@ def list_identities(
 @identities.get("/{identity_id}", response_model=IdentityPublic, responses=error_responses(404))
 def get_identity(identity_id: uuid.UUID, _user: CurrentUser, db: DbSession) -> IdentityPublic:
     return IdentityPublic.model_validate(service.get_identity(db, identity_id))
+
+
+@identities.get(
+    "/{identity_id}/activity", response_model=ContextActivity, responses=error_responses(404)
+)
+def get_identity_activity(
+    identity_id: uuid.UUID, _user: CurrentUser, db: DbSession
+) -> ContextActivity:
+    """The identity's alerts (as the actor or the account acted upon) and incidents, and the
+    latest event with its username."""
+    return _activity(db, activity.for_identity(db, service.get_identity(db, identity_id)))
 
 
 @identities.post(

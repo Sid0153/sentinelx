@@ -846,7 +846,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_AssetPublic_"
+                  "$ref": "#/components/schemas/Page_AssetListItem_"
                 }
               }
             }
@@ -1123,6 +1123,85 @@
         }
       }
     },
+    "/api/assets/{asset_id}/activity": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Get Asset Activity",
+        "description": "The asset's alerts and incidents (counts, the latest ten of each) and its latest event:\nthe context an investigation needs. Alerts involve an asset through correlation or by its\nhost name (short name matching, as enrichment does).",
+        "operationId": "get_asset_activity_api_assets__asset_id__activity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "asset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Asset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextActivity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/identities": {
       "get": {
         "tags": [
@@ -1233,7 +1312,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_IdentityPublic_"
+                  "$ref": "#/components/schemas/Page_IdentityListItem_"
                 }
               }
             }
@@ -1463,6 +1542,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IdentityPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/identities/{identity_id}/activity": {
+      "get": {
+        "tags": [
+          "identities"
+        ],
+        "summary": "Get Identity Activity",
+        "description": "The identity's alerts (as the actor or the account acted upon) and incidents, and the\nlatest event with its username.",
+        "operationId": "get_identity_activity_api_identities__identity_id__activity_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "identity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Identity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextActivity"
                 }
               }
             }
@@ -5172,6 +5330,124 @@
           }
         ]
       }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Summary",
+        "description": "Records processed, events (total and today), alerts (today, open by severity), incidents\n(open, under investigation), monitored hosts, active rules, the top rules and source\naddresses of the last 7 days, and the latest alerts and incidents. Times are UTC.",
+        "operationId": "get_summary_api_dashboard_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/dashboard/trends": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Trends",
+        "description": "Per UTC day, oldest first, with every day present: alerts created (by severity),\nincidents created, and events (by their own time).",
+        "operationId": "get_trends_api_dashboard_trends_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trends"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5966,6 +6242,34 @@
         ],
         "title": "AlertTechnique"
       },
+      "AlertsBySeverity": {
+        "properties": {
+          "critical": {
+            "type": "integer",
+            "title": "Critical"
+          },
+          "high": {
+            "type": "integer",
+            "title": "High"
+          },
+          "medium": {
+            "type": "integer",
+            "title": "Medium"
+          },
+          "low": {
+            "type": "integer",
+            "title": "Low"
+          }
+        },
+        "type": "object",
+        "required": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "AlertsBySeverity"
+      },
       "AssetCreate": {
         "properties": {
           "hostname": {
@@ -6032,6 +6336,111 @@
           "criticality"
         ],
         "title": "AssetCreate"
+      },
+      "AssetListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "hostname": {
+            "type": "string",
+            "title": "Hostname"
+          },
+          "ip_addresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ip Addresses"
+          },
+          "asset_type": {
+            "$ref": "#/components/schemas/AssetType"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment"
+          },
+          "criticality": {
+            "$ref": "#/components/schemas/Criticality"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AssetStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "open_alerts": {
+            "type": "integer",
+            "title": "Open Alerts"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "hostname",
+          "ip_addresses",
+          "asset_type",
+          "environment",
+          "criticality",
+          "owner",
+          "description",
+          "tags",
+          "status",
+          "created_at",
+          "updated_at",
+          "open_alerts",
+          "last_seen_at"
+        ],
+        "title": "AssetListItem"
       },
       "AssetPublic": {
         "properties": {
@@ -6671,6 +7080,64 @@
         ],
         "title": "Confidence"
       },
+      "ContextActivity": {
+        "properties": {
+          "open_alerts": {
+            "type": "integer",
+            "title": "Open Alerts"
+          },
+          "total_alerts": {
+            "type": "integer",
+            "title": "Total Alerts"
+          },
+          "open_incidents": {
+            "type": "integer",
+            "title": "Open Incidents"
+          },
+          "total_incidents": {
+            "type": "integer",
+            "title": "Total Incidents"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "recent_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertSummary"
+            },
+            "type": "array",
+            "title": "Recent Alerts"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentSummary"
+            },
+            "type": "array",
+            "title": "Incidents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "open_alerts",
+          "total_alerts",
+          "open_incidents",
+          "total_incidents",
+          "last_seen_at",
+          "recent_alerts",
+          "incidents"
+        ],
+        "title": "ContextActivity",
+        "description": "An asset's or an identity's alerts, incidents and latest activity."
+      },
       "Criticality": {
         "type": "string",
         "enum": [
@@ -6680,6 +7147,131 @@
           "critical"
         ],
         "title": "Criticality"
+      },
+      "DashboardSummary": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          },
+          "records_processed": {
+            "type": "integer",
+            "title": "Records Processed"
+          },
+          "events_stored": {
+            "type": "integer",
+            "title": "Events Stored"
+          },
+          "events_today": {
+            "type": "integer",
+            "title": "Events Today"
+          },
+          "alerts_today": {
+            "type": "integer",
+            "title": "Alerts Today"
+          },
+          "open_alerts": {
+            "type": "integer",
+            "title": "Open Alerts"
+          },
+          "open_alerts_simulated": {
+            "type": "integer",
+            "title": "Open Alerts Simulated"
+          },
+          "critical_alerts": {
+            "type": "integer",
+            "title": "Critical Alerts"
+          },
+          "high_alerts": {
+            "type": "integer",
+            "title": "High Alerts"
+          },
+          "severity_distribution": {
+            "items": {
+              "$ref": "#/components/schemas/SeverityCount"
+            },
+            "type": "array",
+            "title": "Severity Distribution"
+          },
+          "open_incidents": {
+            "type": "integer",
+            "title": "Open Incidents"
+          },
+          "incidents_under_investigation": {
+            "type": "integer",
+            "title": "Incidents Under Investigation"
+          },
+          "monitored_hosts": {
+            "type": "integer",
+            "title": "Monitored Hosts"
+          },
+          "inventory_assets": {
+            "type": "integer",
+            "title": "Inventory Assets"
+          },
+          "active_rules": {
+            "type": "integer",
+            "title": "Active Rules"
+          },
+          "library_rules": {
+            "type": "integer",
+            "title": "Library Rules"
+          },
+          "top_rules": {
+            "items": {
+              "$ref": "#/components/schemas/TopRule"
+            },
+            "type": "array",
+            "title": "Top Rules"
+          },
+          "top_source_ips": {
+            "items": {
+              "$ref": "#/components/schemas/TopSource"
+            },
+            "type": "array",
+            "title": "Top Source Ips"
+          },
+          "recent_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertSummary"
+            },
+            "type": "array",
+            "title": "Recent Alerts"
+          },
+          "recent_incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentSummary"
+            },
+            "type": "array",
+            "title": "Recent Incidents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "records_processed",
+          "events_stored",
+          "events_today",
+          "alerts_today",
+          "open_alerts",
+          "open_alerts_simulated",
+          "critical_alerts",
+          "high_alerts",
+          "severity_distribution",
+          "open_incidents",
+          "incidents_under_investigation",
+          "monitored_hosts",
+          "inventory_assets",
+          "active_rules",
+          "library_rules",
+          "top_rules",
+          "top_source_ips",
+          "recent_alerts",
+          "recent_incidents"
+        ],
+        "title": "DashboardSummary",
+        "description": "Every number is counted in the database when requested (definitions in docs/api.md)."
       },
       "Disposition": {
         "type": "string",
@@ -8060,6 +8652,107 @@
         ],
         "title": "IdentityCreate"
       },
+      "IdentityListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "privilege_level": {
+            "$ref": "#/components/schemas/PrivilegeLevel"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IdentityStatus"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "open_alerts": {
+            "type": "integer",
+            "title": "Open Alerts"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "department",
+          "title",
+          "privilege_level",
+          "status",
+          "tags",
+          "created_at",
+          "updated_at",
+          "open_alerts",
+          "last_seen_at"
+        ],
+        "title": "IdentityListItem"
+      },
       "IdentityPublic": {
         "properties": {
           "id": {
@@ -8922,11 +9615,11 @@
         ],
         "title": "Page[AlertSummary]"
       },
-      "Page_AssetPublic_": {
+      "Page_AssetListItem_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/AssetPublic"
+              "$ref": "#/components/schemas/AssetListItem"
             },
             "type": "array",
             "title": "Items"
@@ -8951,7 +9644,7 @@
           "limit",
           "offset"
         ],
-        "title": "Page[AssetPublic]"
+        "title": "Page[AssetListItem]"
       },
       "Page_AuditLogPublic_": {
         "properties": {
@@ -9046,11 +9739,11 @@
         ],
         "title": "Page[EvidenceEvent]"
       },
-      "Page_IdentityPublic_": {
+      "Page_IdentityListItem_": {
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/IdentityPublic"
+              "$ref": "#/components/schemas/IdentityListItem"
             },
             "type": "array",
             "title": "Items"
@@ -9075,7 +9768,7 @@
           "limit",
           "offset"
         ],
-        "title": "Page[IdentityPublic]"
+        "title": "Page[IdentityListItem]"
       },
       "Page_IncidentSummary_": {
         "properties": {
@@ -10288,6 +10981,24 @@
         ],
         "title": "Severity"
       },
+      "SeverityCount": {
+        "properties": {
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "severity",
+          "count"
+        ],
+        "title": "SeverityCount"
+      },
       "SourceCreate": {
         "properties": {
           "name": {
@@ -10695,6 +11406,47 @@
         ],
         "title": "TokenResponse"
       },
+      "TopRule": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "name",
+          "alerts"
+        ],
+        "title": "TopRule"
+      },
+      "TopSource": {
+        "properties": {
+          "source_ip": {
+            "type": "string",
+            "title": "Source Ip"
+          },
+          "alerts": {
+            "type": "integer",
+            "title": "Alerts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_ip",
+          "alerts"
+        ],
+        "title": "TopSource"
+      },
       "TransitionRequest": {
         "properties": {
           "status": {
@@ -10730,6 +11482,55 @@
           "status"
         ],
         "title": "TransitionRequest"
+      },
+      "TrendDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "alerts": {
+            "$ref": "#/components/schemas/AlertsBySeverity"
+          },
+          "incidents": {
+            "type": "integer",
+            "title": "Incidents"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "alerts",
+          "incidents",
+          "events"
+        ],
+        "title": "TrendDay"
+      },
+      "Trends": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TrendDay"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "items"
+        ],
+        "title": "Trends"
       },
       "UserCreate": {
         "properties": {
@@ -10955,6 +11756,10 @@
     {
       "name": "settings",
       "description": "Correlation settings (ADMIN)."
+    },
+    {
+      "name": "dashboard",
+      "description": "SOC dashboard numbers, counted in the database."
     }
   ]
 }
