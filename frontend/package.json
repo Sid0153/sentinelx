@@ -19,7 +19,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^22.7.0",
     "@types/react": "^18.3.5",
