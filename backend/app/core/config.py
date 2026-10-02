@@ -5,6 +5,7 @@ startup instead of silently running with something guessable. Settings that are 
 laptop but unsafe on a server are rejected when APP_ENV=production.
 """
 
+import os
 from functools import lru_cache
 from typing import Any, Literal, Self
 
@@ -15,6 +16,11 @@ from sqlalchemy.engine import make_url
 from app.core.client_ip import Network, parse_networks
 
 DATABASE_URL_PREFIX = "postgresql+psycopg://"
+# The system's CA bundle (Debian, the backend image). `sslrootcert=system` is rewritten to it:
+# the libpq bundled in psycopg's binary wheel looks for "system" CAs under the path it was
+# built in (OPENSSLDIR "/host/tmp/libpq.build"), so it verifies nothing and every hosted
+# database fails with "certificate verify failed" (found deploying to Neon). A CA file works.
+SYSTEM_CA_BUNDLE = "/etc/ssl/certs/ca-certificates.crt"
 MIN_SECRET_KEY_LENGTH = 32
 MIN_SECRET_KEY_DISTINCT_CHARS = 10  # rejects "aaaa..." and other obviously weak keys
 
@@ -124,6 +130,21 @@ class Settings(BaseSettings):
         if value is not None and not value.startswith(DATABASE_URL_PREFIX):
             raise ValueError(f"DATABASE_URL must start with {DATABASE_URL_PREFIX}")
         return value
+
+    @field_validator("database_url", "migration_database_url")
+    @classmethod
+    def _system_ca_as_a_file(cls, value: str | None) -> str | None:
+        if (
+            value is None
+            or "sslrootcert=system" not in value
+            or not os.path.exists(SYSTEM_CA_BUNDLE)
+        ):
+            return value
+        url = make_url(value)
+        if url.query.get("sslrootcert") != "system":
+            return value
+        fixed = url.update_query_dict({"sslrootcert": SYSTEM_CA_BUNDLE})
+        return fixed.render_as_string(hide_password=False)
 
     @property
     def owner_database_url(self) -> str:

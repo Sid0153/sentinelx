@@ -1,3 +1,4 @@
+import pathlib
 import secrets
 
 import pytest
@@ -128,3 +129,32 @@ def test_guest_email_is_optional_and_normalized(value: str | None, expected: str
 def test_guest_email_must_be_an_address() -> None:
     with pytest.raises(ValidationError, match="GUEST_EMAIL"):
         make(guest_email="guest")
+
+
+def test_system_cas_are_given_to_libpq_as_a_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """The bundled libpq cannot find "system" CAs (it looks where it was built): Neon refused
+    every connection with "certificate verify failed" until the bundle was named as a file."""
+    bundle = tmp_path / "ca-certificates.crt"
+    bundle.write_text("certificates")
+    monkeypatch.setattr("app.core.config.SYSTEM_CA_BUNDLE", str(bundle))
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        secret_key=SECRET,
+        migration_database_url=OWNER,
+        app_db_user="sentinelx_app",
+        app_db_password="a-generated-password-1234",
+    )
+    for url in (settings.owner_database_url, settings.database_url):
+        assert "sslmode=verify-full" in url
+        assert f"sslrootcert={bundle}" in url.replace("%2F", "/").replace("%3A", ":").replace(
+            "%5C", "\\"
+        )
+        assert "sslrootcert=system" not in url
+
+
+def test_other_ca_settings_are_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
+    compose = "postgresql+psycopg://u:p@db:5432/x?sslmode=verify-full&sslrootcert=/tls-ca/ca.crt"
+    assert make(database_url=compose).database_url == compose

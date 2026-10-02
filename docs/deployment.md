@@ -134,7 +134,10 @@ a Render Blueprint; the same setup as CloudSentinel's public demo.
   are checked instead (a role with more than row rights is refused). Found by the rehearsal
   below before the first deployment.
 - *TLS to the database*: Neon's certificate is verified against the system's CAs
-  (`sslmode=verify-full&sslrootcert=system`), not a local CA.
+  (`sslmode=verify-full&sslrootcert=system`), not a local CA. The backend hands libpq the CA
+  bundle as a file (`/etc/ssl/certs/ca-certificates.crt`): the libpq bundled in psycopg's
+  wheel looks for "system" CAs where it was built, so the first deployment failed with
+  "certificate verify failed" until this was found (verified against Neon afterwards).
 - *Client addresses*: `TRUSTED_PROXIES=private, cloudflare, 74.220.48.0/20`, the chain measured
   on Render for CloudSentinel (Render's internal network, Cloudflare, Render's proxy); the
   rightmost address outside it is the visitor. Named groups are in `app/core/client_ip.py`.
