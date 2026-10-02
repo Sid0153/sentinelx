@@ -2,7 +2,7 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 15 (deployment readiness) complete.** Sign-in and roles, the audit log,
+> **Status: Phase 16 (demo environment) complete.** Sign-in and roles, the audit log,
 > the asset and identity inventory, ingestion of five log formats into an append-only event
 > store, detection (9 rules mapped to ATT&CK v19.2), alerts (deduplicated, prioritized,
 > explained), and **incidents**: related alerts correlated into one investigation with a
@@ -52,7 +52,15 @@ docker compose up -d --build --wait
 - App: http://localhost:8081 (sign in, then: system status, users, audit log, account)
 - API health: http://localhost:8081/api/health · readiness: http://localhost:8081/api/ready
 - API docs (development only): http://localhost:8001/api/docs
-- Ingest simulated activity (marked SIMULATED everywhere) or a real log file:
+- Load the demo environment: a fictional company, three days of SIMULATED activity and one
+  example of every attack scenario (15 alerts, 5 incidents; [docs/demo.md](docs/demo.md)).
+  `scripts/demo_reset.sh` puts it back to the start, keeping the accounts:
+
+  ```bash
+  docker compose exec backend python -m app.cli demo-load
+  ```
+
+- Ingest one simulated scenario (marked SIMULATED everywhere) or a real log file:
 
   ```bash
   docker compose exec backend python -m app.cli create-source --name web-01-auth --type linux_auth
@@ -118,6 +126,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [testing.md](docs/testing.md) | Test strategy |
 | [performance.md](docs/performance.md) | Measured throughput and read latency on 1 million records |
 | [deployment.md](docs/deployment.md) | Production configuration, TLS, configuration reference, backup and restore, upgrades |
+| [demo.md](docs/demo.md) | The demo environment: the company, the story and its expected results, a walkthrough, reset |
 | [decisions/](docs/decisions/README.md) | Architecture decision records |
 | [repository-assessment.md](docs/repository-assessment.md) | What existed before SentinelX, and what was reused from CloudSentinel |
 

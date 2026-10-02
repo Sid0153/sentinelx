@@ -63,6 +63,10 @@ class AuditAction(enum.StrEnum):
     HUNT_SAVED = "HUNT_SAVED"
     HUNT_UPDATED = "HUNT_UPDATED"
     HUNT_DELETED = "HUNT_DELETED"
+    # Demo environment (Phase 16): loaded by an operator; a reset replaces the database, and the
+    # new audit log's first entry records the newest entry of the one it replaced.
+    DEMO_LOADED = "DEMO_LOADED"
+    DEMO_RESET = "DEMO_RESET"
 
 
 class AuditResult(enum.StrEnum):

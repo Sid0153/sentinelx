@@ -27,7 +27,8 @@ its rules always apply:
 | 12 Advanced detection engineering | Done, green in CI (1178 backend tests, 98% coverage; 95 frontend tests; playground examples fire their rules on the live stack; ADR-0013) |
 | 13 Security hardening | Done, green in CI (1254 backend, 105 frontend tests, 98% coverage; nine-area review in docs/security.md; least-privilege DB role, ingest keys, body limits; then every listed residual risk fixed or mitigated: 2FA, admin reset, shared rate limits, audit hash chain, host allowlist, raw text analyst-only, DB TLS, HSTS, digest pins) |
 | 14 Testing and performance | Done, green in CI (1288 backend tests, 98% coverage; 115 frontend tests, 91.7% lines, floors in CI; query-budget tests found 3 N+1 queries and 2 unbounded lists, fixed; 1M-record benchmark in docs/performance.md found AUTH-004 failing past 20k earlier logons, fixed; per-day summaries kept by triggers make detection and the dashboard flat: 713 records/s) |
-| 15 Deployment readiness | Done (image scan found 71 fixable HIGH CVEs, fixed and gated in CI; database container hardened, gosu removed; production overlay with TLS run by CI over https; backup/restore scripts tested in CI; docs/deployment.md with a test-enforced configuration reference; ADR-0014) |
+| 15 Deployment readiness | Done, green in CI (image scan found 71 fixable HIGH CVEs, fixed and gated in CI; database container hardened, gosu removed; production overlay with TLS run by CI over https; backup/restore scripts tested in CI; docs/deployment.md with a test-enforced configuration reference; ADR-0014) |
+| 16 Demo environment | Done (`cli demo-load`: inventory, sources, a 13-step story anchored to one time, ~1,040 records → 15 alerts, 5 incidents at any anchor, tested per step; `scripts/demo_reset.sh` replaces the database, refuses real data, keeps accounts; ADR-0015; docs/demo.md) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -75,6 +76,11 @@ update the doc (and add an ADR for decisions) in the same change.
   nginx headers and routing live only in `frontend/nginx/app.conf` (both configurations
   include it). A new setting or Compose variable must be documented in docs/deployment.md
   (`tests/unit/test_deployment_docs.py`).
+- Demo environment (`app/demo/environment.py`): a new attack step must stay more than the
+  correlation window from its neighbours, on its own host and outside address
+  (`tests/unit/test_demo.py`), and list what it triggers; update the tables in docs/demo.md
+  and the totals CI greps for. `scripts/demo_reset.sh` must keep refusing databases with
+  real records (`cli demo-status`).
 - Restores go into an empty database (`scripts/restore.sh`): never load data into a migrated
   database, or the audit chain is recomputed and the daily summaries count twice.
 - Every image must pass `trivy image --severity HIGH,CRITICAL --ignore-unfixed` (CI). The

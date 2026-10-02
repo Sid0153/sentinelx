@@ -130,12 +130,13 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 | Item | Phase | Status |
 |---|---|---|
 | Scenario selection, event count, time range (start and interval), host, user, source IP | 5 | ✅ `demo-ingest` options, validated; unsupported options refused |
-| 1 normal authentication · 10 benign activity | 5, 6 | ✅ `benign`, tested to trigger no rule |
+| 1 normal authentication · 10 benign activity | 5, 6, 16 | ✅ `benign` (SSH, routine sudo, a typo), `normal_authentication` (Windows logons), `backup_job` (many connections, two ports), `web_traffic` (visitors, health checks, scanner 404s), each tested to trigger no rule |
 | 2 brute force · 3 password spraying · 4 success after failures | 5 | ✅ plus `distributed_brute_force` (AUTH-005) |
 | 5 privilege escalation · 6 privileged account creation · 7 suspicious process · 8 suspicious network | 6 | ✅ each in its own source format, tested to trigger exactly its rule |
 | 9 multi-stage correlated incident | 8 | ✅ `multi_stage_attack`: four rules, one incident (tested in one batch and in four, live, in CI) |
 | Clearly marked simulated; internally consistent | 5 | ✅ `simulated` flag on batch, raw record and event; RFC 5737 addresses |
-| Repeatable demonstrations, reset of the demo environment | 16 | ⬜ |
+| Scenario loader: the whole environment in one command | 16 | ✅ `demo-load`: sources, inventory (11 assets, 6 identities), a three-day story of 13 steps; each step tested to trigger exactly its rules, 15 alerts and 5 incidents checked in PostgreSQL and in CI ([demo.md](demo.md)) |
+| Repeatable demonstrations, reset of the demo environment | 16 | ✅ same anchor, same records; loading again stores nothing new; `scripts/demo_reset.sh` replaces the database (refuses real data, backs up first, keeps accounts, links the audit logs; ADR-0015), run in CI |
 
 ## Engineering requirements
 

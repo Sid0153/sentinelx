@@ -15,6 +15,8 @@
     python -m app.cli demo-scenarios   # SIMULATED scenarios and the options each accepts
     python -m app.cli demo-ingest --scenario brute_force --source web-01-auth \
         [--host web-01] [--user root] [--source-ip 203.0.113.45] [--count 12] [--interval 3]
+    python -m app.cli demo-load [--start 2026-09-25T12:00:00Z]  # the whole demo environment
+    python -m app.cli demo-status      # exit 3 if the database holds real (non-simulated) records
 
 There is no public registration: the first ADMIN is created here, and admins create everyone
 else. The password is read from a hidden prompt (or SENTINELX_ADMIN_PASSWORD for automation),
@@ -219,6 +221,76 @@ def _demo_ingest(args: argparse.Namespace) -> int:
     return _ingest(args.source, [line.encode() for line in lines], "demo", simulated=True)
 
 
+def _parse_anchor(value: str) -> tuple[int, str] | None:
+    seq, _, digest = value.partition(":")
+    if not seq.isdigit() or len(digest) != 64:
+        print(
+            f"An anchor looks like SEQ:HASH (verify-audit prints it): {value}",
+            file=sys.stderr,
+        )
+        return None
+    return int(seq), digest
+
+
+def _demo_load(start: str | None, previous_head: str | None) -> int:
+    from datetime import UTC, datetime
+
+    from app.core.config import get_settings
+    from app.database.session import get_session_factory
+    from app.demo.environment import default_anchor
+    from app.demo.loader import load
+
+    now = datetime.now(UTC)
+    try:
+        anchor = datetime.fromisoformat(start) if start else default_anchor(now)
+    except ValueError:
+        print("--start must be an ISO 8601 time with a zone", file=sys.stderr)
+        return 1
+    if anchor.tzinfo is None or anchor > now:
+        print("--start must include a zone and must not be in the future", file=sys.stderr)
+        return 1
+    head = None
+    if previous_head is not None and (head := _parse_anchor(previous_head)) is None:
+        return 2
+    with get_session_factory()() as db:
+        try:
+            report = load(db, anchor, get_settings(), previous_audit_head=head)
+        except ValueError as exc:
+            print(f"Cannot load the demo: {exc}", file=sys.stderr)
+            return 1
+    print(f"Demo environment (SIMULATED), anchored at {anchor.isoformat()}")
+    print(
+        f"  sources created: {', '.join(report.sources_created) or 'none'}; "
+        f"assets created: {report.assets_created}; identities created: "
+        f"{report.identities_created}"
+    )
+    for result in report.steps:
+        batch = result.batch
+        rules = ", ".join(sorted(result.rules)) or "no detections"
+        print(
+            f"  {result.step.at:%Y-%m-%d %H:%M} {result.step.title}: "
+            f"{batch.parsed_count} parsed, {batch.duplicate_count} duplicates; {rules}"
+        )
+    print(
+        f"{report.records} records ({report.duplicates} already stored), "
+        f"{report.alerts_created} new alerts, {report.incidents_created} new incidents"
+    )
+    return 0
+
+
+def _demo_status() -> int:
+    from app.database.session import get_session_factory
+    from app.demo.loader import status
+
+    with get_session_factory()() as db:
+        current = status(db)
+    print(f"{current.simulated_records} simulated records, {current.real_records} real records")
+    if not current.demo_only:
+        print("This database holds real records: it is not a demo environment")
+        return 3
+    return 0
+
+
 def _reconcile_batches() -> int:
     from app.database.session import get_session_factory
     from app.detection.engine import reconcile_batches
@@ -235,11 +307,9 @@ def _verify_audit(anchors: list[str]) -> int:
 
     parsed = []
     for anchor in anchors:
-        seq, _, digest = anchor.partition(":")
-        if not seq.isdigit() or len(digest) != 64:
-            print(f"An anchor looks like SEQ:HASH (from an audit.chained log line): {anchor}")
+        if (pair := _parse_anchor(anchor)) is None:
             return 2
-        parsed.append((int(seq), digest))
+        parsed.append(pair)
     with get_session_factory()() as db:
         report = verify(db, parsed)
     print(f"{report.chained} entries in the chain, {report.legacy} from before it (not covered)")
@@ -394,6 +464,18 @@ def main(argv: list[str] | None = None) -> int:
     demo.add_argument("--count", type=int, help="size of the scenario (see demo-scenarios)")
     demo.add_argument("--interval", type=int, help="seconds between attempts")
     subcommands.add_parser("demo-scenarios", help="List SIMULATED scenarios and their options")
+    demo_load = subcommands.add_parser(
+        "demo-load", help="Load the SIMULATED demo environment (inventory, sources, story)"
+    )
+    demo_load.add_argument(
+        "--start", help="ISO 8601 time the story ends at (default: the start of this hour)"
+    )
+    demo_load.add_argument(
+        "--previous-audit-head", help="SEQ:HASH of the replaced audit log (scripts/demo_reset.sh)"
+    )
+    subcommands.add_parser(
+        "demo-status", help="Count simulated and real records (exit 3 if any are real)"
+    )
     subcommands.add_parser("seed-rules", help="Load the shipped rule library into the database")
     subcommands.add_parser("reconcile-batches", help="Mark batches a crash left without detection")
     subcommands.add_parser("rescore", help="Score open work again after a risk model change")
@@ -424,6 +506,10 @@ def main(argv: list[str] | None = None) -> int:
         return _demo_ingest(args)
     if args.command == "demo-scenarios":
         return _list_scenarios()
+    if args.command == "demo-load":
+        return _demo_load(args.start, args.previous_audit_head)
+    if args.command == "demo-status":
+        return _demo_status()
     if args.command == "seed-rules":
         return _seed_rules()
     if args.command == "reconcile-batches":

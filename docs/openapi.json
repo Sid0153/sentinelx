@@ -8598,7 +8598,9 @@
           "SETTINGS_CHANGED",
           "HUNT_SAVED",
           "HUNT_UPDATED",
-          "HUNT_DELETED"
+          "HUNT_DELETED",
+          "DEMO_LOADED",
+          "DEMO_RESET"
         ],
         "title": "AuditAction"
       },

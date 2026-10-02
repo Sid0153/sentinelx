@@ -70,9 +70,12 @@ backend/app/
        enrich.py    IP scope + asset/identity lookup from a snapshot loaded once per batch
        sources.py   log sources (which parser, time zone, default host)
        service.py   one batch: dedup, parse, enrich, store raw + events, report
-  ✅ demo/          simulated scenario generator; emits RAW log lines, never normalized rows
+  ✅ demo/          scenarios.py: simulated scenario generators (RAW log lines, never rows);
+                   environment.py: the demo company and story (pure); loader.py: loads it
+                   through the normal pipeline (docs/demo.md)
   ✅ cli.py         check-config, export-openapi, create-admin, create-source, ingest-file,
-                   demo-scenarios, demo-ingest, seed-rules, reconcile-batches, run-detection
+                   demo-scenarios, demo-ingest, demo-load, demo-status, seed-rules,
+                   reconcile-batches, run-detection
   detection/        (Phase 6) conditions.py, events.py, model.py, evaluators/, evaluate.py,
                     explain.py, library/ (YAML rules + pinned ATT&CK file), storage.py,
                     engine.py, service.py
@@ -206,8 +209,8 @@ answer. Full design, trade-offs and limits: [threat-hunting.md](threat-hunting.m
 - Charts (severity distribution, trends) are small hand-written SVG components. A charting
   library is added only if these become hard to maintain.
 - Pages: `/login /dashboard /events /hunt /detections /detections/:id /alerts /alerts/:id
-  /incidents /incidents/:id /assets /identities /audit /settings` (users, log sources, and
-  demo controls when enabled).
+  /incidents /incidents/:id /assets /identities /audit /settings` (users, log sources). The
+  demo is loaded and reset from the command line, not the UI ([demo.md](demo.md)).
 - Anything produced by the demo generator carries a visible **SIMULATED** label.
 
 ## Observability

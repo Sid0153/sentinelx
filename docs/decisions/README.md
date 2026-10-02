@@ -19,3 +19,4 @@ When a decision changes, a new ADR supersedes the old one. Old ADRs are not rewr
 | [0012](0012-correlation-by-finding.md) | Correlation links new kinds of finding on the same host; stages are findings, not tactics | Accepted (Phase 8) |
 | [0013](0013-advanced-detection-engineering.md) | Advanced detection engineering: playground, version diff, suppression windows, grouped queue built; advanced temporal correlation deferred | Accepted (Phase 12) |
 | [0014](0014-single-host-compose-deployment.md) | Single-host Docker Compose deployment, with a production overlay CI runs | Accepted (Phase 15) |
+| [0015](0015-demo-environment-reset.md) | The demo environment is reset by replacing the database, keeping the accounts | Accepted (Phase 16) |

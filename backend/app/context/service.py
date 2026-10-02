@@ -88,7 +88,7 @@ def get_asset(db: Session, asset_id: uuid.UUID) -> Asset:
     return asset
 
 
-def create_asset(db: Session, data: AssetCreate, actor: User) -> Asset:
+def create_asset(db: Session, data: AssetCreate, actor: User | None) -> Asset:
     if db.scalar(select(Asset).where(Asset.hostname == data.hostname)) is not None:
         raise AppError(409, "An asset with this hostname already exists")
     asset = Asset(**data.model_dump())
@@ -183,7 +183,7 @@ def get_identity(db: Session, identity_id: uuid.UUID) -> Identity:
     return identity
 
 
-def create_identity(db: Session, data: IdentityCreate, actor: User) -> Identity:
+def create_identity(db: Session, data: IdentityCreate, actor: User | None) -> Identity:
     if db.scalar(select(Identity).where(Identity.username == data.username)) is not None:
         raise AppError(409, "An identity with this username already exists")
     identity = Identity(**data.model_dump())

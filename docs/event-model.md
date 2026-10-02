@@ -21,8 +21,8 @@ Security logs are evidence, so the original record is never modified.
   U+FFFD, and a NUL or other control character in a user name is rejected.
 
 Both tables are append-only through database triggers that reject `UPDATE`, `DELETE` and
-`TRUNCATE`, the same as `audit_logs`. The demo reset (Phase 16) will be designed without
-weakening this, for example by recreating the demo database.
+`TRUNCATE`, the same as `audit_logs`. The demo reset (Phase 16) does not weaken this: it
+replaces the whole database (ADR-0015).
 
 `log_sources` holds each configured origin: its name, `source_type` (which parser), a default
 host and a time zone for formats that lack them. `ingestion_batches` records each ingest

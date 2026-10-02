@@ -110,8 +110,8 @@ export function DashboardPage() {
       {noData && (
         <p className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
           No data yet. Send logs to a log source (the ingest API or <code>cli ingest-file</code>), or
-          load a simulated scenario with <code>cli demo-ingest</code>. Every number below is counted
-          from what has been ingested.
+          load the simulated demo environment with <code>cli demo-load</code> (one scenario:{" "}
+          <code>cli demo-ingest</code>). Every number below is counted from what has been ingested.
         </p>
       )}
       {data.open_alerts_simulated > 0 && (

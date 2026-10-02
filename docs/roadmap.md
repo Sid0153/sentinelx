@@ -21,7 +21,7 @@ starts only on "Proceed to Phase N".
 | 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | **Done** ([security.md](security.md#phase-13-review)) |
 | 14 | Test completion; controlled benchmark (generated data, `EXPLAIN ANALYZE`) | Numbers recorded with machine spec, none invented | **Done** ([performance.md](performance.md), [testing.md](testing.md)) |
 | 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | **Done** ([deployment.md](deployment.md), ADR-0014) |
-| 16 | Demo environment: scenario loader, 10 scenarios, reset, SIMULATED labels | Each scenario triggers exactly its documented rules (test) | Not started |
+| 16 | Demo environment: scenario loader, 10 scenarios, reset, SIMULATED labels | Each scenario triggers exactly its documented rules (test) | **Done** ([demo.md](demo.md), ADR-0015) |
 | 17 | README, diagrams, screenshots, guides, limitations, future architecture | Docs match the code | Not started |
 | 18 | Full engineering review and fixes | Review report; misleading claims removed | Not started |
 | 19 | Interview and portfolio package (in git-ignored `portfolio/`) | Based only on what exists | Not started |
@@ -30,7 +30,7 @@ starts only on "Proceed to Phase N".
 is built in Phase 5 as test data, because detection needs realistic input before Phase 16.
 Phase 16 completes it. This is a change to the brief's ordering, made on purpose.
 
-## Demo scenarios (planned, Phase 16)
+## Demo scenarios (Phase 16: built; the loaded story and its results are in [demo.md](demo.md))
 
 Fictional environment: `corp.example`, hosts `web-01` (critical, prod), `db-01` (critical),
 `jump-01` (high), `ws-*` workstations (medium), and users with fixed roles and working hours.
@@ -49,4 +49,6 @@ Outside addresses come from RFC 5737 ranges.
 | 9 | Multi-stage: 2 → 4 → 5 → 6 on `web-01` from one source | One incident, 4 alerts, full timeline |
 | 10 | Benign look-alikes (admin's legitimate sudo commands, one typo then success, backup job connections) | No alerts (demonstrates tuning) |
 
-Parameters: scenario, event count/intensity, start time, host, user, source IP, seed.
+Parameters: scenario, event count/intensity, start time, host, user, source IP. There is no
+separate seed: the generators are deterministic for a given start time (the web traffic uses
+a fixed seed per day), so the start time (the demo's anchor) is what makes a run repeatable.

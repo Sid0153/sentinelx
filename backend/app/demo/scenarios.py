@@ -2,7 +2,7 @@
 
 Each scenario produces records in the format of one source type (auth.log lines, Windows
 event JSON, generic JSON connection events) and can only be ingested into a source of that
-type. Phase 16 builds the full demo environment (multi-stage story, reset).
+type. `app.demo.environment` puts them together into the demo environment (Phase 16).
 
 Everything here is synthetic and deterministic (same arguments, same lines):
 - outside addresses come from the documentation ranges (RFC 5737: 192.0.2.0/24,
@@ -15,14 +15,26 @@ Syslog lines use RFC 3339 timestamps (with the offset), so no year inference is 
 
 import base64
 import json
+import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from app.events.schema import SourceType, canonical_hostname, canonical_ip
 
-INTERNAL_WORKSTATIONS = ["10.0.2.41", "10.0.2.42", "10.0.2.57", "10.0.3.12"]
+# Where each member of the fictional team works from. Every scenario uses the same addresses,
+# so the demo environment is consistent: alice's workstation is ws-042 (10.0.2.42), and so on.
+WORKSTATIONS = {
+    "alice": ("ws-042", "10.0.2.42"),
+    "bob": ("ws-017", "10.0.3.12"),
+    "carol": ("ws-031", "10.0.2.41"),
+    "deploy": ("build-01", "10.0.2.57"),  # the CI runner the deployment account works from
+}
 TEAM = ["alice", "bob", "deploy", "carol"]
+INTERNAL_WORKSTATIONS = [WORKSTATIONS[user][1] for user in TEAM]
+FILE_SERVER = ("fs-01", "10.0.1.40")
+DATABASE_SERVER = ("db-01", "10.0.1.20")
+BACKUP_SERVER = ("backup-01", "10.0.1.50")
 _DOC_NETS = ["203.0.113", "198.51.100", "192.0.2"]
 COMMON_ACCOUNTS = ["root", "admin", "oracle", "postgres", "test", "ubuntu", "git", "ftpuser"]
 
@@ -199,7 +211,7 @@ def benign_activity(start: datetime, *, host: str = "web-01", days: int = 1) -> 
         morning = start + timedelta(days=day)
         for index, user in enumerate(TEAM):
             moment = morning + timedelta(minutes=5 + index * 11)
-            ip = INTERNAL_WORKSTATIONS[index % len(INTERNAL_WORKSTATIONS)]
+            ip = WORKSTATIONS[user][1]
             pid = 7000 + day * 100 + index
             sshd = f"sshd[{pid}]"
             if user == "bob":  # one typo, then the right password 20 seconds later
@@ -243,6 +255,127 @@ def benign_activity(start: datetime, *, host: str = "web-01", days: int = 1) -> 
     return lines
 
 
+def normal_authentication(start: datetime, *, days: int = 1) -> list[str]:
+    """Windows logons of an ordinary working day: each person signs on to their workstation
+    in the morning (interactive, type 2), their drives connect to the file server (network,
+    type 3, from the workstation's address), and they sign off in the evening (4634)."""
+    lines = []
+    record_id = 120000
+    for day in range(days):
+        morning = start + timedelta(days=day)
+        for index, user in enumerate(("alice", "bob", "carol")):
+            workstation, address = WORKSTATIONS[user]
+            arrive = morning + timedelta(minutes=12 + index * 17, seconds=index * 7)
+            session = f"0x{0x3E7000 + day * 16 + index:x}"
+            account = {"TargetUserName": user, "TargetDomainName": "CORP"}
+            interactive = {**account, "LogonType": "2", "TargetLogonId": session}
+            interactive |= {"AuthenticationPackageName": "Kerberos", "IpAddress": "127.0.0.1"}
+            network = {**account, "LogonType": "3", "IpAddress": address, "IpPort": "0"}
+            network |= {"AuthenticationPackageName": "Kerberos", "WorkstationName": workstation}
+            logoff = {**account, "LogonType": "2", "TargetLogonId": session}
+            events = [
+                (arrive, workstation, 4624, interactive),
+                (arrive + timedelta(seconds=41), FILE_SERVER[0], 4624, network),
+                (arrive + timedelta(hours=8, minutes=index * 9), workstation, 4634, logoff),
+            ]
+            for moment, host, event_id, data in events:
+                record_id += 1
+                lines.append(_windows_event(moment, host, record_id, event_id, data))
+    return lines
+
+
+def backup_job(start: datetime, *, nights: int = 1) -> list[str]:
+    """The nightly backup: backup-01 connects to the database server's PostgreSQL and SSH
+    ports many times in a few minutes. Many connections, but to two ports only: a port scan
+    rule must not mistake it for one (generic JSON network events)."""
+    lines = []
+    backup_host, backup_ip = BACKUP_SERVER
+    for night in range(nights):
+        moment = start + timedelta(days=night)
+        for index in range(24):
+            when = moment + timedelta(seconds=index * 9)
+            lines.append(
+                json.dumps(
+                    {
+                        "timestamp": when.astimezone(UTC).isoformat(),
+                        "event_category": "network",
+                        "event_action": "connection",
+                        "event_outcome": "success",
+                        "host": backup_host,
+                        "source_ip": backup_ip,
+                        "source_port": 40000 + night * 100 + index,
+                        "destination_ip": DATABASE_SERVER[1],
+                        "destination_port": 5432 if index % 3 else 22,
+                        "protocol": "tcp",
+                    }
+                )
+            )
+    return lines
+
+
+# Web visitors: documentation addresses not used by any attack scenario.
+WEB_VISITORS = [f"192.0.2.{n}" for n in range(10, 60)] + [
+    f"198.51.100.{n}" for n in range(120, 170)
+]
+WEB_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/128.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    "Version/17.6 Safari/605.1.15",
+    "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_6 like Mac OS X) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.6 Mobile/15E148 Safari/604.1",
+]
+SCANNER_PATHS = ["/.env", "/wp-login.php", "/.git/config", "/phpmyadmin/"]
+
+
+def _access(moment: datetime, ip: str, request: str, status: int, size: int, agent: str) -> str:
+    stamp = moment.astimezone(UTC).strftime("%d/%b/%Y:%H:%M:%S +0000")
+    return f'{ip} - - [{stamp}] "{request}" {status} {size} "-" "{agent}"'
+
+
+def web_traffic(start: datetime, *, days: int = 1, sessions: int = 30) -> list[str]:
+    """Ordinary traffic to the public web site on web-01 (combined access log): visitors
+    browsing products, some signing in, the monitoring server's health check every 30
+    minutes, and the internet's background noise (a few scanners asking for well-known
+    files, answered 404). Varied but reproducible: a fixed seed per day."""
+    lines: list[tuple[datetime, str]] = []
+    for day in range(days):
+        midnight = start + timedelta(days=day)
+        pick = random.Random(f"web-traffic-{midnight.isoformat()}")  # noqa: S311 (not security)
+        for slot in range(48):
+            moment = midnight + timedelta(minutes=30 * slot, seconds=4)
+            check = "GET /healthz HTTP/1.1"
+            lines.append((moment, _access(moment, "10.0.1.60", check, 200, 2, "curl/8.5.0")))
+        for _ in range(sessions):
+            ip, agent = pick.choice(WEB_VISITORS), pick.choice(WEB_AGENTS)
+            moment = midnight + timedelta(hours=pick.uniform(7, 22))
+            requests = [
+                ("GET / HTTP/1.1", 200, pick.randint(9000, 12000)),
+                ("GET /static/app.css HTTP/1.1", 200, 18234),
+                ("GET /static/app.js HTTP/1.1", 200, 96112),
+            ]
+            for _ in range(pick.randint(1, 5)):
+                product = pick.randint(100, 480)
+                requests.append(
+                    (f"GET /products/{product} HTTP/1.1", 200, pick.randint(6000, 9000))
+                )
+            if pick.random() < 0.3:
+                requests += [
+                    ("POST /login HTTP/1.1", 302, 0),
+                    ("GET /account HTTP/1.1", 200, pick.randint(4000, 5000)),
+                ]
+            for request, status, size in requests:
+                lines.append((moment, _access(moment, ip, request, status, size, agent)))
+                moment += timedelta(seconds=pick.randint(1, 40))
+        for path in pick.sample(SCANNER_PATHS, 2):
+            moment = midnight + timedelta(hours=pick.uniform(0, 6))
+            ip = f"203.0.113.{pick.randint(150, 250)}"
+            request = f"GET {path} HTTP/1.1"
+            lines.append((moment, _access(moment, ip, request, 404, 153, "Mozilla/5.0 zgrab/0.x")))
+    return [line for _, line in sorted(lines, key=lambda pair: pair[0])]
+
+
 def privilege_escalation(
     start: datetime, *, host: str = "web-01", username: str = "deploy"
 ) -> list[str]:
@@ -253,7 +386,8 @@ def privilege_escalation(
             start,
             host,
             "sshd[6100]",
-            f"Accepted publickey for {username} from 10.0.2.57 port 53100 ssh2: "
+            f"Accepted publickey for {username} from {WORKSTATIONS['deploy'][1]} "
+            "port 53100 ssh2: "
             "ED25519 SHA256:demo-escalation",
         ),
         _line(
@@ -391,6 +525,7 @@ def network_scan(
     source_ip: str = "10.0.2.42",
     port_count: int = 25,
     interval_seconds: int = 1,
+    target_ip: str = DATABASE_SERVER[1],
 ) -> list[str]:
     """One internal workstation connecting to many ports of a server within seconds
     (generic JSON network events, as a flow or firewall log would give them)."""
@@ -408,7 +543,7 @@ def network_scan(
                     "host": host,
                     "source_ip": source_ip,
                     "source_port": 49152 + index,
-                    "destination_ip": "10.0.1.20",
+                    "destination_ip": target_ip,
                     "destination_port": port,
                     "protocol": "tcp",
                 }
@@ -481,6 +616,30 @@ SCENARIOS: dict[str, Scenario] = {
         benign_activity,
         {"host": "host", "count": "days"},
         "working days of activity",
+    ),
+    "normal_authentication": Scenario(
+        "normal_authentication",
+        "Windows: working-day logons to workstations and the file server",
+        normal_authentication,
+        {"count": "days"},
+        "working days of activity",
+        source_type=SourceType.WINDOWS_SECURITY,
+    ),
+    "backup_job": Scenario(
+        "backup_job",
+        "The nightly backup: many connections to two ports of the database server",
+        backup_job,
+        {"count": "nights"},
+        "nights",
+        source_type=SourceType.GENERIC_JSON,
+    ),
+    "web_traffic": Scenario(
+        "web_traffic",
+        "Ordinary traffic to the public web site: visitors, health checks, scanner noise",
+        web_traffic,
+        {"count": "days"},
+        "days of traffic",
+        source_type=SourceType.HTTP_ACCESS,
     ),
     "privilege_escalation": Scenario(
         "privilege_escalation",

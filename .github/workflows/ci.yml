@@ -158,6 +158,27 @@ jobs:
           echo "$admin_password" > /tmp/admin_password
           docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend             python -m app.cli create-admin --email admin@ci.example
           python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$admin_password"
+      # Before the ingestion smoke test stores real (non-simulated) records: a reset refuses those.
+      - name: The demo environment loads, loads again without changes, and resets (Phase 16)
+        run: |
+          start=2026-09-25T18:00:00Z  # a fixed anchor: the same records, alerts and incidents every run
+          docker compose exec -T backend python -m app.cli demo-load --start "$start" | tee /tmp/demo_load.txt
+          grep -q "1042 records (0 already stored), 15 new alerts, 5 new incidents" /tmp/demo_load.txt
+          docker compose exec -T backend python -m app.cli demo-load --start "$start" | tee /tmp/demo_again.txt
+          grep -q "1042 records (1042 already stored), 0 new alerts, 0 new incidents" /tmp/demo_again.txt
+          before="$(sh scripts/db_counts.sh)"
+          echo "before: $before"
+          sh scripts/demo_reset.sh --yes --start "$start" | tee /tmp/demo_reset.txt
+          grep -q "15 new alerts, 5 new incidents" /tmp/demo_reset.txt
+          grep -q "Audit log intact" /tmp/demo_reset.txt
+          test -s "$(ls backups/sentinelx-*.dump)"  # the reset backed up the demo it replaced
+          after="$(sh scripts/db_counts.sh)"
+          echo "after:  $after"
+          # Same users, records, events, alerts and incidents; the summaries equal the rows.
+          test "$(echo "$before" | cut -d'|' -f1-5)" = "$(echo "$after" | cut -d'|' -f1-5)"
+          echo "$after" | grep -q "|t|t$"
+          docker compose exec -T backend python -m app.cli verify-audit | grep -q "Audit log intact"
+          python3 scripts/auth_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
       - name: Two-factor sign-in, admin resets and the audit hash chain work end to end (through nginx)
         run: python3 scripts/security_smoke.py http://127.0.0.1:8081 admin@ci.example "$(cat /tmp/admin_password)"
       - name: Ingestion, detection, alerts and incidents work end to end (API through nginx, scenarios via CLI)
@@ -172,6 +193,12 @@ jobs:
           docker compose exec -T backend python -m app.cli demo-ingest --scenario multi_stage_attack \
             --source ci-auth --host ci-web-02 --source-ip 198.51.100.200 | tee /tmp/chain.txt
           grep -q "1 new incidents" /tmp/chain.txt  # the whole chain is one story
+      - name: A database holding real records is never reset as a demo
+        run: |
+          before="$(sh scripts/db_counts.sh)"
+          if sh scripts/demo_reset.sh --yes --no-backup 2> /tmp/refused.txt; then exit 1; fi
+          grep -q "Refusing to reset" /tmp/refused.txt
+          test "$before" = "$(sh scripts/db_counts.sh)"
       - name: The application connects as a least-privilege database role
         run: |
           docker compose logs backend | grep -q "Runtime role sentinelx_app"

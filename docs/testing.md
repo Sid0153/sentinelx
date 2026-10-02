@@ -249,6 +249,13 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
 - The demo generator (`app/demo/scenarios.py`) is **also** used by tests. Every scenario must
   parse with zero failures and have the shape its name promises. Each scenario is also
   tested to trigger (or, for benign activity, not trigger) exactly its documented rules.
+- The demo environment (Phase 16, [demo.md](demo.md)): `tests/integration/test_demo_environment.py`
+  loads the whole story into PostgreSQL and checks every step's rules, the five incidents,
+  the inventory links, that loading again stores nothing, and the audit entries;
+  `tests/unit/test_demo.py` checks that the attacks are further apart than the correlation
+  window and share no host or outside address. CI loads it on the running stack, loads it
+  again, resets it with `scripts/demo_reset.sh` (same counts, accounts kept, audit chain
+  intact) and checks the reset refuses a database holding real records.
 - Time is injected (`now` / receive time as parameters): no sleeping, no wall-clock
   dependence.
 

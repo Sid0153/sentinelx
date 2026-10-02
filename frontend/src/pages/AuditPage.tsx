@@ -54,6 +54,8 @@ const ACTIONS = [
   "HUNT_SAVED",
   "HUNT_UPDATED",
   "HUNT_DELETED",
+  "DEMO_LOADED",
+  "DEMO_RESET",
 ];
 const RESULTS: AuditResult[] = ["SUCCESS", "FAILURE", "DENIED"];
 
