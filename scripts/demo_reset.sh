@@ -19,9 +19,10 @@
 #    just given is kept that way.
 # 3. Note the audit log's newest entry; the new audit log records it (DEMO_RESET), so the
 #    chain of audit logs across resets can be followed back to the backups.
-# 4. Copy the users table inside the database container (its /tmp is memory only; password
-#    hashes never leave the container), recreate the database, let the backend migrate it,
-#    and put the users back.
+# 4. Copy the users table into this script's memory (a shell variable: the password hashes
+#    are never written to disk; the database container may be recreated, so its /tmp is no
+#    place for them), recreate the database, let the backend migrate it, and put the users
+#    back. If the script fails in between, the accounts are in the backup of step 2.
 # 5. Load the demo story (python -m app.cli demo-load) and verify the new audit log.
 set -eu
 
@@ -60,9 +61,12 @@ head="$(docker compose exec -T backend python -m app.cli verify-audit \
 
 # The variables are expanded inside the database container (its own environment).
 # shellcheck disable=SC2016
-docker compose exec -T db sh -c \
-    'pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --data-only --table=users \
-        --file /tmp/sentinelx-users.sql'
+users_sql="$(docker compose exec -T db sh -c \
+    'pg_dump --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --data-only --table=users')"
+case "$users_sql" in
+    *"COPY public.users"*) ;;
+    *) echo "Could not copy the users table; nothing was changed." >&2; exit 1 ;;
+esac
 
 docker compose stop backend frontend
 # shellcheck disable=SC2016
@@ -72,10 +76,10 @@ docker compose exec -T db sh -c \
 docker compose up -d --wait backend  # migrates the empty database and loads the rules
 
 # shellcheck disable=SC2016
-docker compose exec -T db sh -c \
+printf '%s\n' "$users_sql" | docker compose exec -T db sh -c \
     'psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --quiet --output /dev/null \
-        --set ON_ERROR_STOP=1 --file /tmp/sentinelx-users.sql && rm /tmp/sentinelx-users.sql'
-# (If that failed, the copy stays in the database container's /tmp for the operator.)
+        --set ON_ERROR_STOP=1'
+unset users_sql
 
 set -- demo-load
 if [ -n "$head" ]; then

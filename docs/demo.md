@@ -145,8 +145,9 @@ too), and everyone signs in again. In order, the script:
 2. backs up the database with `scripts/backup.sh` (skip with `--no-backup`), which keeps the
    audit log of the demo just given;
 3. notes the audit log's newest entry; it stops here if the audit chain is broken;
-4. copies the users table inside the database container, recreates the database, lets the
-   backend migrate it, and puts the users back;
+4. copies the users table into its own memory (the password hashes are never written to
+   disk), recreates the database, lets the backend migrate it, and puts the users back (if
+   it fails in between, the accounts are in the backup of step 2);
 5. loads the story (`demo-load`). The new audit log's DEMO_RESET entry names the replaced
    log's newest entry. The script then verifies the new chain.
 

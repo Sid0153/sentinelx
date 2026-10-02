@@ -19,8 +19,9 @@ notes and activity all point at that evidence.
   given survives in the backup.
 - The new audit log's DEMO_RESET entry records the newest entry of the one it replaced.
   The audit logs of successive resets can therefore be followed back through the backups.
-- Exception: the users table is copied across (inside the database container, so password
-  hashes never leave it). Presenters keep their accounts, passwords and two-factor settings.
+- Exception: the users table is copied across, held only in the script's memory (password
+  hashes are never written to disk). Presenters keep their accounts, passwords and
+  two-factor settings.
   Sessions end.
 
 **Consequences.**
