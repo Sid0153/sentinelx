@@ -4,6 +4,12 @@ A security operations platform: it ingests security logs, detects attacks with e
 rules, correlates alerts into incidents, and gives analysts one place to investigate, hunt
 and record what they did.
 
+**Live demo: https://sentinelx-demo.onrender.com** (click *Explore as guest (read-only)*). It
+runs the real app with the SIMULATED demo environment: a fictional company with three days of
+activity, 15 alerts and 5 incidents. The free backend sleeps after 15 minutes without visitors,
+so the first page can take about a minute to load. How it is deployed:
+[docs/deployment.md](docs/deployment.md#free-public-deployment-render-and-neon).
+
 > **Status: all 19 phases complete** ([roadmap](docs/roadmap.md)). Every feature of the brief is
 > mapped to its phase and status in [feature-coverage.md](docs/feature-coverage.md).
 > It is a **defensive** tool built as a portfolio project. Every attack it has seen is
