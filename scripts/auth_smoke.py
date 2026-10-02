@@ -9,6 +9,7 @@ line; the first failure stops the script with a non-zero exit code.
 import json
 import secrets
 import sys
+import time
 import urllib.error
 import urllib.request
 from http.cookiejar import CookieJar
@@ -42,9 +43,15 @@ class Client:
             return error.code, json.loads(raw) if raw else None, dict(error.headers)
 
     def login(self, email: str, password: str) -> dict[str, Any]:
-        status, body, headers = self.call(
-            "POST", "/api/auth/login", {"email": email, "password": password}
-        )
+        for _ in range(3):
+            status, body, headers = self.call(
+                "POST", "/api/auth/login", {"email": email, "password": password}
+            )
+            if status != 429:
+                break
+            # Other runs from this address used its sign-in budget (the rate limit at work).
+            print("     (sign-in rate limit reached; waiting for the window to pass)")
+            time.sleep(int(headers.get("Retry-After", "60")) + 1)
         check(status == 200, f"login as {email}", status)
         cookie = headers.get("set-cookie", "").lower()
         check("httponly" in cookie and "samesite=strict" in cookie, "refresh cookie is locked down")

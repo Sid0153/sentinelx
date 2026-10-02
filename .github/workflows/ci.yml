@@ -291,15 +291,13 @@ jobs:
           # A production start refuses unsafe settings.
           ! docker compose run --rm -T --no-deps --entrypoint python \
               -e CORS_ORIGINS=http://localhost:8081 backend -m app.cli check-config
-      - name: Sign-in, two-factor, ingestion and detection work end to end over https
+      - name: Create the first admin
         run: |
           admin_password="$(openssl rand -hex 16)"
           echo "$admin_password" > /tmp/admin_password
           docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend \
             python -m app.cli create-admin --email admin@ci.example
-          python3 scripts/auth_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
-          python3 scripts/security_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
-          python3 scripts/ingest_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+      # Before the smoke scripts: they use this address's sign-in budget (10 per minute).
       - name: The refresh cookie is https-only in production
         run: |
           printf '{"email":"admin@ci.example","password":"%s"}' "$(cat /tmp/admin_password)" > /tmp/login.json
@@ -307,6 +305,12 @@ jobs:
             --data @/tmp/login.json https://localhost:8443/api/auth/login
           grep -i "^set-cookie: sx_refresh=" /tmp/login_headers | grep -qi "; secure"
           rm /tmp/login.json
+      - name: Sign-in, two-factor, ingestion and detection work end to end over https
+        run: |
+          admin_password="$(cat /tmp/admin_password)"
+          python3 scripts/auth_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+          python3 scripts/security_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+          python3 scripts/ingest_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
       - name: Backup, loss of the database and restore keep every record and the audit chain
         run: |
           before="$(sh scripts/db_counts.sh)"
