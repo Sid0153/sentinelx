@@ -116,7 +116,7 @@ route is missing from the access table. Log shippers post batches to
 
 ## Testing
 
-- **Backend**: 1,458 tests at 98% line coverage. API and integration tests run on a real
+- **Backend**: 1,460 tests at 98% line coverage. API and integration tests run on a real
   PostgreSQL, not a mock. They cover parsers against malformed input, each rule on its
   scenario, real concurrency, query budgets, the RBAC table and the audit chain.
 - **Frontend**: 121 tests with coverage floors. Every page passes an axe WCAG 2 AA audit

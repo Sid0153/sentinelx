@@ -2,7 +2,7 @@
 
 > Status: **in force since Phase 2.** Every item below is implemented and runs in CI (✅).
 > CI fails under 90 % backend line coverage. Coverage is a floor, not the goal: the goal is
-> behaviour tests like the ones below. With the public deployment: 1,458 backend tests (98 % line coverage)
+> behaviour tests like the ones below. With the public deployment: 1,460 backend tests (98 % line coverage)
 > and 121 frontend tests; totals are kept current in the README.
 
 ## Layers

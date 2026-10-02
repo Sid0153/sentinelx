@@ -148,10 +148,13 @@ a Render Blueprint; the same setup as CloudSentinel's public demo.
 
 **Rehearsed on every push** (CI job "Free public deployment", `scripts/hosted_check.sh`): the
 backend image at 512 MB and 0.1 CPU with Render's settings, against a PostgreSQL whose owner
-is a non-superuser that can create roles, as on Neon. Measured locally: first start (migrations,
-role, rules, guest, loading the demo) 132–148 s; memory about 101 MB; then guest sign-in, the 15
-alerts and 5 incidents, read-only checks, the app connected as `sentinelx_app` only, and a
-restart that leaves the demo as it is. Not rehearsed: Neon's TLS and Render's proxies themselves.
+is a non-superuser that can create roles, as on Neon. It checks guest sign-in, the 15 alerts
+and 5 incidents, the read-only restrictions, that the app connects as `sentinelx_app` only, and
+a restart that leaves the demo as it is. Measured on the development machine at 0.1 CPU: first
+start (migrations, role, rules, guest, loading the demo) 60 s, a restart 52 s, memory about
+85 MB of 512. The rehearsal first measured 123 s for both: the entrypoint started eight
+Python processes, each re-importing the app; `python -m app.cli startup` now runs every step
+in one. Not rehearsed: Neon's TLS and Render's proxies themselves.
 
 ### Steps
 
@@ -196,7 +199,7 @@ passed. Pull-request previews are off.
 
 **Limits to be honest about.**
 - *Cold starts*: after 15 minutes without visitors the backend stops; the next one waits for
-  Render to start the container and for the start-up checks (about a minute in the rehearsal,
+  Render to start the container and for the start-up steps (52 s in the rehearsal at 0.1 CPU,
   plus Render's own start). The site itself stays up and shows the sign-in page meanwhile.
 - *Read-only*: visitors cannot triage, write notes or use the playground (analyst features);
   the demo shows what an analyst would see.

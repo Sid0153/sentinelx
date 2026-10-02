@@ -76,6 +76,8 @@ class Settings(BaseSettings):
     # Public demo: the shared, read-only guest account. When set, POST /api/auth/guest signs
     # visitors in as it without a password, and the startup creates it as a VIEWER.
     guest_email: str | None = None
+    # Public demo: load the demo story at start-up, into an empty database only.
+    demo_autoload: bool = False
 
     @model_validator(mode="before")
     @classmethod

@@ -1,6 +1,7 @@
 """Operator commands, run on the server.
 
-    python -m app.cli check-config     # run first by docker-entrypoint.sh
+    python -m app.cli startup          # docker-entrypoint.sh: every start-up step, one process
+    python -m app.cli check-config     # validate settings and database access
     python -m app.cli export-openapi   # writes docs/openapi.json (a test fails if it is stale)
     python -m app.cli create-admin --email you@example.com
     python -m app.cli create-source --name web-01-auth --type linux_auth [--timezone UTC]
@@ -319,6 +320,33 @@ def _ensure_guest() -> int:
     return 0
 
 
+def _startup() -> int:
+    """Everything the container does before serving, in one process: at 0.1 CPU (Render's free
+    plan) each separate `python -m app.cli` spends seconds importing the app again.
+
+    The order matters: migrate as the owner, give the application's role its grants, check the
+    configuration as that role, then the steps that need the schema and the rules."""
+    from alembic import command
+
+    from app.core.config import get_settings
+    from app.database.migrations import alembic_config
+
+    settings = get_settings()
+    command.upgrade(alembic_config(), "head")
+    steps = []
+    if settings.app_db_user:
+        steps.append(_setup_app_role)
+    steps += [_check_config, _seed_rules, _reconcile_batches, _rescore]
+    if settings.guest_email:
+        steps.append(_ensure_guest)
+    if settings.demo_autoload:
+        steps.append(lambda: _demo_load(None, None, if_empty=True))
+    for step in steps:
+        if (code := step()) != 0:
+            return code
+    return 0
+
+
 def _demo_status() -> int:
     from app.database.session import get_session_factory
     from app.demo.loader import status
@@ -479,6 +507,9 @@ def _list_scenarios() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands.add_parser(
+        "startup", help="Every start-up step before serving (docker-entrypoint.sh)"
+    )
     subcommands.add_parser("check-config", help="Validate settings and database access")
     subcommands.add_parser("export-openapi", help="Write docs/openapi.json")
     create_admin = subcommands.add_parser("create-admin", help="Create an ADMIN user")
@@ -545,6 +576,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "startup":
+        return _startup()
     if args.command == "check-config":
         return _check_config()
     if args.command == "export-openapi":
