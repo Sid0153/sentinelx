@@ -10,6 +10,14 @@ updates:
   - package-ecosystem: docker
     directory: /frontend
     schedule: { interval: weekly }
+  # PostgreSQL (Phase 15: db/Dockerfile). Same-major digests only: a new major version cannot
+  # open an existing data directory; it needs a dump and restore (docs/deployment.md).
+  - package-ecosystem: docker
+    directory: /db
+    schedule: { interval: weekly }
+    ignore:
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly }

@@ -38,9 +38,9 @@ Last updated: **Phase 8**.
 | 25 | Audit logging | 3+ | ✅ append-only; rule changes and manual detection runs audited (6); alert status changes (7); every incident action and settings change (8) |
 | 26 | API | 2+ | ◐ health, auth, users, audit, assets, identities, sources, ingest, batches, events, detections, detection runs, MITRE techniques, alerts, incidents, settings, dashboard, asset/identity activity, hunt done; coverage in its phase |
 | 27 | SOC dashboard | 9 | ✅ every metric of §19 from the database, with empty states (see below) |
-| 28 | Dockerized deployment | 2 | ✅ Compose: postgres, backend, frontend; hardened; health checks |
+| 28 | Dockerized deployment | 2, 15 | ✅ Compose: postgres, backend, frontend; every container non-root, read-only, no capabilities (the database too, 15); health checks; persistent volume; log rotation; production overlay with TLS ([deployment.md](deployment.md)) |
 | 29 | Automated testing | 2+ | ✅ 500+ backend tests (97 % coverage), frontend tests, smoke scripts |
-| 30 | CI/CD | 2, 15 | ✅ CI (lint, types, tests, audits, gitleaks, Compose smoke). ⬜ production-style configuration and deployment docs: Phase 15 |
+| 30 | CI/CD | 2, 15 | ✅ CI (lint, types, tests, audits, gitleaks, Compose smoke, image vulnerability scan) and a job running the production configuration over https with a backup and restore (15). Deployment is documented, not automated (no paid cloud; [deployment.md](deployment.md)) |
 | 31 | Security hardening | 2+, 13 | ✅ headers, CSP without inline scripts or styles, rate limits (login, per-source ingest), validation (unknown fields refused, bounded strings), backend body limits, hardened containers, spoofing-proof client IP, least-privilege database role, per-source ingest keys; nine-area review in [security.md](security.md); then TOTP two-factor sign-in, admin password reset with forced change, shared rate limits, hash-chained audit log, per-source host allowlist, raw text analyst-only, database TLS, HSTS, images pinned by digest (13) |
 | 32 | Comprehensive documentation | every phase, 17 | ◐ design docs and ADRs current; screenshots, guides, demo guide: Phase 17 |
 

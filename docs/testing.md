@@ -13,7 +13,8 @@
 | ✅ Integration | pytest | **real PostgreSQL** (Docker) | Migrations up/down, models match migrations, every constraint and append-only trigger, index fit per query shape, event store round trip; later detection runs and the advisory lock |
 | ✅ API | pytest + TestClient | real PostgreSQL | Validation, status codes, pagination, filtering, the route-access matrix (every route × every role), audit records, ingestion end to end, CLI commands |
 | ✅ Frontend | Vitest + Testing Library | mocked `fetch` per route | Pages in real states (loading, empty, error, data), sign-in and session renewal, role-based controls, URL state, cross-tab refresh lock. CI fails under 90 % lines / 78 % branches (Phase 14) |
-| ✅ Smoke | GitHub Actions + Docker Compose | real stack | Images start healthy; hardening; security headers; database outage → 503 and recovery; `scripts/auth_smoke.py`; `scripts/ingest_smoke.py`; `scripts/security_smoke.py`; a simulated scenario through the CLI; forged `X-Forwarded-For` on both ports; no secret in logs |
+| ✅ Smoke | GitHub Actions + Docker Compose | real stack | Images start healthy; hardening (every container, the database included); no fixable HIGH/CRITICAL vulnerability in any image (Trivy); security headers; database outage → 503 and recovery; `scripts/auth_smoke.py`; `scripts/ingest_smoke.py`; `scripts/security_smoke.py`; a simulated scenario through the CLI; forged `X-Forwarded-For` on both ports; no secret in logs |
+| ✅ Production (Phase 15) | GitHub Actions + Docker Compose with `docker-compose.prod.yml` | real stack over https | Production settings in force (https-only cookie, docs off, unsafe settings refused, only the site published, http redirects, certificate verified); the three smoke scripts over https; backup, loss of the database, restore: identical counts, summaries equal to the rows, audit chain verified against the backup's anchor; no secret in logs |
 | ✅ Query budget (Phase 14) | pytest | real PostgreSQL | Statements per request do not grow with the data (no N+1), on list and detail pages; every list response is bounded |
 | ✅ Performance (Phase 14) | `backend/benchmarks/run.py` | real PostgreSQL (own `_bench` database) | Ingest rate, detection time as the tables grow, read latency and query plans on 1 million generated records; [performance.md](performance.md) |
 
@@ -263,4 +264,6 @@ Against a running stack: `python3 scripts/auth_smoke.py <url> <admin> <password>
 `python3 scripts/ingest_smoke.py <url> <admin> <password>` and
 `python3 scripts/security_smoke.py <url> <admin> <password>`.
 Benchmark (own database, never the test or app one): see [performance.md](performance.md#reproducing).
+Production configuration and backup: [deployment.md](deployment.md); `tests/unit/test_deployment_docs.py`
+fails if a setting, a Compose variable or an `.env.example` entry is not documented there.
 CI runs all of these, plus gitleaks over the full history.

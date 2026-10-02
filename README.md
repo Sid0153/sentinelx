@@ -2,7 +2,7 @@
 
 Security operations platform for detection, correlation, threat hunting and incident response.
 
-> **Status: Phase 14 (testing and performance) complete.** Sign-in and roles, the audit log,
+> **Status: Phase 15 (deployment readiness) complete.** Sign-in and roles, the audit log,
 > the asset and identity inventory, ingestion of five log formats into an append-only event
 > store, detection (9 rules mapped to ATT&CK v19.2), alerts (deduplicated, prioritized,
 > explained), and **incidents**: related alerts correlated into one investigation with a
@@ -71,6 +71,14 @@ docker compose up -d --build --wait
   docker compose exec backend python -m app.cli run-detection --from 2026-09-26T00:00:00+00:00 --to 2026-09-27T00:00:00+00:00
   ```
 
+**Production configuration** (https, production settings, only the site published) and
+backups: [docs/deployment.md](docs/deployment.md).
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+scripts/backup.sh
+```
+
 Every port is bound to 127.0.0.1. The host ports (5433, 8001, 8081) are chosen so the stack
 can run next to others that use the usual 5432, 8000 and 8080.
 
@@ -108,6 +116,8 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [api.md](docs/api.md) | Routes and roles (implemented and planned) |
 | [security.md](docs/security.md) | Auth, RBAC, audit, threat model |
 | [testing.md](docs/testing.md) | Test strategy |
+| [performance.md](docs/performance.md) | Measured throughput and read latency on 1 million records |
+| [deployment.md](docs/deployment.md) | Production configuration, TLS, configuration reference, backup and restore, upgrades |
 | [decisions/](docs/decisions/README.md) | Architecture decision records |
 | [repository-assessment.md](docs/repository-assessment.md) | What existed before SentinelX, and what was reused from CloudSentinel |
 

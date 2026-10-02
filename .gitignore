@@ -28,3 +28,6 @@ dist/
 # Personal: the project brief and interview/portfolio preparation (not part of the project)
 SENTINELX_MASTER_PROMPT.md
 portfolio/
+
+# Database backups (scripts/backup.sh): evidence and password hashes, never committed.
+backups/

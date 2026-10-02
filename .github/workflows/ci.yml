@@ -109,6 +109,14 @@ jobs:
           sed -i "s/^APP_DB_PASSWORD=.*/APP_DB_PASSWORD=$(openssl rand -hex 24)/" .env
       - name: Build and start the stack (waits for health checks)
         run: docker compose up -d --build --wait --wait-timeout 240
+      - name: Images have no fixable HIGH or CRITICAL vulnerabilities (Trivy 0.67.2)
+        run: |
+          for image in sentinelx-backend sentinelx-frontend sentinelx-db; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              aquasec/trivy@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08 \
+              image --quiet --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
+              --scanners vuln "$image"
+          done
       - name: Backend liveness (direct)
         run: curl -fsS http://127.0.0.1:8001/api/health | grep -q '"status":"ok"'
       - name: Readiness through nginx (proxy, database and migrations)
@@ -132,6 +140,11 @@ jobs:
           ! docker compose exec -T backend touch /app/probe
           ! docker compose exec -T frontend touch /usr/share/nginx/html/probe
           docker compose exec -T backend grep -q "CapEff:.0000000000000000" /proc/self/status
+          # The database too (Phase 15): postgres from the start, no gosu, read-only, no caps.
+          test "$(docker compose exec -T db id -u)" = "70"
+          ! docker compose exec -T db test -e /usr/local/bin/gosu
+          ! docker compose exec -T db touch /probe
+          docker compose exec -T db grep -q "CapEff:.0000000000000000" /proc/self/status
       - name: Security headers are served
         run: |
           page="$(curl -fsS -D - -o /dev/null http://127.0.0.1:8081/)"
@@ -227,6 +240,94 @@ jobs:
             sleep 2
           done
           exit 1
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  production:
+    name: Production configuration (TLS, production settings, backup and restore)
+    runs-on: ubuntu-latest
+    env:
+      # Every docker compose command below uses the production configuration.
+      COMPOSE_FILE: docker-compose.yml:docker-compose.prod.yml
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create .env with generated throwaway secrets
+        run: |
+          cp .env.example .env
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
+          sed -i "s/^SECRET_KEY=.*/SECRET_KEY=$(openssl rand -hex 32)/" .env
+          sed -i "s/^APP_DB_PASSWORD=.*/APP_DB_PASSWORD=$(openssl rand -hex 24)/" .env
+      - name: Build and start the production configuration (waits for health checks)
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Trust the site's local CA for the checks below
+        run: |
+          docker compose run --rm -T --no-deps --entrypoint cat site-certs /out/ca/ca.crt > /tmp/site-ca.crt
+          grep -q "BEGIN CERTIFICATE" /tmp/site-ca.crt
+          # Python (the smoke scripts) reads SSL_CERT_FILE; curl reads CURL_CA_BUNDLE.
+          echo "SSL_CERT_FILE=/tmp/site-ca.crt" >> "$GITHUB_ENV"
+          echo "CURL_CA_BUNDLE=/tmp/site-ca.crt" >> "$GITHUB_ENV"
+      - name: Production settings are in force
+        run: |
+          docker compose logs backend | grep -q "Configuration OK"
+          curl -fsS https://localhost:8443/api/ready
+          # The certificate is verified (curl uses SSL_CERT_FILE), and it is for localhost only.
+          ! curl -fsS --resolve wrong.example:8443:127.0.0.1 https://wrong.example:8443/api/health
+          # No interactive API docs in production.
+          test "$(curl -s -o /dev/null -w '%{http_code}' https://localhost:8443/api/docs)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' https://localhost:8443/api/openapi.json)" = "404"
+          # Plain http only redirects to https.
+          redirect="$(curl -s -D - -o /dev/null http://127.0.0.1:8081/events | tr -d '\r')"
+          echo "$redirect" | grep -q "^HTTP/1.1 301"
+          echo "$redirect" | grep -qi "^location: https://127.0.0.1:8443/events$"
+          # HSTS over https.
+          curl -fsS -D - -o /dev/null https://localhost:8443/ | grep -qi "strict-transport-security: max-age=31536000"
+          # Only the site is published: not the backend, not the database.
+          ! curl -s -m 3 http://127.0.0.1:8001/api/health
+          ! timeout 3 bash -c 'exec 3<>/dev/tcp/127.0.0.1/5433'
+          # A production start refuses unsafe settings.
+          ! docker compose run --rm -T --no-deps --entrypoint python \
+              -e CORS_ORIGINS=http://localhost:8081 backend -m app.cli check-config
+      - name: Sign-in, two-factor, ingestion and detection work end to end over https
+        run: |
+          admin_password="$(openssl rand -hex 16)"
+          echo "$admin_password" > /tmp/admin_password
+          docker compose exec -T -e SENTINELX_ADMIN_PASSWORD="$admin_password" backend \
+            python -m app.cli create-admin --email admin@ci.example
+          python3 scripts/auth_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+          python3 scripts/security_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+          python3 scripts/ingest_smoke.py https://localhost:8443 admin@ci.example "$admin_password"
+      - name: The refresh cookie is https-only in production
+        run: |
+          printf '{"email":"admin@ci.example","password":"%s"}' "$(cat /tmp/admin_password)" > /tmp/login.json
+          curl -fsS -D /tmp/login_headers -o /dev/null -H 'Content-Type: application/json' \
+            --data @/tmp/login.json https://localhost:8443/api/auth/login
+          grep -i "^set-cookie: sx_refresh=" /tmp/login_headers | grep -qi "; secure"
+          rm /tmp/login.json
+      - name: Backup, loss of the database and restore keep every record and the audit chain
+        run: |
+          before="$(sh scripts/db_counts.sh)"
+          echo "before: $before"
+          sh scripts/backup.sh /tmp/backups
+          docker compose exec -T db sh -c 'dropdb --username "$POSTGRES_USER" --force "$POSTGRES_DB"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' https://localhost:8443/api/ready)" = "503"
+          sh scripts/restore.sh --yes /tmp/backups/*.dump
+          after="$(sh scripts/db_counts.sh)"
+          echo "after:  $after"
+          test "$before" = "$after"
+          echo "$after" | grep -q "|t|t$"
+          python3 scripts/auth_smoke.py https://localhost:8443 admin@ci.example "$(cat /tmp/admin_password)"
+      - name: No secret appears in the logs
+        run: |
+          logs="$(docker compose logs --no-color)"
+          for secret in "$(grep ^POSTGRES_PASSWORD= .env | cut -d= -f2)" \
+              "$(grep ^SECRET_KEY= .env | cut -d= -f2)" "$(grep ^APP_DB_PASSWORD= .env | cut -d= -f2)" \
+              "$(cat /tmp/admin_password)"; do
+            ! echo "$logs" | grep -qF "$secret"
+          done
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs --no-color

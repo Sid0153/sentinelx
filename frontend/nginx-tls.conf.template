@@ -1,0 +1,35 @@
+# Production configuration (docker-compose.prod.yml, docs/deployment.md): https on 8443 with
+# the certificate in /etc/nginx/tls (a local CA's by default, or your own), and plain http on
+# 8080 only to redirect to it. The nginx image's template step renders it into conf.d at start
+# (only the variables set in the environment are replaced: ${SITE_PORT}; nginx's own $host etc.
+# stay), with NGINX_ENVSUBST_TEMPLATE_DIR pointing here and conf.d an in-memory directory.
+log_format sentinelx '$remote_addr [$time_local] "$request_method $uri $server_protocol" '
+                     '$status $body_bytes_sent $request_time "$http_user_agent" $request_id';
+
+server {
+  listen 8080;
+  server_tokens off;
+  access_log /dev/stdout sentinelx;
+  # The container health check (docker-compose.prod.yml); says nothing about the app.
+  location = /healthz {
+    access_log off;
+    return 200 "ok
+";
+  }
+  # Everything else to https, on the port the site is published on (SITE_PORT).
+  location / {
+    return 301 https://$host:${SITE_PORT}$request_uri;
+  }
+}
+
+server {
+  listen 8443 ssl;
+  http2 on;
+  ssl_certificate /etc/nginx/tls/server.crt;
+  ssl_certificate_key /etc/nginx/tls/server.key;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_session_cache shared:SSL:1m;
+  ssl_session_tickets off;
+  include /etc/nginx/sentinelx/app.conf;
+}

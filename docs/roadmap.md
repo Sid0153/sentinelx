@@ -20,7 +20,7 @@ starts only on "Proceed to Phase N".
 | 12 | Evaluate and build where justified: detection playground, version diff UI, suppression windows, alert grouping | Each item justified or explicitly deferred | **Done** ([ADR-0013](decisions/0013-advanced-detection-engineering.md): advanced temporal correlation deferred) |
 | 13 | Security review of all of the above; per-source ingest keys; threat model completed | Findings fixed or recorded as residual risk | **Done** ([security.md](security.md#phase-13-review)) |
 | 14 | Test completion; controlled benchmark (generated data, `EXPLAIN ANALYZE`) | Numbers recorded with machine spec, none invented | **Done** ([performance.md](performance.md), [testing.md](testing.md)) |
-| 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | Not started |
+| 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | **Done** ([deployment.md](deployment.md), ADR-0014) |
 | 16 | Demo environment: scenario loader, 10 scenarios, reset, SIMULATED labels | Each scenario triggers exactly its documented rules (test) | Not started |
 | 17 | README, diagrams, screenshots, guides, limitations, future architecture | Docs match the code | Not started |
 | 18 | Full engineering review and fixes | Review report; misleading claims removed | Not started |

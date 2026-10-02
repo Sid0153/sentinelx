@@ -1,0 +1,83 @@
+# Production configuration on one host (Phase 15, docs/deployment.md). On top of
+# docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+#
+# - APP_ENV=production: https-only origins and refresh cookies, no API docs, startup refuses
+#   weak or development settings (app/core/config.py).
+# - https on SITE_PORT (default 8443) with a certificate from a local CA for SITE_NAMES
+#   (default localhost); plain http on HTTP_PORT only redirects. Replace the certificate with
+#   your own by putting server.crt and server.key in the site_tls_server volume (or point a TLS
+#   proxy at the http port instead; docs/deployment.md).
+# - Only the site is published: the database and the backend are not reachable from the host.
+# - Memory limits; logs rotated (docker-compose.yml).
+#
+# CI starts exactly this and runs the end-to-end checks over https.
+
+services:
+  # One-shot: the site's certificate from a private CA (same script as the database's).
+  site-certs:
+    image: python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
+    entrypoint: ["sh", "/make-certs.sh"]
+    network_mode: none
+    environment:
+      CERT_NAMES: ${SITE_NAMES:-localhost,127.0.0.1}
+      CERT_OWNER_UID: "101"  # nginx in the frontend image
+      CERT_LABEL: Site
+    volumes:
+      - ./db/make-certs.sh:/make-certs.sh:ro
+      - site_tls_ca:/out/ca
+      - site_tls_server:/out/server
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    read_only: true
+    tmpfs:
+      - /tmp
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "1" }
+
+  db:
+    ports: !reset []
+    mem_limit: 1g
+
+  backend:
+    environment:
+      APP_ENV: production
+      # The origin browsers use: the first of SITE_NAMES on SITE_PORT.
+      CORS_ORIGINS: ${SITE_ORIGIN:-https://localhost:8443}
+    ports: !reset []
+    mem_limit: 768m
+
+  frontend:
+    depends_on:
+      site-certs:
+        condition: service_completed_successfully
+    environment:
+      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/sentinelx/templates
+      SITE_PORT: ${SITE_PORT:-8443}
+    volumes:
+      - site_tls_server:/etc/nginx/tls:ro
+    # The template step writes the rendered configuration here (the root filesystem stays
+    # read-only).
+    tmpfs:
+      - /tmp
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+    ports: !override
+      # SITE_BIND=0.0.0.0 (and SITE_PORT=443, HTTP_PORT=80) to serve other machines.
+      - "${SITE_BIND:-127.0.0.1}:${SITE_PORT:-8443}:8443"
+      - "${SITE_BIND:-127.0.0.1}:${HTTP_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    mem_limit: 128m
+
+volumes:
+  site_tls_ca:
+  site_tls_server:

@@ -1,4 +1,4 @@
-FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+FROM python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -9,6 +9,10 @@ WORKDIR /app
 # Dependencies first so this layer is cached when only application code changes.
 # requirements.txt is a lockfile: exact versions, and --require-hashes refuses any package
 # whose download does not match the recorded hash (protects against tampered packages).
+# Security fixes released after the pinned base image (CI's image scan fails on any fixable
+# HIGH or CRITICAL issue). The base stays pinned by digest; Dependabot proposes new digests.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends     && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --require-hashes -r requirements.txt
 
