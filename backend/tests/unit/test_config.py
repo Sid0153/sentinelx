@@ -94,6 +94,8 @@ OWNER = "postgresql+psycopg://neondb_owner:owner-pw@ep-x.neon.tech/neondb?sslmod
 def test_the_app_url_is_derived_from_the_owner_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Only the owner's address is pasted; the app connects as its own role, same host."""
     monkeypatch.delenv("DATABASE_URL", raising=False)
+    # Derivation only: no CA bundle here (the rewrite of sslrootcert is tested below).
+    monkeypatch.setattr("app.core.config.SYSTEM_CA_BUNDLE", "/nonexistent/ca-certificates.crt")
     settings = Settings(  # type: ignore[call-arg]
         _env_file=None,
         secret_key=SECRET,
