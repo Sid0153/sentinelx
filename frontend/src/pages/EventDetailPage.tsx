@@ -12,7 +12,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   if (children === null || children === undefined || children === "") return null;
   return (
     <div className="flex gap-3 py-0.5 text-sm">
-      <dt className="w-36 shrink-0 text-slate-500">{label}</dt>
+      <dt className="w-36 shrink-0 text-slate-400">{label}</dt>
       <dd className="min-w-0 break-words font-mono text-xs text-slate-200">{children}</dd>
     </div>
   );
@@ -99,7 +99,7 @@ export function EventDetailPage() {
           </div>
           {attributes.length > 0 && (
             <>
-              <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Attributes</h3>
+              <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Attributes</h3>
               <dl>
                 {attributes.map(([key, value]) => (
                   <Row key={key} label={key}>
@@ -144,14 +144,14 @@ export function EventDetailPage() {
                     <Link to={`/alerts/${a.id}`} className="text-sky-300">
                       {a.title}
                     </Link>{" "}
-                    <span className="text-xs text-slate-500">({a.status})</span>
+                    <span className="text-xs text-slate-400">({a.status})</span>
                   </li>
                 ))}
               </ul>
             )}
           </Panel>
           <Panel title="Raw record">
-            <p className="mb-2 text-xs text-slate-500">
+            <p className="mb-2 text-xs text-slate-400">
               As received ({event.raw.size_bytes} bytes), parse status {event.raw.parse_status}.
               Shown as text; the stored bytes are never changed.
             </p>
@@ -164,7 +164,7 @@ export function EventDetailPage() {
                   {event.raw.text}
                 </pre>
                 {event.raw.truncated && (
-                  <p className="text-xs text-slate-500">Shown up to 4,096 characters.</p>
+                  <p className="text-xs text-slate-400">Shown up to 4,096 characters.</p>
                 )}
               </>
             )}

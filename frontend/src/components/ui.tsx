@@ -8,7 +8,7 @@ import {
 
 export const inputClass =
   "w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 " +
-  "placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500";
+  "placeholder:text-slate-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500";
 
 export const selectClass =
   "rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-100 " +
@@ -17,7 +17,7 @@ export const selectClass =
 type Variant = "primary" | "secondary" | "danger";
 
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-sky-600 text-white hover:bg-sky-500",
+  primary: "bg-sky-700 text-white hover:bg-sky-600",
   secondary: "border border-slate-700 text-slate-200 hover:bg-slate-800",
   danger: "border border-rose-800 text-rose-300 hover:bg-rose-950",
 };
@@ -54,7 +54,7 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
         {control}
       </label>
       {hint && (
-        <p id={hintId} className="mt-1 text-xs text-slate-500">
+        <p id={hintId} className="mt-1 text-xs text-slate-400">
           {hint}
         </p>
       )}

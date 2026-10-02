@@ -119,7 +119,7 @@ function Header({
         </form>
       ) : (
         <h1 className="mt-2 text-lg font-semibold text-slate-100">
-          <span className="font-mono text-slate-500">{incidentRef(incident.number)}</span> {incident.title}
+          <span className="font-mono text-slate-400">{incidentRef(incident.number)}</span> {incident.title}
           {canAct && !closed && (
             <Button variant="secondary" className="ml-2 align-middle" onClick={() => setEditing(true)}>
               Rename
@@ -410,7 +410,7 @@ function TimelineRow({
   return (
     <li className="border-t border-slate-800 py-1.5 text-sm">
       <div className="flex flex-wrap items-start gap-x-3">
-        <span className="shrink-0 font-mono text-xs text-slate-500">{formatUtc(entry.at)}</span>
+        <span className="shrink-0 font-mono text-xs text-slate-400">{formatUtc(entry.at)}</span>
         {e && (
           <span className="min-w-0 text-slate-200">
             <span className="font-mono text-xs">
@@ -518,7 +518,7 @@ function Timeline({
 
   return (
     <Panel title="Timeline">
-      <p className="mb-2 text-xs text-slate-500">
+      <p className="mb-2 text-xs text-slate-400">
         Rebuilt from stored data: the evidence events of the linked alerts, the alerts, and every
         action on the incident, oldest first.
       </p>
@@ -571,7 +571,7 @@ function Notes({
           {incident.notes.map((note) => (
             <li key={note.id} className="text-sm">
               <p className="whitespace-pre-wrap text-slate-200">{note.body}</p>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-400">
                 {note.author ?? "—"} · {formatUtc(note.created_at)}
               </p>
             </li>
@@ -629,7 +629,7 @@ function Evidence({
               </span>{" "}
               <span className="text-slate-200">{pin.label}</span>
               {pin.comment && <div className="text-xs text-slate-400">{pin.comment}</div>}
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-400">
                 {pin.pinned_by ?? "—"} · {formatUtc(pin.pinned_at)}
                 {canAct && incident.status !== "CLOSED" && (
                   <Button
@@ -691,7 +691,7 @@ export function IncidentDetailPage() {
         <div className="min-w-0 space-y-4 lg:col-span-2">
           <Panel title="Summary">
             <p className="text-sm text-slate-200">{incident.summary}</p>
-            <p className="mt-2 text-xs text-slate-500">Opened: {incident.created_reason}</p>
+            <p className="mt-2 text-xs text-slate-400">Opened: {incident.created_reason}</p>
             {incident.resolution && (
               <p className="mt-2 text-sm text-emerald-200">
                 Resolution ({incident.disposition?.replace("_", " ")}): {incident.resolution}
@@ -731,7 +731,7 @@ export function IncidentDetailPage() {
                 </tr>
               </tbody>
             </table>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-400">
               SentinelX risk, model version {incident.risk_model_version}: project-specific, not an
               industry standard.
             </p>
@@ -740,15 +740,15 @@ export function IncidentDetailPage() {
           <Panel title="Affected">
             <dl className="space-y-1 text-sm">
               <div>
-                <dt className="text-slate-500">Hosts</dt>
+                <dt className="text-slate-400">Hosts</dt>
                 <dd className="text-slate-200">{shortList(incident.hosts, 20) || "—"}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Accounts</dt>
+                <dt className="text-slate-400">Accounts</dt>
                 <dd className="text-slate-200">{shortList(incident.usernames, 20) || "—"}</dd>
               </div>
               <div>
-                <dt className="text-slate-500">Sources</dt>
+                <dt className="text-slate-400">Sources</dt>
                 <dd className="text-slate-200">{shortList(incident.source_ips, 20) || "—"}</dd>
               </div>
             </dl>
@@ -780,7 +780,7 @@ export function IncidentDetailPage() {
                   <a href={t.url} target="_blank" rel="noreferrer noopener" className="text-sky-300">
                     {t.technique} {t.name}
                   </a>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-slate-400">
                     {t.tactics.join(", ")} · from {t.rules.join(", ")}
                   </div>
                 </li>
@@ -788,7 +788,7 @@ export function IncidentDetailPage() {
             </ul>
           </Panel>
           <Panel title="Recommended response">
-            <p className="mb-2 text-xs text-slate-500">
+            <p className="mb-2 text-xs text-slate-400">
               Recommendations only: SentinelX never changes anything on monitored systems.
             </p>
             {incident.response.map((group) => (

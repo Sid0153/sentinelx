@@ -33,8 +33,8 @@ function IncidentRow({ incident }: { incident: IncidentSummary }) {
         <PriorityBadge score={incident.risk_score} band={incident.risk_band} />
       </td>
       <td className="py-2 pr-4">
-        <Link to={`/incidents/${incident.id}`} className="text-slate-100 hover:text-sky-300">
-          <span className="font-mono text-xs text-slate-500">{incidentRef(incident.number)}</span>{" "}
+        <Link to={`/incidents/${incident.id}`} className="text-slate-100 underline decoration-slate-600 underline-offset-4 hover:text-sky-300 hover:decoration-sky-300">
+          <span className="font-mono text-xs text-slate-400">{incidentRef(incident.number)}</span>{" "}
           {incident.title}
         </Link>
         <div className="mt-0.5 flex flex-wrap items-center gap-2">
@@ -129,7 +129,7 @@ export function IncidentsPage() {
           </p>
         ) : (
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Risk</th>
                 <th className="py-2 pr-4 font-medium">Incident</th>

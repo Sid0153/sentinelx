@@ -35,7 +35,7 @@ function Row({ name, condition, label, hint }: {
       <dt className="text-sm text-slate-300">{name}</dt>
       <dd className="flex flex-col gap-0.5 sm:items-end">
         <StatusIndicator condition={condition} label={label} />
-        {hint && <span className="text-xs text-slate-500">{hint}</span>}
+        {hint && <span className="text-xs text-slate-400">{hint}</span>}
       </dd>
     </div>
   );
@@ -67,7 +67,7 @@ export function StatusPage() {
             <StatusIndicator condition="down" label="API unreachable" />
             <p className="mt-2 text-sm text-slate-400">{error.message}</p>
             {error.requestId && (
-              <p className="mt-1 font-mono text-xs text-slate-500">Request ID: {error.requestId}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">Request ID: {error.requestId}</p>
             )}
           </div>
         ) : !data ? (
@@ -96,7 +96,7 @@ export function StatusPage() {
           </>
         )}
       </div>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-3 text-xs text-slate-400">
         Live values from <span className="font-mono">/api/health</span> and{" "}
         <span className="font-mono">/api/ready</span>.
       </p>

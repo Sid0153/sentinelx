@@ -307,7 +307,7 @@ export function PivotValue({
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
-  if (!value) return <span className="text-slate-500">—</span>;
+  if (!value) return <span className="text-slate-400">—</span>;
   return (
     <span ref={box} className="relative inline-block">
       <button

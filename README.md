@@ -4,7 +4,7 @@ A security operations platform: it ingests security logs, detects attacks with e
 rules, correlates alerts into incidents, and gives analysts one place to investigate, hunt
 and record what they did.
 
-> **Status: Phases 1–17 complete** ([roadmap](docs/roadmap.md)). Every feature of the brief is
+> **Status: all 19 phases complete** ([roadmap](docs/roadmap.md)). Every feature of the brief is
 > mapped to its phase and status in [feature-coverage.md](docs/feature-coverage.md).
 > It is a **defensive** tool built as a portfolio project. Every attack it has seen is
 > SIMULATED: generated log records of a fictional company, sent through the real pipeline and
@@ -113,10 +113,11 @@ route is missing from the access table. Log shippers post batches to
 
 ## Testing
 
-- **Backend**: 1,370 tests at 98% line coverage. API and integration tests run on a real
+- **Backend**: 1,427 tests at 98% line coverage. API and integration tests run on a real
   PostgreSQL, not a mock. They cover parsers against malformed input, each rule on its
   scenario, real concurrency, query budgets, the RBAC table and the audit chain.
-- **Frontend**: 116 tests with coverage floors.
+- **Frontend**: 117 tests with coverage floors. Every page passes an axe WCAG 2 AA audit
+  ([review.md](docs/review.md)).
 - **CI**: on every push, lint, types, dependency audits, a secret scan and an image
   vulnerability scan. It also starts the development stack and the production configuration
   (over https) and runs end-to-end scripts, a backup and restore, and a demo load and reset.
@@ -172,6 +173,7 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 | [performance.md](docs/performance.md) | Measured throughput and read latency on 1 million records |
 | [deployment.md](docs/deployment.md) | Production configuration, TLS, configuration reference, backup and restore, upgrades |
 | [decisions/](docs/decisions/README.md) | Architecture decision records |
+| [review.md](docs/review.md) | The final engineering review: what was checked, what was found, what was fixed or accepted |
 | [repository-assessment.md](docs/repository-assessment.md) | What existed before SentinelX, and what was reused from CloudSentinel |
 
 ## Stack

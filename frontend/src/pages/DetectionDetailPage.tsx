@@ -72,7 +72,7 @@ function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (
     <fieldset className="space-y-2">
       <legend className="mb-1 text-sm text-slate-300">Exclusions (events matching one are ignored by this rule)</legend>
       {value.length === 0 ? (
-        <p className="text-xs text-slate-500">None.</p>
+        <p className="text-xs text-slate-400">None.</p>
       ) : (
         <ul className="space-y-1 text-sm">
           {value.map((e, i) => (
@@ -80,7 +80,7 @@ function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (
               <span className="font-mono text-xs text-slate-200">
                 {e.field} = {e.value}
               </span>
-              {e.comment && <span className="text-xs text-slate-500">({e.comment})</span>}
+              {e.comment && <span className="text-xs text-slate-400">({e.comment})</span>}
               {suppressionLabel(e) && <span className="text-xs text-amber-300">{suppressionLabel(e)}</span>}
               <button
                 type="button"
@@ -158,7 +158,7 @@ function ExclusionsEditor({ value, onChange }: { value: Exclusion[]; onChange: (
           {from && until ? "Add suppression" : "Add exclusion"}
         </Button>
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-400">
         Without dates an exclusion is permanent. With both, it is a suppression (a maintenance
         window, an announced test) of at most 90 days: only events inside the window are ignored.
         {halfWindow && <span className="text-amber-300"> Give both dates, or neither.</span>}
@@ -389,7 +389,7 @@ function VersionDiff({ versions }: { versions: RuleVersion[] }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs" aria-label="Changed fields">
-            <thead className="uppercase tracking-wide text-slate-500">
+            <thead className="uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-1 pr-3 font-medium">Field</th>
                 <th className="py-1 pr-3 font-medium">v{older}</th>
@@ -433,7 +433,7 @@ function Versions({ ruleId, attempt }: { ruleId: string; attempt: number }) {
           </div>
           {v.change_reason && <p className="text-slate-300">{v.change_reason}</p>}
           {Object.keys(v.overrides).length > 0 && (
-            <p className="break-all font-mono text-xs text-slate-500">overrides {JSON.stringify(v.overrides)}</p>
+            <p className="break-all font-mono text-xs text-slate-400">overrides {JSON.stringify(v.overrides)}</p>
           )}
         </li>
       ))}
@@ -451,7 +451,7 @@ function RuleOutcomes({ ruleId }: { ruleId: string }) {
   const m = data?.items.find((item) => item.rule_id === ruleId);
   const row = (label: string, value: string) => (
     <div className="flex gap-3">
-      <dt className="w-40 shrink-0 text-slate-500">{label}</dt>
+      <dt className="w-40 shrink-0 text-slate-400">{label}</dt>
       <dd className="font-mono text-slate-200">{value}</dd>
     </div>
   );
@@ -581,7 +581,7 @@ export function DetectionDetailPage() {
                   <a href={t.url} target="_blank" rel="noreferrer noopener" className="text-sky-300">
                     <span className="font-mono">{t.technique_id}</span> {t.name}
                   </a>
-                  <span className="text-xs text-slate-500"> · {t.tactics.join(", ")}</span>
+                  <span className="text-xs text-slate-400"> · {t.tactics.join(", ")}</span>
                   <p className="text-xs text-slate-400">{t.reason}</p>
                 </li>
               ))}
@@ -590,19 +590,19 @@ export function DetectionDetailPage() {
           <Panel title="Statistics">
             <dl className="text-sm">
               <div className="flex gap-3">
-                <dt className="w-32 text-slate-500">Matches</dt>
+                <dt className="w-32 text-slate-400">Matches</dt>
                 <dd className="font-mono text-slate-200">{rule.match_count}</dd>
               </div>
               <div className="flex gap-3">
-                <dt className="w-32 text-slate-500">Errors</dt>
+                <dt className="w-32 text-slate-400">Errors</dt>
                 <dd className="font-mono text-slate-200">{rule.error_count}</dd>
               </div>
               <div className="flex gap-3">
-                <dt className="w-32 text-slate-500">Last run</dt>
+                <dt className="w-32 text-slate-400">Last run</dt>
                 <dd className="font-mono text-xs text-slate-200">{rule.last_run_at ? formatUtc(rule.last_run_at) : "never"}</dd>
               </div>
               <div className="flex gap-3">
-                <dt className="w-32 text-slate-500">Last match</dt>
+                <dt className="w-32 text-slate-400">Last match</dt>
                 <dd className="font-mono text-xs text-slate-200">{rule.last_match_at ? formatUtc(rule.last_match_at) : "never"}</dd>
               </div>
             </dl>

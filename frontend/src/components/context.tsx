@@ -24,7 +24,7 @@ export function splitList(text: string): string[] {
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 py-0.5 text-sm">
-      <dt className="w-32 shrink-0 text-slate-500">{label}</dt>
+      <dt className="w-32 shrink-0 text-slate-400">{label}</dt>
       <dd className="min-w-0 break-words text-slate-200">{children}</dd>
     </div>
   );
@@ -57,7 +57,7 @@ export function ActivityPanels({ activity }: { activity: ContextActivity }) {
                   <Link to={`/alerts/${a.id}`} className="block truncate text-slate-100 hover:text-sky-300">
                     {a.title}
                   </Link>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                     <StatusText status={a.status} />
                     {formatUtc(a.last_event_at)}
                     {a.simulated && <SimulatedTag />}
@@ -78,9 +78,9 @@ export function ActivityPanels({ activity }: { activity: ContextActivity }) {
                 <PriorityBadge score={i.risk_score} band={i.risk_band} />
                 <div className="min-w-0">
                   <Link to={`/incidents/${i.id}`} className="block truncate text-slate-100 hover:text-sky-300">
-                    <span className="font-mono text-xs text-slate-500">{incidentRef(i.number)}</span> {i.title}
+                    <span className="font-mono text-xs text-slate-400">{incidentRef(i.number)}</span> {i.title}
                   </Link>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                     <IncidentStatusText status={i.status} />
                     {i.alert_count} alerts
                   </div>
@@ -272,7 +272,7 @@ export function InventoryPanel({ inventory }: { inventory: InventoryContext | nu
               <span className="text-slate-300">
                 {a.criticality} criticality · {a.asset_type.replace("_", " ")} · {a.environment}
               </span>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-400">
                 {a.owner ? `Owner: ${a.owner}` : "No owner recorded"}
                 {a.status === "retired" && " · retired"}
                 {a.tags.length > 0 && ` · ${a.tags.join(", ")}`}
@@ -288,7 +288,7 @@ export function InventoryPanel({ inventory }: { inventory: InventoryContext | nu
                 {i.privilege_level}
               </span>{" "}
               <span className="text-xs text-slate-400">({i.roles.join(" and ")})</span>
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-slate-400">
                 {[i.display_name, i.department, i.title].filter(Boolean).join(" · ") || "No details recorded"}
                 {i.status === "disabled" && " · disabled"}
               </div>

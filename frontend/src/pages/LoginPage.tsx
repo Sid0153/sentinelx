@@ -155,7 +155,7 @@ export function LoginPage() {
             {submitting ? "Signing in…" : codeStep ? "Verify" : "Sign in"}
           </Button>
         </form>
-        <p className="mt-4 text-center text-xs text-slate-500">
+        <p className="mt-4 text-center text-xs text-slate-400">
           Accounts are created by an administrator. There is no self-registration.
         </p>
       </div>

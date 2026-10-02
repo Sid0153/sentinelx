@@ -630,6 +630,17 @@ def test_generic_json_failures(record: dict[str, Any]) -> None:
     assert failure(GENERIC, json.dumps(record)) == "invalid_event"
 
 
+def test_generic_json_cannot_claim_another_source_type() -> None:
+    """The source decides the format: a record saying it is a Windows event is not one."""
+    record = {
+        "timestamp": "2026-09-25T10:31:02Z",
+        "event_category": "network",
+        "event_action": "connection",
+        "source_type": "windows_security",
+    }
+    assert event(GENERIC, json.dumps(record)).source_type == SourceType.GENERIC_JSON
+
+
 # ---------- hostile input ----------
 
 

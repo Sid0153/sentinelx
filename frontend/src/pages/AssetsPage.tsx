@@ -137,7 +137,7 @@ export function AssetsPage() {
           <p className="py-3 text-sm text-slate-400">No assets match.</p>
         ) : (
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Hostname</th>
                 <th className="py-2 pr-4 font-medium">Criticality</th>
@@ -153,8 +153,8 @@ export function AssetsPage() {
                     <Link to={`/assets/${a.id}`} className="font-mono text-slate-100 hover:text-sky-300">
                       {a.hostname}
                     </Link>
-                    {a.status === "retired" && <span className="ml-2 text-xs text-slate-500">retired</span>}
-                    {a.owner && <div className="text-xs text-slate-500">{a.owner}</div>}
+                    {a.status === "retired" && <span className="ml-2 text-xs text-slate-400">retired</span>}
+                    {a.owner && <div className="text-xs text-slate-400">{a.owner}</div>}
                   </td>
                   <td className="py-2 pr-4 capitalize text-slate-300">{a.criticality}</td>
                   <td className="py-2 pr-4 text-xs text-slate-400">

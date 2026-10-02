@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { hasRole, useAuth, useCurrentUser } from "../auth/AuthContext";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Button } from "../components/ui";
 import type { Role } from "../types/api";
 
@@ -27,6 +28,7 @@ const NAV_ITEMS: { to: string; label: string; minimum: Role }[] = [
 export function AppLayout() {
   const user = useCurrentUser();
   const { signOut } = useAuth();
+  const location = useLocation();
 
   return (
     <div className="min-h-screen">
@@ -62,7 +64,9 @@ export function AppLayout() {
         </div>
       </header>
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <Outlet />
+        <ErrorBoundary key={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

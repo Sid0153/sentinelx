@@ -37,8 +37,8 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+psycopg://ci:ci-only-throwaway@127.0.0.1:5432/sentinelx_test
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -65,8 +65,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -88,19 +88,19 @@ jobs:
     name: Secret scan (gitleaks, full history)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0 # every commit, so a secret removed later is still found
       - name: Scan for committed secrets
         run: >-
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
           git /repo --config /repo/.gitleaks.toml --no-banner --redact
 
   docker-stack:
     name: Docker Compose smoke test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Create .env with generated throwaway secrets
         run: |
           cp .env.example .env
@@ -281,7 +281,7 @@ jobs:
       # Every docker compose command below uses the production configuration.
       COMPOSE_FILE: docker-compose.yml:docker-compose.prod.yml
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Create .env with generated throwaway secrets
         run: |
           cp .env.example .env

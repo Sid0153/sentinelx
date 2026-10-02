@@ -54,7 +54,7 @@ function AlertPivots({ alert }: { alert: AlertDetail }) {
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 py-0.5 text-sm">
-      <dt className="w-32 shrink-0 text-slate-500">{label}</dt>
+      <dt className="w-32 shrink-0 text-slate-400">{label}</dt>
       <dd className="min-w-0 break-words text-slate-200">{children ?? "—"}</dd>
     </div>
   );
@@ -112,7 +112,7 @@ function Breakdown({ alert }: { alert: AlertDetail }) {
           </tr>
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-slate-400">
         SentinelX priority score, model version {alert.risk_model_version}: a documented,
         project-specific sum, not an industry standard. Asset and identity points use the
         current inventory.
@@ -156,7 +156,7 @@ function Timeline({ alert }: { alert: AlertDetail }) {
       <ol className="space-y-2">
         {timeline(alert).map((item, i) => (
           <li key={i} className="text-sm">
-            <span className="font-mono text-xs text-slate-500">{formatUtc(item.at)}</span>
+            <span className="font-mono text-xs text-slate-400">{formatUtc(item.at)}</span>
             <div className="text-slate-200">{item.text}</div>
             {item.detail && <div className="text-xs text-slate-400">{item.detail}</div>}
           </li>
@@ -182,7 +182,7 @@ function EvidenceRow({ event }: { event: EvidenceEvent }) {
         </td>
         <td className="py-1.5 pr-3 text-xs text-slate-300">
           {event.host ?? "—"}
-          {who && <span className="text-slate-500"> · {who}</span>}
+          {who && <span className="text-slate-400"> · {who}</span>}
         </td>
         <td className="py-1.5 text-right">
           <Button variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>
@@ -202,7 +202,7 @@ function EvidenceRow({ event }: { event: EvidenceEvent }) {
               </pre>
             )}
             {event.raw_truncated && !event.raw_withheld && (
-              <p className="text-xs text-slate-500">Shown up to 4,096 characters.</p>
+              <p className="text-xs text-slate-400">Shown up to 4,096 characters.</p>
             )}
           </td>
         </tr>
@@ -450,7 +450,7 @@ export function AlertDetailPage() {
           <StatusText status={alert.status} />
           <LevelBadge level={alert.severity} label="severity" />
           <LevelBadge level={alert.confidence} label="confidence" />
-          <span className="font-mono text-xs text-slate-500">
+          <span className="font-mono text-xs text-slate-400">
             {alert.rule_id} v{alert.rule_version}
           </span>
           {alert.simulated && <SimulatedTag />}
@@ -462,7 +462,7 @@ export function AlertDetailPage() {
           <Panel title="What happened">
             <p className="text-sm text-slate-200">{alert.explanation}</p>
             {alert.detection_count > 1 && (
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-400">
                 Latest of {alert.detection_count} detections merged into this alert.
               </p>
             )}
@@ -499,7 +499,7 @@ export function AlertDetailPage() {
           {alert.status_note && (
             <Panel title="Latest note">
               <p className="text-sm text-slate-200">{alert.status_note}</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-slate-400">
                 {alert.status_changed_by ?? "—"} · {formatUtc(alert.status_changed_at)}
               </p>
             </Panel>
@@ -525,12 +525,12 @@ export function AlertDetailPage() {
                   <a href={m.url} target="_blank" rel="noreferrer noopener" className="text-sky-300">
                     {m.technique} {m.name}
                   </a>
-                  <div className="text-xs text-slate-500">{m.tactics.join(", ")}</div>
+                  <div className="text-xs text-slate-400">{m.tactics.join(", ")}</div>
                   <div className="text-xs text-slate-400">{m.reason}</div>
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-slate-500">ATT&CK v{alert.mitre[0]?.attack_version}</p>
+            <p className="mt-2 text-xs text-slate-400">ATT&CK v{alert.mitre[0]?.attack_version}</p>
           </Panel>
           <Timeline alert={alert} />
           <Panel title="Related alerts">
@@ -545,7 +545,7 @@ export function AlertDetailPage() {
                     <Link to={`/alerts/${r.id}`} className="text-sky-300">
                       {r.title}
                     </Link>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <PriorityBadge score={r.priority_score} band={r.priority_band} />
                       <StatusText status={r.status} />
                       shares {r.shared.join(", ")}

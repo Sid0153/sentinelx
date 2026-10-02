@@ -127,7 +127,7 @@ export function IdentitiesPage() {
           <p className="py-3 text-sm text-slate-400">No identities match.</p>
         ) : (
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Username</th>
                 <th className="py-2 pr-4 font-medium">Privilege</th>
@@ -143,8 +143,8 @@ export function IdentitiesPage() {
                     <Link to={`/identities/${i.id}`} className="font-mono text-slate-100 hover:text-sky-300">
                       {i.username}
                     </Link>
-                    {i.status === "disabled" && <span className="ml-2 text-xs text-slate-500">disabled</span>}
-                    {i.display_name && <div className="text-xs text-slate-500">{i.display_name}</div>}
+                    {i.status === "disabled" && <span className="ml-2 text-xs text-slate-400">disabled</span>}
+                    {i.display_name && <div className="text-xs text-slate-400">{i.display_name}</div>}
                   </td>
                   <td className="py-2 pr-4 text-slate-300">{i.privilege_level}</td>
                   <td className="py-2 pr-4 text-xs text-slate-400">{i.department ?? "—"}</td>

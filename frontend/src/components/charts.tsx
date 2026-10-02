@@ -68,7 +68,7 @@ export function DailyColumns({
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-40 w-full"
-          role="img"
+          role="group"
           aria-label={`${title}: ${empty ? "nothing in this period" : `peak ${max} on one day`}. The table view lists every value.`}
           aria-describedby={tableId}
           onMouseLeave={() => setActive(null)}

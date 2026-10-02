@@ -95,7 +95,7 @@ function QueryResults({
       ) : (
         <div className="overflow-x-auto">
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-3 font-medium">Time</th>
                 <th className="py-2 pr-3 font-medium">Event</th>
@@ -170,7 +170,7 @@ function QueryResults({
 // ---------- template results ----------
 
 function Cell({ column, value, around }: { column: TemplateColumn; value: unknown; around: { from: string; to: string } }) {
-  if (value === null || value === undefined) return <span className="text-slate-500">—</span>;
+  if (value === null || value === undefined) return <span className="text-slate-400">—</span>;
   const pivotField: Record<string, string> = { ip: "source_ip", user: "username", host: "host", process: "process_name" };
   if (column.kind in pivotField) return <PivotValue field={pivotField[column.kind]} value={String(value)} around={around} />;
   if (column.kind === "time") return <span className="whitespace-nowrap font-mono text-xs">{formatUtc(String(value))}</span>;
@@ -206,7 +206,7 @@ function TemplateResults({ definition }: { definition: TemplateDefinition }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 {data.columns.map((c) => (
                   <th key={c.key} className="py-2 pr-3 font-medium">
@@ -287,7 +287,7 @@ function QueryEditor({
       </div>
       <fieldset className="space-y-2">
         <legend className="mb-1 text-sm text-slate-300">Events where all of these are true</legend>
-        {rows.length === 0 && <p className="text-xs text-slate-500">No filters: every event in the time range.</p>}
+        {rows.length === 0 && <p className="text-xs text-slate-400">No filters: every event in the time range.</p>}
         {rows.map((row, i) => (
           <FilterRowEditor
             key={i}
@@ -399,7 +399,7 @@ function TemplateEditor({
             />
             <span className="block font-medium text-slate-100">{t.name}</span>
             <span className="block text-xs text-slate-400">{t.question}</span>
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-1 block text-xs text-slate-400">
               ATT&CK {t.technique}
               {t.mirrors_rule && ` · mirrors rule ${t.mirrors_rule}`}
             </span>
@@ -474,11 +474,11 @@ function SavedHunts({ current }: { current: HuntDefinition | null }) {
                   <span className="font-medium text-slate-400">{h.name}</span>
                 )}
                 {h.shared && <span className="rounded bg-slate-800 px-1.5 text-xs text-slate-300">shared</span>}
-                <span className="text-xs text-slate-500">{h.kind === "template" ? "template" : "query"}</span>
+                <span className="text-xs text-slate-400">{h.kind === "template" ? "template" : "query"}</span>
               </div>
               {h.description && <p className="text-xs text-slate-400">{h.description}</p>}
               {!h.valid && <p className="text-xs text-amber-300">{h.problem}</p>}
-              {!h.is_owner && <p className="text-xs text-slate-500">by {h.owner_email}</p>}
+              {!h.is_owner && <p className="text-xs text-slate-400">by {h.owner_email}</p>}
               {h.is_owner && (
                 <div className="mt-1 flex gap-3 text-xs">
                   <button type="button" className="text-sky-300 hover:underline" onClick={() => void act(() => updateSavedHunt(h.id, { shared: !h.shared }))}>

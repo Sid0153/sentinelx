@@ -184,7 +184,7 @@ export function AuditPage() {
           <p className="py-3 text-sm text-slate-400">No entries match these filters.</p>
         ) : (
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Time</th>
                 <th className="py-2 pr-4 font-medium">Action</th>

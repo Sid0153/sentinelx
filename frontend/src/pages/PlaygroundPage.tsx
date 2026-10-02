@@ -105,7 +105,7 @@ function Results({ result }: { result: PlaygroundResult }) {
       <Panel title="Lines">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="uppercase tracking-wide text-slate-500">
+            <thead className="uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-1 pr-3 font-medium">#</th>
                 <th className="py-1 pr-3 font-medium">Result</th>
@@ -119,7 +119,7 @@ function Results({ result }: { result: PlaygroundResult }) {
                   <td className="py-1 pr-3 font-mono text-slate-400">{line.line}</td>
                   <td className="py-1 pr-3">
                     {line.status !== "parsed" ? (
-                      <span className="text-slate-500">
+                      <span className="text-slate-400">
                         {line.status} ({line.code})
                       </span>
                     ) : line.excluded ? (
@@ -129,12 +129,12 @@ function Results({ result }: { result: PlaygroundResult }) {
                     ) : line.matched || line.steps.length > 0 ? (
                       <span className="text-sky-300">matched{line.steps.length > 0 && ` (${line.steps.join(", ")})`}</span>
                     ) : (
-                      <span className="text-slate-500">no match</span>
+                      <span className="text-slate-400">no match</span>
                     )}
                   </td>
                   <td className="py-1 pr-3 font-mono text-slate-300">
                     {line.event ?? "—"}
-                    {line.timestamp && <div className="text-slate-500">{formatUtc(line.timestamp)}</div>}
+                    {line.timestamp && <div className="text-slate-400">{formatUtc(line.timestamp)}</div>}
                   </td>
                   <td className="py-1 font-mono text-slate-400">
                     {[line.username && `user ${line.username}`, line.target_username && `→ ${line.target_username}`, line.source_ip && `from ${line.source_ip}`, line.host && `on ${line.host}`, line.process_name]
@@ -250,7 +250,7 @@ export function PlaygroundPage() {
         {detail && (
           <p className="text-sm text-slate-400">
             {detail.description}{" "}
-            <Link to={`/detections/${detail.rule_id}`} className="text-sky-300">
+            <Link to={`/detections/${detail.rule_id}`} className="text-sky-300 underline underline-offset-2">
               Rule page
             </Link>
           </p>

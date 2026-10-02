@@ -40,7 +40,7 @@ function AlertRow({ alert }: { alert: AlertSummary }) {
           {alert.title}
         </Link>
         <div className="mt-0.5 flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs text-slate-500">{alert.rule_id}</span>
+          <span className="font-mono text-xs text-slate-400">{alert.rule_id}</span>
           <Entities alert={alert} />
           {alert.simulated && <SimulatedTag />}
         </div>
@@ -112,11 +112,11 @@ function GroupedQueue({
         <p className="py-3 text-sm text-slate-400">No alerts match these filters.</p>
       ) : (
         <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-          <caption className="py-2 text-left text-xs text-slate-500">
+          <caption className="py-2 text-left text-xs text-slate-400">
             {data.total} group{data.total === 1 ? "" : "s"}
             {data.total > data.items.length && ` (the ${data.items.length} with the highest priority shown)`}
           </caption>
-          <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <thead className="text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="py-2 pr-4 font-medium">Highest priority</th>
               <th className="py-2 pr-4 font-medium">{GROUPS.find((g) => g.value === by)?.label}</th>
@@ -134,7 +134,7 @@ function GroupedQueue({
                   <Link to={linkFor(g.key)} className="text-slate-100 hover:text-sky-300">
                     {by === "rule" ? (
                       <>
-                        <span className="font-mono text-xs text-slate-500">{g.key}</span> {g.label}
+                        <span className="font-mono text-xs text-slate-400">{g.key}</span> {g.label}
                       </>
                     ) : (
                       <span className="font-mono">{g.key}</span>
@@ -143,7 +143,7 @@ function GroupedQueue({
                 </td>
                 <td className="py-2 pr-4 text-right font-mono text-slate-200">
                   {g.alerts}
-                  {g.open !== g.alerts && <div className="text-xs text-slate-500">{g.open} open</div>}
+                  {g.open !== g.alerts && <div className="text-xs text-slate-400">{g.open} open</div>}
                 </td>
                 <td className="whitespace-nowrap py-2 font-mono text-xs text-slate-400">
                   {formatUtc(g.last_event_at)}
@@ -255,7 +255,7 @@ export function AlertsPage() {
           </p>
         ) : (
           <table className={`w-full text-left text-sm ${loading ? "opacity-60" : ""}`}>
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Priority</th>
                 <th className="py-2 pr-4 font-medium">Alert</th>

@@ -152,7 +152,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 | Detection coverage view, labelled "Implemented coverage" (§43) | ✅ `/coverage`: active rules, categories, severity, mappings, trigger counts, last triggered; every tactic with gaps stated (11) |
 | Detection testing playground (§44) | ✅ `/playground` (analysts): choose a rule, paste sample events, run it, see whether and why it triggered, the evidence lines, severity and confidence; what-if tuning; nothing stored (12) |
 | Real-world extension plan (§49) | ✅ `architecture.md` |
-| Interview and portfolio package (§48, Phase 19) | ⬜ |
+| Interview and portfolio package (§48, Phase 19) | ✅ in the git-ignored `portfolio/` (personal, not published): explanations, deep dives, 32 questions and answers, resume and GitHub text, demo script |
 
 ## Deliberate interpretations (documented, not omissions)
 

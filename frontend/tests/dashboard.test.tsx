@@ -63,7 +63,7 @@ describe("SOC dashboard", () => {
   it("draws the trends with a table view of the same numbers, and changes the period", async () => {
     const api = mockApi({ ...SIGNED_IN, ...dashboardRoutes() });
     renderApp("/dashboard");
-    const chart = await screen.findByRole("img", { name: /Alerts created: peak 3 on one day/ });
+    const chart = await screen.findByRole("group", { name: /Alerts created: peak 3 on one day/ });
     expect(chart).toBeInTheDocument();
     expect(api.callsTo("GET /api/dashboard/trends")[0].url.searchParams.get("days")).toBe("14");
 

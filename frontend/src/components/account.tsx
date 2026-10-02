@@ -82,7 +82,7 @@ export function ChangePasswordForm({ forced = false }: { forced?: boolean }) {
         />
       </Field>
       {error && <ErrorMessage>{error}</ErrorMessage>}
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-slate-400">
         {forced
           ? "Then sign in again with the new password."
           : "Changing it signs you out on every device."}
@@ -178,7 +178,7 @@ function EnableMfa() {
         <p aria-label="Setup key" className="break-all rounded bg-slate-950 p-2 font-mono text-sm text-slate-100">
           {setup.secret}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-slate-400">
           Or open the setup link on the device with the app:{" "}
           <a className="text-sky-400 underline" href={setup.otpauth_uri}>
             add to authenticator
@@ -229,7 +229,7 @@ function DisableMfa() {
   return (
     <form onSubmit={onSubmit} className="space-y-3">
       <p className="text-sm text-emerald-300">On. Signing in needs a code from your app.</p>
-      <p className="text-xs text-slate-500">To turn it off, confirm your password and a current code.</p>
+      <p className="text-xs text-slate-400">To turn it off, confirm your password and a current code.</p>
       <Field label="Password">
         <input
           type="password"

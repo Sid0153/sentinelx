@@ -142,7 +142,7 @@ function UserRow({ user, isSelf, onChanged }: { user: User; isSelf: boolean; onC
     <tr className="border-t border-slate-800 align-top">
       <td className="py-2 pr-4 text-slate-100">
         {user.email}
-        {isSelf && <span className="ml-2 text-xs text-slate-500">(you)</span>}
+        {isSelf && <span className="ml-2 text-xs text-slate-400">(you)</span>}
         {user.mfa_enabled && <span className="ml-2 text-xs text-emerald-300">2FA</span>}
         {user.must_change_password && (
           <span className="ml-2 text-xs text-amber-300">must change password</span>
@@ -169,7 +169,7 @@ function UserRow({ user, isSelf, onChanged }: { user: User; isSelf: boolean; onC
         </select>
       </td>
       <td className="py-2 pr-4">
-        <span className={user.is_active ? "text-emerald-300" : "text-slate-500"}>
+        <span className={user.is_active ? "text-emerald-300" : "text-slate-400"}>
           {user.is_active ? "Active" : "Deactivated"}
         </span>
       </td>
@@ -226,7 +226,7 @@ export function UsersPage() {
           <p className="py-3 text-sm text-slate-400">Loading users…</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Email</th>
                 <th className="py-2 pr-4 font-medium">Role</th>

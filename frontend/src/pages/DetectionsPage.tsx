@@ -58,7 +58,7 @@ export function DetectionsPage() {
           <p className="py-3 text-sm text-slate-400">Loading rules…</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-4 font-medium">Rule</th>
                 <th className="py-2 pr-4 font-medium">Severity</th>
@@ -81,9 +81,9 @@ export function DetectionsPage() {
                   <tr key={r.rule_id} className="border-t border-slate-800 align-top">
                     <td className="py-2 pr-4">
                       <Link to={`/detections/${r.rule_id}`} className="text-slate-100 hover:text-sky-300">
-                        <span className="font-mono text-xs text-slate-500">{r.rule_id}</span> {r.name}
+                        <span className="font-mono text-xs text-slate-400">{r.rule_id}</span> {r.name}
                       </Link>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-slate-400">
                         {r.category} · {r.kind} · v{r.version}
                       </div>
                     </td>
@@ -92,7 +92,7 @@ export function DetectionsPage() {
                     </td>
                     <td className="py-2 pr-4 text-xs">
                       {!r.in_library ? (
-                        <span className="text-slate-500">removed from library</span>
+                        <span className="text-slate-400">removed from library</span>
                       ) : r.enabled ? (
                         <span className="text-emerald-300">enabled</span>
                       ) : (
@@ -103,12 +103,12 @@ export function DetectionsPage() {
                     <td className="py-2 pr-4 font-mono text-xs text-slate-400">{r.techniques.join(", ")}</td>
                     <td className="py-2 pr-4 text-right font-mono text-slate-200">
                       {m ? m.alerts : "…"}
-                      {m && m.open > 0 && <div className="text-xs text-slate-500">{m.open} open</div>}
+                      {m && m.open > 0 && <div className="text-xs text-slate-400">{m.open} open</div>}
                     </td>
                     <td className="py-2 pr-4 text-right font-mono text-slate-200">
                       {m ? formatRate(m.false_positive_rate) : "…"}
                       {m && m.closed > 0 && (
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-slate-400">
                           {m.false_positives} of {m.closed} closed
                         </div>
                       )}

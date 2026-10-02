@@ -13,7 +13,7 @@ function Stat({ label, value, detail }: { label: string; value: string; detail?:
     <div className="min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-3">
       <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-1 font-mono text-2xl text-slate-100">{value}</div>
-      {detail && <div className="mt-0.5 text-xs text-slate-500">{detail}</div>}
+      {detail && <div className="mt-0.5 text-xs text-slate-400">{detail}</div>}
     </div>
   );
 }
@@ -54,10 +54,10 @@ function TacticGrid({
             <a href={tactic.url} target="_blank" rel="noreferrer noopener" className="text-sm font-semibold text-slate-200 hover:text-sky-300">
               {tactic.name}
             </a>
-            <span className="text-xs text-slate-500">{tactic.id}</span>
+            <span className="text-xs text-slate-400">{tactic.id}</span>
           </div>
           {tactic.techniques.length === 0 ? (
-            <p className="mt-1 text-xs text-slate-500">No SentinelX rule</p>
+            <p className="mt-1 text-xs text-slate-400">No SentinelX rule</p>
           ) : (
             <ul className="mt-1 space-y-1">
               {tactic.techniques.map((id) => {
@@ -75,7 +75,7 @@ function TacticGrid({
                     >
                       <span className="font-mono text-slate-400">{id}</span>{" "}
                       <span className="text-slate-100">{t.name}</span>
-                      <span className="block text-slate-500">
+                      <span className="block text-slate-400">
                         {ruleCount(t)} · {t.alerts} alert{t.alerts === 1 ? "" : "s"}
                         {!t.active && <span className="text-amber-300"> · rules disabled</span>}
                       </span>
@@ -114,7 +114,7 @@ function TechniqueDetail({ technique }: { technique: CoverageTechnique }) {
               {r.indicator && <span className="font-mono text-xs text-slate-400">indicator {r.indicator}</span>}
             </div>
             <p className="text-xs text-slate-400">{r.reason}</p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               {r.alerts} alert{r.alerts === 1 ? "" : "s"} in the period · last triggered{" "}
               {r.last_triggered_at ? formatUtc(r.last_triggered_at) : "never"}
             </p>
@@ -173,7 +173,7 @@ export function CoveragePage() {
       <Panel title="Techniques (table view)">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="py-2 pr-3 font-medium">Technique</th>
                 <th className="py-2 pr-3 font-medium">Tactics</th>
@@ -198,7 +198,7 @@ export function CoveragePage() {
                         <Link to={`/detections/${r.rule_id}`} className="font-mono text-sky-300">
                           {r.rule_id}
                         </Link>
-                        {r.indicator && <span className="text-slate-500"> ({r.indicator})</span>}
+                        {r.indicator && <span className="text-slate-400"> ({r.indicator})</span>}
                       </span>
                     ))}
                   </td>

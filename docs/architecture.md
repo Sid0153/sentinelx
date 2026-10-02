@@ -126,14 +126,22 @@ api → services (ingestion, alerts, incidents, hunting, ...) → pure cores →
                      conditions, explain; correlation scoring; risk; demo generators
 ```
 
-Rules we will enforce with tests or review:
-- Parsers, evaluators, correlation scoring and risk take plain data and return plain data. They
-  do not import SQLAlchemy, FastAPI or the clock. The clock is always passed in, which makes
-  time-window tests deterministic.
-- Only `events/store.py` writes `raw_events` and `events`, and only `ingestion/service.py`
-  calls it.
-- Only `alerts/` writes alerts; only `incidents/` and `correlation/` write incidents.
-- Security-relevant writes call `audit.record()` in the same transaction as the change.
+Rules, enforced by `tests/unit/test_architecture.py` (Phase 18) unless marked review:
+- The pure cores (parsers, normalization, evaluators, `evaluate`, `explain`, correlation
+  scoring, risk, the alert and incident workflows, the demo generators) take plain data and
+  return plain data. They import no SQLAlchemy, FastAPI or database module, take only enums
+  and constants from the model modules, and never read the clock: the time is passed in,
+  which makes time-window tests deterministic.
+- Two cores are pure in evaluation but know about SQL. `detection/conditions.py` compiles a
+  condition to an SQL expression (`to_sql`, never executed there). `ingestion/enrich.py` loads
+  its inventory snapshot with a session once per batch (`load_snapshot`), then looks up
+  without I/O. Neither reads the clock.
+- Raw records and events are built only in `events/store.py` (only `ingestion/service.py`
+  calls it), alerts only in `alerts/service.py`, incidents only in `incidents/records.py`, and
+  audit entries only in `audit/service.py`. Correlation changes incidents through
+  `incidents/records.py`.
+- Security-relevant writes call `audit.record()` in the same transaction as the change
+  (review, and a test per action).
 
 ## Pipeline and processing model
 

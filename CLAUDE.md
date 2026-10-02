@@ -29,7 +29,9 @@ its rules always apply:
 | 14 Testing and performance | Done, green in CI (1288 backend tests, 98% coverage; 115 frontend tests, 91.7% lines, floors in CI; query-budget tests found 3 N+1 queries and 2 unbounded lists, fixed; 1M-record benchmark in docs/performance.md found AUTH-004 failing past 20k earlier logons, fixed; per-day summaries kept by triggers make detection and the dashboard flat: 713 records/s) |
 | 15 Deployment readiness | Done, green in CI (image scan found 71 fixable HIGH CVEs, fixed and gated in CI; database container hardened, gosu removed; production overlay with TLS run by CI over https; backup/restore scripts tested in CI; docs/deployment.md with a test-enforced configuration reference; ADR-0014) |
 | 16 Demo environment | Done, green in CI (`cli demo-load`: inventory, sources, a 13-step story anchored to one time, ~1,040 records → 15 alerts, 5 incidents at any anchor, tested per step; `scripts/demo_reset.sh` replaces the database, refuses real data, keeps accounts; ADR-0015; docs/demo.md) |
-| 17 Documentation and polish | Done (README rewritten with screenshots from `scripts/screenshots.mjs` and a diagram; Mermaid diagrams in architecture.md; setup.md, limitations.md, future-architecture.md; stale statuses and a never-built demo API removed from the docs; `tests/unit/test_docs.py` checks links, routes, commands, scripts and rule names; audit log labels request-less entries "system") |
+| 17 Documentation and polish | Done, green in CI (README rewritten with screenshots from `scripts/screenshots.mjs` and a diagram; Mermaid diagrams in architecture.md; setup.md, limitations.md, future-architecture.md; stale statuses and a never-built demo API removed from the docs; `tests/unit/test_docs.py` checks links, routes, commands, scripts and rule names; audit log labels request-less entries "system") |
+| 18 Final engineering review | Done (docs/review.md: 13 findings, 7 fixed: WCAG AA contrast on every page (axe: 0 violations on 16 pages), chart and link accessibility, a page error boundary, the pure-core claim made true and enforced by tests/unit/test_architecture.py, CI actions pinned by SHA and gitleaks by digest; 6 accepted with reasons; 1427 backend, 117 frontend tests) |
+| 19 Interview and portfolio package | Done, in git-ignored `portfolio/` (explanations, deep dives, 32 Q&A, resume/GitHub text, demo script; facts from the Phase 18 state; update it if the project changes) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -41,9 +43,12 @@ update the doc (and add an ADR for decisions) in the same change.
 
 ## Key design rules (from Phase 1)
 
-- Modular monolith. Pure cores (parsers, normalize, enrich, detection evaluators and
-  conditions, explanation, correlation scoring, risk, demo generators) import no
-  SQLAlchemy/FastAPI and take `now` as a parameter.
+- Modular monolith. Pure cores (parsers, normalize, evaluators, evaluate, explanation,
+  correlation scoring, risk, the workflows, demo generators) import no SQLAlchemy/FastAPI/
+  database module (enums from models only) and take `now` as a parameter; `conditions.py`
+  (builds SQL expressions) and `enrich.py` (`load_snapshot` only) are the two documented
+  exceptions. `tests/unit/test_architecture.py` enforces this and that each record type
+  (RawEvent, Event, Alert, Incident, AuditLog) is built in one module only.
 - Raw records go in `raw_events` (always, even on parse failure); normalized ones in `events`.
   Both are append-only (DB triggers), as are the audit log, incident notes, evidence and
   activity.
@@ -82,6 +87,11 @@ update the doc (and add an ADR for decisions) in the same change.
   (`tests/unit/test_demo.py`), and list what it triggers; update the tables in docs/demo.md
   and the totals CI greps for. `scripts/demo_reset.sh` must keep refusing databases with
   real records (`cli demo-status`).
+- Accessibility: secondary text is `text-slate-400` (not 500) and primary buttons `bg-sky-700`,
+  for WCAG AA contrast on the dark theme. A chart with focusable parts is a labelled `group`,
+  not an `img`. Re-run the axe audit described in docs/review.md after visual changes.
+- CI actions are pinned by commit SHA (release in a comment) and images by digest: change
+  both together.
 - Docs are tested (`tests/unit/test_docs.py`): a renamed heading, route, CLI command, script
   or rule must be updated in every document that names it. `api.md` must list every route
   with its full path. Screenshots come from `scripts/screenshots.mjs` on a throwaway stack

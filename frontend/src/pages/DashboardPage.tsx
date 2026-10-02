@@ -26,7 +26,7 @@ function Tile({
     <>
       <div className="text-xs uppercase tracking-wide text-slate-400">{label}</div>
       <div className="mt-1 font-mono text-2xl text-slate-100">{value.toLocaleString("en-US")}</div>
-      {detail && <div className="mt-0.5 text-xs text-slate-500">{detail}</div>}
+      {detail && <div className="mt-0.5 text-xs text-slate-400">{detail}</div>}
     </>
   );
   const style = "block min-w-0 rounded-lg border border-slate-800 bg-slate-900 p-3";
@@ -59,7 +59,7 @@ function Trends() {
           <option value={14}>14 days</option>
           <option value={30}>30 days</option>
         </select>
-        <span className="text-xs text-slate-500">per UTC day</span>
+        <span className="text-xs text-slate-400">per UTC day</span>
       </div>
       {error ? (
         <ErrorMessage>{error.message}</ErrorMessage>
@@ -103,7 +103,7 @@ export function DashboardPage() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-100">SOC dashboard</h1>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-slate-400">
           Counted from the database at {formatUtc(data.generated_at)}
         </span>
       </div>
@@ -164,7 +164,7 @@ export function DashboardPage() {
               {data.top_rules.map((r) => (
                 <li key={r.rule_id} className="flex justify-between gap-2">
                   <Link to={`/detections/${r.rule_id}`} className="min-w-0 truncate text-sky-300">
-                    <span className="font-mono text-xs text-slate-500">{r.rule_id}</span> {r.name}
+                    <span className="font-mono text-xs text-slate-400">{r.rule_id}</span> {r.name}
                   </Link>
                   <span className="font-mono text-slate-200">{r.alerts}</span>
                 </li>
@@ -210,7 +210,7 @@ export function DashboardPage() {
                     <Link to={`/alerts/${a.id}`} className="block truncate text-slate-100 hover:text-sky-300">
                       {a.title}
                     </Link>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <StatusText status={a.status} />
                       {formatUtc(a.created_at)}
                       {a.simulated && <SimulatedTag />}
@@ -231,10 +231,10 @@ export function DashboardPage() {
                   <PriorityBadge score={i.risk_score} band={i.risk_band} />
                   <div className="min-w-0">
                     <Link to={`/incidents/${i.id}`} className="block truncate text-slate-100 hover:text-sky-300">
-                      <span className="font-mono text-xs text-slate-500">{incidentRef(i.number)}</span>{" "}
+                      <span className="font-mono text-xs text-slate-400">{incidentRef(i.number)}</span>{" "}
                       {i.title}
                     </Link>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
                       <IncidentStatusText status={i.status} />
                       {i.alert_count} alerts · {formatUtc(i.created_at)}
                     </div>
