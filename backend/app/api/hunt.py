@@ -135,9 +135,21 @@ def run_template(
     )
 
 
-def _public(db: DbSession, hunt_row: SavedHunt, user: User) -> SavedHuntPublic:
+def _owner_emails(db: DbSession, rows: list[SavedHunt]) -> dict[uuid.UUID, str]:
+    """Owners of the listed hunts in one query (Phase 14: was one query per hunt)."""
+    owners = {r.owner_id for r in rows}
+    if not owners:
+        return {}
+    return dict(db.execute(select(User.id, User.email).where(User.id.in_(owners))).tuples().all())
+
+
+def _public(
+    db: DbSession, hunt_row: SavedHunt, user: User, owners: dict[uuid.UUID, str] | None = None
+) -> SavedHuntPublic:
     _, problem = service.load_definition(hunt_row)
-    owner = db.scalar(select(User.email).where(User.id == hunt_row.owner_id))
+    if owners is None:
+        owners = _owner_emails(db, [hunt_row])
+    owner = owners.get(hunt_row.owner_id)
     return SavedHuntPublic(
         id=hunt_row.id,
         name=hunt_row.name,
@@ -159,7 +171,9 @@ def _public(db: DbSession, hunt_row: SavedHunt, user: User) -> SavedHuntPublic:
 def list_saved(user: CurrentUser, db: DbSession) -> list[SavedHuntPublic]:
     """Your saved hunts and those shared by others. A hunt saved by an older version that no
     longer validates is listed with `valid: false` and a `problem`, never run."""
-    return [_public(db, h, user) for h in service.list_saved(db, user)]
+    rows = service.list_saved(db, user)
+    owners = _owner_emails(db, rows)
+    return [_public(db, h, user, owners) for h in rows]
 
 
 @hunt.get("/saved/{hunt_id}", response_model=SavedHuntPublic, responses=error_responses(404))

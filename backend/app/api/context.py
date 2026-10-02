@@ -62,13 +62,13 @@ def list_assets(
     hostname, owner or description."""
     filters = service.AssetFilters(search, criticality, environment, status, tag)
     items, total = service.list_assets(db, filters, limit, offset)
-    alerts, seen = activity.open_alert_counts(db, items), activity.last_seen(db, items)
+    found = activity.list_activity(db, items)
     return Page(
         items=[
             AssetListItem(
                 **AssetPublic.model_validate(a).model_dump(),
-                open_alerts=alerts[a.id],
-                last_seen_at=seen[a.id],
+                open_alerts=found[a.id][0],
+                last_seen_at=found[a.id][1],
             )
             for a in items
         ],
@@ -123,13 +123,13 @@ def list_identities(
     """`search` matches part of the username, display name or department."""
     filters = service.IdentityFilters(search, privilege_level, status, tag)
     items, total = service.list_identities(db, filters, limit, offset)
-    alerts, seen = activity.open_alert_counts(db, items), activity.last_seen(db, items)
+    found = activity.list_activity(db, items)
     return Page(
         items=[
             IdentityListItem(
                 **IdentityPublic.model_validate(i).model_dump(),
-                open_alerts=alerts[i.id],
-                last_seen_at=seen[i.id],
+                open_alerts=found[i.id][0],
+                last_seen_at=found[i.id][1],
             )
             for i in items
         ],

@@ -493,3 +493,23 @@ def test_saved_hunt_changes_are_audited_without_filter_values(
     for entry in entries.values():
         assert entry.actor_label == "analyst@example.com"
         assert "203.0.113.45" not in str(entry.details)
+
+
+def test_saved_hunts_per_user_are_capped(
+    db_client: TestClient,
+    analyst: dict[str, str],
+    other_analyst: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The saved-hunt list is not paged, so each user may keep a bounded number (Phase 14)."""
+    monkeypatch.setattr("app.hunting.service.MAX_SAVED_PER_USER", 2)
+    assert save(db_client, analyst, "one").status_code == 201
+    assert save(db_client, analyst, "two").status_code == 201
+    refused = save(db_client, analyst, "three")
+    assert refused.status_code == 409
+    assert "Delete one first" in refused.json()["error"]["message"]
+    # The cap is per user, and deleting frees a place.
+    assert save(db_client, other_analyst, "mine").status_code == 201
+    first = db_client.get("/api/hunt/saved", headers=analyst).json()[0]
+    assert db_client.delete(f"/api/hunt/saved/{first['id']}", headers=analyst).status_code == 204
+    assert save(db_client, analyst, "three").status_code == 201

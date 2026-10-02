@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { filterFromRow } from "../src/components/hunt";
 import { huntUrl, parseHunt, pivotUrl } from "../src/services/hunt";
 import type { HuntFields, HuntResult, SavedHunt, TemplateInfo, TemplateResult } from "../src/types/hunt";
 import type { EventRecord } from "../src/types/inventory";
@@ -317,5 +318,66 @@ describe("Threat hunting", () => {
     await waitFor(() => expect(api.callsTo("PATCH /api/hunt/saved/h-1")[0].body).toEqual({ shared: true }));
     fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
     await waitFor(() => expect(api.callsTo("DELETE /api/hunt/saved/h-1")).toHaveLength(1));
+  });
+});
+
+describe("Hunt builder values (Phase 14)", () => {
+  const row = (field: string, op: string, text: string, attribute = "") =>
+    filterFromRow({ field, attribute, op: op as never, text }, [
+      ...FIELDS.fields,
+      { field: "is_admin", kind: "boolean", operators: ["eq", "exists"] },
+    ]);
+
+  it("turns form text into the typed values the API expects", () => {
+    expect(row("destination_port", "eq", " 22 ")).toEqual({ field: "destination_port", op: "eq", value: 22 });
+    // A number field with text that is not a number is sent as typed: the server explains.
+    expect(row("destination_port", "eq", "ssh")).toEqual({ field: "destination_port", op: "eq", value: "ssh" });
+    expect(row("destination_port", "in", "22, ,3389,")).toEqual({
+      field: "destination_port",
+      op: "in",
+      value: [22, 3389],
+    });
+    expect(row("username", "not_in", " root , admin ")).toEqual({
+      field: "username",
+      op: "not_in",
+      value: ["root", "admin"],
+    });
+    expect(row("is_admin", "eq", "false")).toEqual({ field: "is_admin", op: "eq", value: false });
+    expect(row("username", "exists", "true")).toEqual({ field: "username", op: "exists", value: true });
+    expect(row("username", "exists", "false")).toEqual({ field: "username", op: "exists", value: false });
+    expect(row("attributes", "eq", "10", " logon_type ")).toEqual({
+      field: "attributes.logon_type",
+      op: "eq",
+      value: "10", // attribute values have no declared type: kept as text
+    });
+  });
+
+  it("maps every kind of server validation message to the part of the form it is about", async () => {
+    mockApi({
+      ...signedInAs("ANALYST"),
+      ...routes({
+        "POST /api/hunt/query": {
+          status: 422,
+          body: {
+            error: {
+              code: "validation_error",
+              message: "Invalid request",
+              request_id: null,
+              details: [
+                { loc: ["body", "time_range", "from"], msg: "Value error, the range is longer than 31 days", type: "value_error" },
+                { loc: ["body", "alert", "status"], msg: "unknown status", type: "value_error" },
+                { loc: ["body", "limit"], msg: "too large", type: "value_error" },
+              ],
+            },
+          },
+        },
+      }),
+    });
+    renderApp("/hunt");
+    fireEvent.click(await screen.findByRole("button", { name: "Run hunt" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Time range: the range is longer than 31 days");
+    expect(alert).toHaveTextContent("Alert filters: unknown status");
+    expect(alert).toHaveTextContent("limit: too large");
   });
 });

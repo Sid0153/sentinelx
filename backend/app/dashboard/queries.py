@@ -1,6 +1,11 @@
 """SOC dashboard numbers, all counted in the database on request (brief §19): nothing is
 cached, estimated or hardcoded. "Today" is the current UTC day, like every time in the UI.
 
+Event and raw-record totals and the event trend come from `event_daily_counts`, which
+database triggers keep equal to the stored rows (migration 0014), so the dashboard does not
+count every event on each request (Phase 14, docs/performance.md). Only today's events in
+the trend are counted from `events`, because that bucket stops at "now".
+
 Definitions, as shown in the UI:
 - records processed: raw records received (parsed, skipped or failed; duplicates excluded).
 - events stored: normalized events. Events today: events whose own time is today.
@@ -21,8 +26,9 @@ from sqlalchemy.orm import Session
 from app.models.alert import ACTIVE_STATUSES, Alert
 from app.models.context import Asset, AssetStatus
 from app.models.detection import DetectionRule
-from app.models.event import Event, RawEvent
+from app.models.event import Event
 from app.models.incident import ACTIVE_INCIDENT_STATUSES, Incident, IncidentStatus
+from app.models.summary import EventDailyCount
 
 LEVELS = ("critical", "high", "medium", "low")
 TOP = 5
@@ -33,6 +39,14 @@ WORKED = (IncidentStatus.TRIAGED, IncidentStatus.INVESTIGATING, IncidentStatus.C
 
 def _count(db: Session, statement: Any) -> int:
     return int(db.scalar(statement) or 0)
+
+
+def _stored(db: Session, kind: str, since: date | None = None) -> int:
+    """Rows of `kind` ('event' or 'raw') in the daily counts, from `since` on (UTC days)."""
+    statement = select(func.sum(EventDailyCount.records)).where(EventDailyCount.kind == kind)
+    if since is not None:
+        statement = statement.where(EventDailyCount.day >= since)
+    return _count(db, statement)
 
 
 def summary(db: Session, now: datetime) -> dict[str, Any]:
@@ -62,11 +76,9 @@ def summary(db: Session, now: datetime) -> dict[str, Any]:
     ).all()
     return {
         "generated_at": now,
-        "records_processed": _count(db, select(func.count()).select_from(RawEvent)),
-        "events_stored": _count(db, select(func.count()).select_from(Event)),
-        "events_today": _count(
-            db, select(func.count()).select_from(Event).where(Event.timestamp >= today)
-        ),
+        "records_processed": _stored(db, "raw"),
+        "events_stored": _stored(db, "event"),
+        "events_today": _stored(db, "event", since=today.date()),
         "alerts_today": _count(
             db, select(func.count()).select_from(Alert).where(Alert.created_at >= today)
         ),
@@ -158,11 +170,22 @@ def trends(db: Session, days: int, now: datetime) -> list[dict[str, Any]]:
     ):
         if day in rows:
             rows[day]["incidents"] = count
+    today = now.date()
     for day, count in db.execute(
-        select(_day(Event.timestamp), func.count())
-        .where(Event.timestamp >= start, Event.timestamp <= now)
-        .group_by(literal_column("1"))
+        select(EventDailyCount.day, EventDailyCount.records).where(
+            EventDailyCount.kind == "event",
+            EventDailyCount.day >= first,
+            EventDailyCount.day < today,
+        )
     ):
         if day in rows:
             rows[day]["events"] = count
+    if today in rows:  # today stops at "now": events dated later today are not counted yet
+        midnight = datetime(today.year, today.month, today.day, tzinfo=UTC)
+        rows[today]["events"] = _count(
+            db,
+            select(func.count())
+            .select_from(Event)
+            .where(Event.timestamp >= midnight, Event.timestamp <= now),
+        )
     return list(rows.values())

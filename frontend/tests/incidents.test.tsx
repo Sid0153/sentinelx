@@ -365,3 +365,141 @@ describe("Escalation and settings", () => {
     });
   });
 });
+
+describe("Incident workspace: history, evidence and final states (Phase 14)", () => {
+  function activity(kind: string, details: Record<string, unknown>, actor: string | null = "ana@example.com"): TimelineEntry {
+    return { at: "2026-09-26T10:05:00Z", kind: "activity", id: `act-${kind}`, event: null, alert: null, activity: { kind, actor, details } };
+  }
+
+  it("tells the story of every kind of activity in plain words", async () => {
+    const items: TimelineEntry[] = [
+      activity("CREATED", { reason: "Multi-stage activity" }, null),
+      activity("LINK", { title: "Brute force", strength: "STRONG" }),
+      activity("UNLINK", { title: "Admin task", reason: "planned change" }),
+      activity("STATUS", { from: "OPEN", to: "RESOLVED", resolution: "host rebuilt" }),
+      activity("ASSIGN", { to: "bob@example.com" }),
+      activity("NOTE", {}),
+      activity("EVIDENCE", { change: "UNPIN", tag: "benign" }),
+      activity("RENAME", { to: "Deploy key abuse" }),
+      activity("SOMETHING_NEW", {}),
+      {
+        at: "2026-09-26T10:06:00Z",
+        kind: "alert",
+        id: "al-1",
+        event: null,
+        alert: { rule_id: "AUTH-002", title: "Success after failures", severity: "high", priority_score: 80, status: "NEW" },
+        activity: null,
+      },
+    ];
+    mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/incidents/i-1": { body: detail() },
+      "GET /api/incidents/i-1/timeline": { body: { items, next_cursor: null, limit: 100 } },
+    });
+    renderApp("/incidents/i-1");
+    expect(await screen.findByText("Correlation opened the incident: Multi-stage activity")).toBeInTheDocument();
+    for (const text of [
+      'ana@example.com linked "Brute force" (strong)',
+      'ana@example.com unlinked "Admin task": planned change',
+      "ana@example.com: Open → Resolved: host rebuilt",
+      "ana@example.com assigned it to bob@example.com",
+      "ana@example.com added a note",
+      "ana@example.com unpinned evidence (benign)",
+      'ana@example.com renamed it to "Deploy key abuse"',
+      "ana@example.com: SOMETHING_NEW",
+      "Alert AUTH-002: Success after failures",
+    ]) {
+      expect(screen.getByText(text)).toBeInTheDocument();
+    }
+    // No "Load more" when the server says there is nothing after this page.
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("lets an analyst rename, assign and unpin, and shows a refusal", async () => {
+    const pinned = detail({
+      evidence: [
+        {
+          id: "p-1",
+          event_id: "e-1",
+          alert_id: null,
+          label: "authentication/logon failure on web-01",
+          tag: "initial_access",
+          comment: "first contact",
+          pinned_by: "ana@example.com",
+          pinned_at: "2026-09-26T10:04:00Z",
+        },
+      ],
+    });
+    const api = mockApi({
+      ...signedInAs("ANALYST"),
+      "GET /api/incidents/i-1": { body: pinned },
+      "GET /api/incidents/assignees": { body: [{ id: "u-1", email: "analyst@example.com" }] },
+      "PATCH /api/incidents/i-1": {
+        status: 409,
+        body: { error: { code: "conflict", message: "The incident changed; reload it", request_id: null } },
+      },
+      "POST /api/incidents/i-1/assign": { body: pinned },
+      "POST /api/incidents/i-1/evidence": { body: detail() },
+      ...TIMELINE,
+    });
+    renderApp("/incidents/i-1");
+    expect(await screen.findByText("first contact")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    const rename = screen.getByRole("form", { name: "Rename incident" });
+    fireEvent.change(within(rename).getByLabelText("Title"), { target: { value: "ab" } });
+    expect(within(rename).getByRole("button", { name: "Save" })).toBeDisabled(); // under 3 characters
+    fireEvent.change(within(rename).getByLabelText("Title"), { target: { value: "  Deploy key abuse  " } });
+    fireEvent.click(within(rename).getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("The incident changed; reload it")).toBeInTheDocument();
+    expect(api.callsTo("PATCH /api/incidents/i-1")[0].body).toEqual({ title: "Deploy key abuse" });
+
+    const assignee = await screen.findByRole("option", { name: "analyst@example.com" });
+    fireEvent.change(assignee.closest("select")!, { target: { value: "u-1" } });
+    await waitFor(() =>
+      expect(api.callsTo("POST /api/incidents/i-1/assign")[0].body).toEqual({ assignee_id: "u-1" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Unpin" }));
+    await waitFor(() =>
+      expect(api.callsTo("POST /api/incidents/i-1/evidence")[0].body).toEqual({
+        event_id: "e-1",
+        action: "UNPIN",
+        tag: "initial_access",
+      }),
+    );
+  });
+
+  it("offers no changes on a closed incident, even to an analyst", async () => {
+    mockApi({
+      ...signedInAs("ANALYST"),
+      "GET /api/incidents/i-1": {
+        body: detail({ status: "CLOSED", allowed_transitions: [], assigned_to: { id: "u-1", email: "analyst@example.com" } }),
+      },
+      "GET /api/incidents/assignees": { body: [] },
+      ...TIMELINE,
+    });
+    renderApp("/incidents/i-1");
+    expect(await screen.findByText("Closed incidents are final.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rename" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "Add note" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unlink…" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pin…" })).not.toBeInTheDocument();
+    const assignment = screen.getByRole("heading", { name: "Assignment" }).parentElement!;
+    expect(within(assignment).getByText("analyst@example.com")).toBeInTheDocument(); // shown, not editable
+    expect(within(assignment).queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("says when an incident does not exist", async () => {
+    mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/incidents/i-404": {
+        status: 404,
+        body: { error: { code: "not_found", message: "Incident not found", request_id: null } },
+      },
+    });
+    renderApp("/incidents/i-404");
+    expect(await screen.findByText("This incident does not exist.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "← Incidents" })).toHaveAttribute("href", "/incidents");
+  });
+});

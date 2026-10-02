@@ -5,9 +5,6 @@ events first (a sequence filters per step instead). No database, no clock: the e
 the events, this decides.
 """
 
-from datetime import datetime
-from typing import Any
-
 from app.detection.evaluators import distinct, new_value, sequence, single, threshold
 from app.detection.evaluators.common import excluded
 from app.detection.events import DetectionEvent, sort_key
@@ -17,9 +14,9 @@ from app.detection.model import Match, Rule
 def evaluate(
     rule: Rule,
     events: list[DetectionEvent],
-    history: dict[tuple[Any, ...], list[tuple[datetime, Any]]] | None = None,
+    history: new_value.History | None = None,
 ) -> list[Match]:
-    """`history` is only used by new_value rules: earlier (time, value) pairs per key."""
+    """`history` is only used by new_value rules: earlier (time, value, count) per key."""
     usable = sorted((e for e in events if not excluded(e, rule.exclusions)), key=sort_key)
     if rule.kind == "sequence":
         return sequence.evaluate(rule, usable)

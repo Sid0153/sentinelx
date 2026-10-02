@@ -11,7 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.auth import mfa
 from app.models.user import Role, User
-from tests.helpers import TEST_PASSWORD, audit_entries, bearer, login, make_user
+from tests.helpers import (
+    TEST_PASSWORD,
+    audit_entries,
+    bearer,
+    cookie_header,
+    login,
+    make_user,
+    refresh_cookie_value,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -208,7 +216,8 @@ def test_password_reset_forces_a_change_before_anything_else(
 
     # The old password and the old session are gone; the temporary password signs in.
     assert login(db_client, user.email, TEST_PASSWORD).status_code == 401
-    refreshed = db_client.post("/api/auth/refresh", cookies=old_session.cookies)
+    old_cookie = cookie_header(refresh_cookie_value(old_session))
+    refreshed = db_client.post("/api/auth/refresh", headers=old_cookie)
     assert refreshed.status_code == 401
     signed_in = db_client.post("/api/auth/login", json={"email": user.email, "password": temporary})
     assert signed_in.status_code == 200

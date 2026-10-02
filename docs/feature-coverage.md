@@ -147,7 +147,7 @@ and incidents. `tests/api/test_dashboard.py` checks each number against independ
 | Observability: request IDs, structured logs, ingestion counts, processing and database errors (§34) | ✅ including detection runs (per-rule candidates, detections, errors, time; `detection.run_completed` log) |
 | Docker: health checks, env config, persistent volume, documented start (§35) | ✅ |
 | ADR-001 … ADR-007 (§38) | ✅ plus 0008–0010 |
-| Performance: indexes, pagination, bounded responses, batch ingestion (§33) | ✅ so far (index-fit tests, keyset paging, batched inserts); measured benchmarks: Phase 14 |
+| Performance: indexes, pagination, bounded responses, batch ingestion (§33) | ✅ index-fit tests, keyset paging, batched inserts; no N+1 queries and every list bounded (tested, 14); controlled benchmark on 1 million records with `EXPLAIN ANALYZE` ([performance.md](performance.md), 14) |
 | Detection coverage view, labelled "Implemented coverage" (§43) | ✅ `/coverage`: active rules, categories, severity, mappings, trigger counts, last triggered; every tactic with gaps stated (11) |
 | Detection testing playground (§44) | ✅ `/playground` (analysts): choose a rule, paste sample events, run it, see whether and why it triggered, the evidence lines, severity and confidence; what-if tuning; nothing stored (12) |
 | Real-world extension plan (§49) | ✅ `architecture.md` |

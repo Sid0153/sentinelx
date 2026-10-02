@@ -25,7 +25,8 @@ its rules always apply:
 | 10 Threat hunting | Done, green in CI (1133 backend tests, 98% coverage; 82 frontend tests; hunts and templates checked on the live stack at desktop and phone widths) |
 | 11 Risk, context, coverage | Done, green in CI (1153 backend tests, 98% coverage; 87 frontend tests; risk model 3; coverage, metrics and context checked on the live stack) |
 | 12 Advanced detection engineering | Done, green in CI (1178 backend tests, 98% coverage; 95 frontend tests; playground examples fire their rules on the live stack; ADR-0013) |
-| 13 Security hardening | Done (1254 backend, 105 frontend tests, 98% coverage; nine-area review in docs/security.md; least-privilege DB role, ingest keys, body limits; then every listed residual risk fixed or mitigated: 2FA, admin reset, shared rate limits, audit hash chain, host allowlist, raw text analyst-only, DB TLS, HSTS, digest pins) |
+| 13 Security hardening | Done, green in CI (1254 backend, 105 frontend tests, 98% coverage; nine-area review in docs/security.md; least-privilege DB role, ingest keys, body limits; then every listed residual risk fixed or mitigated: 2FA, admin reset, shared rate limits, audit hash chain, host allowlist, raw text analyst-only, DB TLS, HSTS, digest pins) |
+| 14 Testing and performance | Done (1288 backend tests, 98% coverage; 115 frontend tests, 91.7% lines, floors in CI; query-budget tests found 3 N+1 queries and 2 unbounded lists, fixed; 1M-record benchmark in docs/performance.md found AUTH-004 failing past 20k earlier logons, fixed; per-day summaries kept by triggers make detection and the dashboard flat: 713 records/s) |
 
 Scope: **every feature in the brief must exist and work.** `docs/feature-coverage.md` maps each
 one to its phase and status; update it at the end of every phase (a phase is not done until
@@ -56,6 +57,20 @@ update the doc (and add an ADR for decisions) in the same change.
 - Demo data = simulated raw log lines through the real pipeline, RFC 5737 outside IPs,
   labelled SIMULATED.
 - Every API route in the RBAC access table test; backend is authoritative.
+- List endpoints must not query per row (`tests/api/test_query_budget.py` measures statements
+  on a small and a larger data set) and every list must be bounded: a capped `limit`, or an
+  entry in `NATURALLY_BOUNDED` with the reason. Add new list routes to `LIST_ROUTES` there.
+- A `new_value` rule's match must be exact in SQL and name stored columns (validated): the
+  engine counts its history in SQL (`engine._history`); keep it exact (tested against reading
+  every earlier event).
+- `event_daily_counts` and `logon_success_daily` are written only by the triggers on
+  `events` and `raw_events` (migration 0014); never write them from Python. A new way of
+  removing events (retention) must update them too.
+- Benchmarks: `backend/benchmarks/run.py`, only against a database named `*_bench` (it drops
+  and recreates it). Never claim a number that is not in a results file under
+  `docs/benchmarks/`. Do not run tests or builds during a benchmark run.
+- Frontend tests have a 20 s per-test timeout (whole-app renders under coverage on slow
+  runners); a test that needs more is a bug.
 - Security-relevant actions call `audit.record()` in the same transaction; never log secrets
   or raw event bodies at INFO.
 - The app connects as a least-privilege DB role (`APP_DB_USER`, rows only; Phase 13);

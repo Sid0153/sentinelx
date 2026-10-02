@@ -272,3 +272,110 @@ describe("Assets and identities", () => {
     expect(query.get("status")).toBe("active");
   });
 });
+
+describe("Inventory and events: filters, editing and missing records (Phase 14)", () => {
+  const NOT_FOUND = {
+    status: 404,
+    body: { error: { code: "not_found", message: "Not found", request_id: null } },
+  };
+
+  it("sends asset search and filters to the server and starts again from the first page", async () => {
+    const api = mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/assets": { body: { items: [{ ...ASSET, open_alerts: 0, last_seen_at: null }], total: 120, limit: 50, offset: 0 } },
+    });
+    renderApp("/assets?offset=50");
+    await screen.findByRole("link", { name: "web-01" });
+    expect(api.callsTo("GET /api/assets")[0].url.searchParams.get("offset")).toBe("50");
+    expect(api.callsTo("GET /api/assets")[0].url.searchParams.get("status")).toBe("active");
+
+    fireEvent.change(screen.getByPlaceholderText("hostname, owner…"), { target: { value: "  web  " } });
+    fireEvent.submit(screen.getByRole("form", { name: "Asset filters" }));
+    await waitFor(() => expect(api.callsTo("GET /api/assets")).toHaveLength(2));
+    const searched = api.callsTo("GET /api/assets")[1].url.searchParams;
+    expect(searched.get("search")).toBe("web"); // trimmed
+    expect(searched.get("offset")).toBe("0"); // a new filter starts from the first page
+
+    fireEvent.change(screen.getByLabelText("Criticality"), { target: { value: "critical" } });
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "all" } });
+    await waitFor(() => expect(api.callsTo("GET /api/assets").at(-1)!.url.searchParams.get("criticality")).toBe("critical"));
+    const last = api.callsTo("GET /api/assets").at(-1)!.url.searchParams;
+    expect(last.get("status")).toBeNull(); // "all" sends no status filter
+    expect(last.get("search")).toBe("web");
+  });
+
+  it("lets an admin register an identity and then edit it", async () => {
+    let current = IDENTITY;
+    const api = mockApi({
+      ...signedInAs("ADMIN"),
+      "GET /api/identities": page([]),
+      "POST /api/identities": { status: 201, body: IDENTITY },
+      "GET /api/identities/id-1": () => ({ body: current }),
+      "GET /api/identities/id-1/activity": { body: NO_ACTIVITY },
+      "PATCH /api/identities/id-1": (call) => {
+        current = { ...IDENTITY, ...(call.body as Partial<Identity>) };
+        return { body: current };
+      },
+    });
+    renderApp("/identities");
+    fireEvent.click(await screen.findByRole("button", { name: "New identity" }));
+    const form = screen.getByRole("form", { name: "Add identity" });
+    fireEvent.change(within(form).getByLabelText("Username"), { target: { value: "deploy" } });
+    fireEvent.change(within(form).getByLabelText("Privilege level"), { target: { value: "service" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Add identity" }));
+    expect(await screen.findByRole("heading", { name: "deploy" })).toBeInTheDocument();
+    expect(api.callsTo("POST /api/identities")[0].body).toMatchObject({ username: "deploy", privilege_level: "service" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const edit = screen.getByRole("form", { name: "Save changes" });
+    fireEvent.change(within(edit).getByLabelText("Privilege level"), { target: { value: "privileged" } });
+    fireEvent.click(within(edit).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(api.callsTo("PATCH /api/identities/id-1")[0].body).toEqual({ privilege_level: "privileged" }));
+    // Back to the read view with the saved value.
+    expect(await screen.findByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  it("says when an asset, identity or event does not exist, and shows other errors as sent", async () => {
+    mockApi({
+      ...signedInAs("VIEWER"),
+      "GET /api/assets/missing": NOT_FOUND,
+      "GET /api/assets/missing/activity": NOT_FOUND,
+      "GET /api/identities/missing": NOT_FOUND,
+      "GET /api/identities/missing/activity": NOT_FOUND,
+      "GET /api/events/missing": NOT_FOUND,
+      "GET /api/events/broken": {
+        status: 503,
+        body: { error: { code: "unavailable", message: "Database unavailable", request_id: null } },
+      },
+    });
+    const first = renderApp("/assets/missing");
+    expect(await screen.findByText("This record does not exist.")).toBeInTheDocument();
+    first.unmount();
+    const second = renderApp("/identities/missing");
+    expect(await screen.findByText("This record does not exist.")).toBeInTheDocument();
+    second.unmount();
+    const third = renderApp("/events/missing");
+    expect(await screen.findByText("This event does not exist.")).toBeInTheDocument();
+    third.unmount();
+    renderApp("/events/broken");
+    expect(await screen.findByText("Database unavailable")).toBeInTheDocument();
+  });
+
+  it("shows source-specific attributes of an event as text", async () => {
+    const detail: EventDetail = {
+      ...event({ attributes: { logon_type: 10, note: "<b>bold?</b>" } }),
+      raw: {
+        id: "raw-1", batch_id: "b-1", received_at: "2026-09-27T09:00:02Z", parse_status: "parsed",
+        parse_detail: null, size_bytes: 10, text: "x", truncated: false, simulated: false, withheld: false,
+      },
+      source_name: "dc-01 security",
+      alerts: [],
+    };
+    mockApi({ ...signedInAs("ANALYST"), "GET /api/events/ev-1": { body: detail } });
+    const { container } = renderApp("/events/ev-1");
+    expect(await screen.findByText("logon_type")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("<b>bold?</b>")).toBeInTheDocument();
+    expect(container.querySelector("b")).toBeNull();
+  });
+});

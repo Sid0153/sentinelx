@@ -33,17 +33,19 @@ def transform(rule: Rule, value: Any) -> str | None:
     return str(value)
 
 
-def evaluate(
-    rule: Rule,
-    events: list[DetectionEvent],
-    history: dict[tuple[Any, ...], list[tuple[datetime, Any]]],
-) -> list[Match]:
+# Earlier observations per group key: (time, value, how many). One stored event is
+# (its time, its value, 1); the engine also passes (latest time, value, count) for events it
+# counted in SQL, which it does only where every one of them is inside the lookback.
+History = dict[tuple[Any, ...], list[tuple[datetime, Any, int]]]
+
+
+def evaluate(rule: Rule, events: list[DetectionEvent], history: History) -> list[Match]:
     assert rule.value_field and rule.lookback and rule.min_history  # noqa: S101
-    seen: dict[tuple[Any, ...], list[tuple[datetime, str]]] = defaultdict(list)
+    seen: dict[tuple[Any, ...], list[tuple[datetime, str, int]]] = defaultdict(list)
     for key, entries in history.items():
-        for stamp, raw in entries:
+        for stamp, raw, count in entries:
             if (value := transform(rule, raw)) is not None:
-                seen[key].append((stamp, value))
+                seen[key].append((stamp, value, count))
     reported: set[tuple[tuple[Any, ...], str]] = set()
     matches = []
     for key, members in grouped(rule, events).items():
@@ -52,10 +54,11 @@ def evaluate(
             if value is None:
                 continue
             since = event.timestamp - rule.lookback
-            prior = [v for stamp, v in seen[key] if since <= stamp < event.timestamp]
+            prior = [(v, n) for stamp, v, n in seen[key] if since <= stamp < event.timestamp]
+            prior_count = sum(n for _, n in prior)
             if (
-                len(prior) >= rule.min_history
-                and value not in prior
+                prior_count >= rule.min_history
+                and value not in {v for v, _ in prior}
                 and (key, value) not in reported
             ):
                 reported.add((key, value))
@@ -66,9 +69,9 @@ def evaluate(
                         facts={
                             "value": value,
                             "lookback": rule.lookback,
-                            "history_count": len(prior),
+                            "history_count": prior_count,
                         },
                     )
                 )
-            seen[key].append((event.timestamp, value))
+            seen[key].append((event.timestamp, value, 1))
     return matches

@@ -200,12 +200,16 @@ def get_detection_rule(rule_id: RuleId, _user: CurrentUser, db: DbSession) -> Ru
     response_model=list[RuleVersionPublic],
     responses=error_responses(404),
 )
-def list_versions(rule_id: RuleId, _user: CurrentUser, db: DbSession) -> list[RuleVersionPublic]:
+def list_versions(
+    rule_id: RuleId, _user: CurrentUser, db: DbSession, limit: Limit = 100
+) -> list[RuleVersionPublic]:
+    """Newest first, at most `limit` (every tuning adds a version with its full definition)."""
     get_rule(db, rule_id)
     rows = db.scalars(
         select(DetectionRuleVersion)
         .where(DetectionRuleVersion.rule_id == rule_id)
         .order_by(DetectionRuleVersion.version.desc())
+        .limit(limit)
     )
     return [RuleVersionPublic.model_validate(r) for r in rows]
 

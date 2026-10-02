@@ -3889,6 +3889,7 @@
           "detections"
         ],
         "summary": "List Versions",
+        "description": "Newest first, at most `limit` (every tuning adds a version with its full definition).",
         "operationId": "list_versions_api_detections__rule_id__versions_get",
         "security": [
           {
@@ -3904,6 +3905,18 @@
               "type": "string",
               "pattern": "^[A-Z]{3,5}-\\d{3}$",
               "title": "Rule Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
             }
           }
         ],

@@ -32,6 +32,8 @@ from app.models.hunt import SavedHunt
 from app.models.user import User
 
 COUNT_CAP = 10_000
+# Saved hunts per user (Phase 14): the saved-hunt list is not paged, so it must stay bounded.
+MAX_SAVED_PER_USER = 100
 
 
 @contextmanager
@@ -253,6 +255,13 @@ def create_saved(
     shared: bool,
 ) -> SavedHunt:
     check_definition(definition)
+    # The user's row lock makes the count and the insert one step for concurrent saves.
+    db.scalar(select(User.id).where(User.id == user.id).with_for_update())
+    owned = db.scalar(select(func.count()).where(SavedHunt.owner_id == user.id)) or 0
+    if owned >= MAX_SAVED_PER_USER:
+        raise AppError(
+            409, f"You have {MAX_SAVED_PER_USER} saved hunts, the most allowed. Delete one first."
+        )
     hunt = SavedHunt(
         owner_id=user.id,
         name=name,

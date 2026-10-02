@@ -685,3 +685,69 @@ def test_a_parser_bug_fails_the_record_and_logs_only_the_exception_type(
     (entry,) = caplog.records
     assert entry.fields == {"source_type": "linux_auth", "error": "KeyError"}  # type: ignore[attr-defined]
     assert "secret-looking" not in caplog.text
+
+
+# ---------- edge cases found by the Phase 14 coverage review ----------
+
+
+def test_sudo_and_su_bookkeeping_lines_are_skipped_not_failed() -> None:
+    assert (
+        skipped(
+            LINUX,
+            "Sep 25 10:31:28 web-01 sudo: pam_unix(sudo:session): session opened for user root",
+        )
+        == "sudo_session"
+    )
+    assert (
+        skipped(LINUX, "Sep 25 10:31:28 web-01 su[5001]: pam_unix(su:session): session closed")
+        == "su_session"
+    )
+    assert skipped(LINUX, "Sep 25 10:31:28 web-01 sudo: something unexpected") == (
+        "unmodelled_message"
+    )
+    assert skipped(LINUX, "Sep 25 10:31:28 web-01 su[5001]: something unexpected") == (
+        "unmodelled_message"
+    )
+
+
+def test_sudo_command_not_allowed_is_a_failure() -> None:
+    e = event(
+        LINUX,
+        "Sep 25 10:40:00 web-01 sudo:      bob : command not allowed ; TTY=pts/1 ; "
+        "PWD=/home/bob ; USER=root ; COMMAND=/usr/bin/passwd root",
+    )
+    assert (e.event_outcome, e.attributes["failure_reason"]) == ("failure", "command_not_allowed")
+    assert (e.username, e.target_username) == ("bob", "root")
+    assert e.command_line == "/usr/bin/passwd root"
+
+
+def test_useradd_without_a_name_is_not_an_account_creation() -> None:
+    line = "Sep 25 10:31:34 web-01 useradd[5120]: new user: UID=1002, GID=1002"
+    assert skipped(LINUX, line) == "unmodelled_message"
+
+
+def test_an_impossible_iso_timestamp_fails_the_record() -> None:
+    line = "2026-02-30T10:31:02Z web-01 sshd[1]: Failed password for root from 1.2.3.4 port 1"
+    assert failure(LINUX, line) == "invalid_timestamp"
+
+
+def test_windows_logoff() -> None:
+    e = event(WINDOWS, win(4634, {"TargetUserName": "alice", "TargetDomainName": "CORP"}))
+    assert (e.event_category, e.event_action, e.username, e.user_domain) == (
+        "authentication",
+        "logoff",
+        "alice",
+        "corp",
+    )
+
+
+def test_windows_logon_without_an_account_name_has_no_account_kind() -> None:
+    e = event(WINDOWS, win(4624, {"LogonType": 3}))
+    assert e.username is None
+    assert e.attributes.get("account_kind") is None
+
+
+def test_windows_style_domain_names_are_split() -> None:
+    record = {"ts": "2026-09-25T10:31:02Z", "event": "login_success", "user": "CORP\\Alice"}
+    e = event(APP, json.dumps(record))
+    assert (e.username, e.user_domain) == ("alice", "corp")

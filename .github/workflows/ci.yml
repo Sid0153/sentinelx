@@ -79,8 +79,8 @@ jobs:
         run: npm run lint
       - name: Type check
         run: npm run typecheck
-      - name: Tests
-        run: npm test
+      - name: Tests (with coverage floors, vite.config.ts)
+        run: npm run test:coverage
       - name: Build
         run: npm run build
 

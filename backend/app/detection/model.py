@@ -16,7 +16,7 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.detection.conditions import MAX_DEPTH, Condition, depth, valid_field
+from app.detection.conditions import COLUMNS, MAX_DEPTH, Condition, depth, is_exact, valid_field
 
 RULE_ID = re.compile(r"^[A-Z]{3,5}-\d{3}$")
 TECHNIQUE_ID = re.compile(r"^T\d{4}(?:\.\d{3})?$")
@@ -270,6 +270,16 @@ class Rule(_Strict):
                 raise ValueError("a sequence has 2 to 5 steps")
             if self.match is not None:
                 raise ValueError("a sequence rule filters with its steps, not match")
+        if kind == "new_value":
+            # The engine counts a new_value rule's history in SQL (engine._history), which is
+            # exact only when the SQL filter is and every field is a stored column.
+            if self.match is not None and not is_exact(self.match):
+                raise ValueError(
+                    "a new_value rule's match must be exact in SQL "
+                    "(no regex or attribute-value comparisons)"
+                )
+            if any(name not in COLUMNS for name in [*self.group_by, self.value_field or ""]):
+                raise ValueError("a new_value rule groups by and compares stored columns only")
         if self.indicators is not None and kind != "single":
             raise ValueError("only single-event rules have indicators")
         if self.distinct_field:

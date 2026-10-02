@@ -28,4 +28,4 @@ known-third-party = ["alembic"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-files = ["app", "tests"]
+files = ["app", "tests", "benchmarks"]

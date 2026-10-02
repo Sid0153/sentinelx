@@ -238,8 +238,11 @@ is included in every error body. Planned below:
   the advisory-lock detection model still assumes one backend instance.
 - There is no retention policy at first. The `events` table is designed to be partitioned by
   month later (a time-leading primary key and a BRIN index option); see `database-schema.md`.
-- Controlled benchmarks (Phase 14) will measure ingest rate and detection latency on this
-  machine. Until then no throughput numbers are claimed.
+- Measured (Phase 14, [performance.md](performance.md)): 1 million records through the full
+  pipeline on a laptop at 713 records/s, one batch at a time; neither storing nor detection
+  slows down as the tables grow (per-day summaries kept by triggers, migration 0014); paged
+  reads stay at 8–27 ms with 921,000 events. Detection runs are serialized, so throughput does
+  not scale with senders.
 
 ## Real-world extension plan
 

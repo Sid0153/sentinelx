@@ -59,12 +59,22 @@ events, alerts and activity, not a stored table, so it cannot drift from its sou
 | `saved_hunts` ✅ | 10 | owner_id (FK users), name (unique per owner), description, kind (check: query/template), definition JSONB (validated again on every load), shared (indexed), created_at, updated_at |
 | `app_settings` ✅ | 8 | key, value JSONB, updated_at, updated_by: the correlation and sequence windows; changes audited |
 | `rate_limit_counters` ✅ | 13 | key (scope + client or source), window_start, count; PK (key, window_start). Sliding-window rate limits shared by every backend instance; old windows removed now and then |
+| `event_daily_counts` ✅ | 14 | kind (check: event/raw), day (UTC), records; PK (kind, day). Events per day of their own time, raw records per day of receipt. **Written only by triggers** (below); the dashboard reads totals and trends from it |
+| `logon_success_daily` ✅ | 14 | username, source_ip (inet), day (UTC), logons (> 0), last_logon; PK (username, source_ip, day). Successful logons per account and address. **Written only by triggers**; AUTH-004 reads whole days of its 14-day history from it |
 
 `log_sources` moved from Phase 5 to Phase 4: every event references its source, so the event
 store cannot exist without it. The batches that group records per ingest request stay in
 Phase 5.
 
 ## Integrity rules enforced by the database
+
+- **Per-day summaries cannot drift** (Phase 14, migration 0014): statement-level `AFTER INSERT`
+  triggers on `events` and `raw_events` (`count_inserted_events()`,
+  `count_inserted_raw_events()`) add each inserted statement's rows to `event_daily_counts`
+  and `logon_success_daily` in the same statement, whatever code inserts them. Both source
+  tables are append-only, so counting inserts is exact. Rows are written in a fixed order, so
+  concurrent batches do not deadlock. Tested: the summaries equal a fresh `GROUP BY` over the
+  rows after ingestion, after hand-made inserts, and after four concurrent batches.
 
 - Check constraints on every enum-like column, port ranges, lowercase identifiers and size
   limits (implemented for all ✅ tables and tested one by one), later also on
@@ -118,13 +128,17 @@ query is "value X within time range T".
 sequential scans are disabled and the generic time index is dropped inside the rolled-back
 test transaction. The plan must then use the intended index, with the time range in its index
 condition rather than as a filter. This proves each index *fits* its query. It does not prove
-the planner *chooses* it at every table size: that needs real data, and Phase 14 checks it with
-`EXPLAIN ANALYZE` on a generated data set. No performance numbers are claimed before then.
+the planner *chooses* it at every table size: that needs real data. Phase 14 ran every page's
+reads under `EXPLAIN (ANALYZE, BUFFERS)` on 921,000 generated events
+([performance.md](performance.md)): the explorer, hunts and evidence pages use their intended
+indexes (time, host, username, source IP, trigram); the alert and incident tables are read by
+sequential scan at their size (149 and 61 rows), which is the cheapest plan there.
 
 **Write cost.** Each event insert updates ten indexes on `events` (two of them GIN). That is
-the price of fast pivots and hunts, and it bounds ingest throughput. Phase 14 measures it
-rather than guessing; if it is too high, the trigram indexes are the first candidates to drop
-or defer.
+the price of fast pivots and hunts, and it bounds ingest throughput. Measured in Phase 14:
+storing costs about 0.65–0.8 ms per record (duplicate check, raw record, event, enrichment,
+the summary triggers, commit) and does not grow with the table up to 1 million records. The
+trigram indexes stay.
 
 ## Growth plan (documented, not built)
 

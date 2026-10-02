@@ -146,7 +146,19 @@ so a restart loses nothing and late or out-of-order events are seen.
    stays concurrent.
 3. Per rule: load the candidate events in `[t_min − window, t_max + window]` (window =
    `time_window` or `max_gap`), filtered by the SQL prefilter and ordered by `(timestamp, id)`.
-   A `new_value` rule also loads the history before `t_min − window` over `lookback`.
+   A `new_value` rule also needs the history before `t_min − window` over `lookback`, for
+   the keys (accounts) in the candidates only. It is **counted in SQL** (Phase 14): the part
+   of the lookback inside every candidate's lookback becomes one row per (key, value) with
+   its latest time and count; only the band at the old edge is read row by row. This gives
+   exactly what reading every earlier event gives (tested against it), in a bounded number of
+   rows. Reading every earlier event made AUTH-004 fail past 20,000 earlier logons, measured
+   in [performance.md](performance.md). It is exact only because a `new_value` rule's match
+   must be exact in SQL and name stored columns, which rule validation enforces.
+   For AUTH-004's question (successful logons per account and address), whole UTC days of the
+   lookback come from `logon_success_daily`, which a trigger keeps equal to the stored events
+   (migration 0014); only the partial days at both ends are counted from events, so the cost
+   no longer follows the length of the lookback. Any other `new_value` rule is counted from
+   events (`engine._summarized` decides, and a test pins which rules qualify).
 4. **Candidate cap.** If a rule has more than 20,000 candidates it is **not** evaluated on a
    truncated set, which could hide or invent a detection. It is reported as
    `too_many_candidates`.

@@ -13,6 +13,8 @@ seen, and a restart loses nothing.
   could hide or invent a detection): it is reported as `too_many_candidates`.
 - For a run after a batch, only detections with at least one event from that batch are kept,
   so re-reading overlapping windows does not report the same activity again and again.
+- New-value rules (AUTH-004) need weeks of history. It is read for the accounts in the run
+  only, and counted in SQL per (account, value); see `_history`.
 """
 
 import logging
@@ -22,13 +24,15 @@ from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, or_, select, true
+from sqlalchemy import ColumnElement, func, or_, select, true, tuple_
 from sqlalchemy.orm import Session
 
 from app.alerts import service as alerts
 from app.correlation import service as correlation
+from app.detection.conditions import All, Predicate
 from app.detection.evaluate import evaluate
 from app.detection.evaluators.common import group_key
+from app.detection.evaluators.new_value import History
 from app.detection.events import DetectionEvent
 from app.detection.explain import build
 from app.detection.library import get_library
@@ -36,6 +40,7 @@ from app.detection.model import Detection, Rule
 from app.detection.storage import enabled_rules
 from app.models.detection import DetectionRule, DetectionRun, RunStatus, RunTrigger
 from app.models.event import BatchStatus, Event, IngestionBatch, RawEvent
+from app.models.summary import LogonSuccessDaily
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -80,18 +85,116 @@ def _load(db: Session, rule: Rule, start: datetime, end: datetime) -> list[Detec
     return [_to_event(event, batch_id) for event, batch_id in rows]
 
 
+_IP_FIELDS = ("host_ip", "source_ip", "destination_ip")
+
+# What the `logon_success_daily` trigger summarizes (migration 0014): successful logons per
+# account and source address. A new_value rule asking exactly this question reads full days
+# of its history from there.
+_LOGON_SUCCESS = {
+    ("event_category", "eq", "authentication"),
+    ("event_action", "eq", "logon"),
+    ("event_outcome", "eq", "success"),
+}
+
+
+def _summarized(rule: Rule) -> bool:
+    match = rule.match
+    return (
+        rule.group_by == ["username"]
+        and rule.value_field == "source_ip"
+        and isinstance(match, All)
+        and len(match.all) == len(_LOGON_SUCCESS)
+        and all(isinstance(p, Predicate) for p in match.all)
+        and {(p.field, p.op, p.value) for p in match.all if isinstance(p, Predicate)}
+        == _LOGON_SUCCESS
+    )
+
+
+def _midnight(moment: datetime) -> datetime:
+    return datetime(moment.year, moment.month, moment.day, tzinfo=UTC)
+
+
+def _plain(field: str, value: Any) -> Any:
+    """A column value as `_to_event` gives it (addresses as text), so keys compare equal."""
+    return str(value) if field in _IP_FIELDS and value is not None else value
+
+
 def _history(
-    db: Session, rule: Rule, before: datetime
-) -> dict[tuple[Any, ...], list[tuple[datetime, Any]]]:
-    """Earlier (time, value) pairs per group key, for new_value rules."""
+    db: Session, rule: Rule, events: list[DetectionEvent], low: datetime, high: datetime
+) -> History:
+    """Earlier observations of the accounts in `events` (loaded from [low, high]), for
+    new_value rules, before `low` and within the lookback.
+
+    Earlier events at or after `high - lookback` are inside the lookback of *every* event of
+    the run, so they are counted in SQL: one row per (key, value) with its latest time and
+    count. Only the band before that, inside the lookback of some events and not others, is
+    read event by event. The evaluator therefore sees exactly what reading every earlier
+    event would give, in rows bounded by keys x values plus the band (Phase 14: reading every
+    event of the lookback grew with the data, and past MAX_CANDIDATES the rule stopped
+    working; docs/performance.md). Exact because a new_value rule's match must be exact in
+    SQL and name stored columns only (validated in model.py).
+
+    For AUTH-004's question (successful logons per account and address) whole UTC days come
+    from `logon_success_daily`, which a trigger keeps equal to the stored events: only the
+    partial days at both ends are counted from events, so the work no longer grows with the
+    lookback (docs/performance.md).
+    """
     assert rule.lookback is not None and rule.value_field is not None  # noqa: S101
-    history: dict[tuple[Any, ...], list[tuple[datetime, Any]]] = {}
-    for event in _load(db, rule, before - rule.lookback, before - timedelta(microseconds=1)):
-        if rule.match is not None and not rule.match.evaluate(event):
+    keys = sorted({k for e in events if (k := group_key(rule, e)) is not None}, key=str)
+    if not keys:
+        return {}
+    group_columns = [getattr(Event, name) for name in rule.group_by]
+    value_column = getattr(Event, rule.value_field)
+    common = [_prefilter(rule), tuple_(*group_columns).in_(keys)]
+    edge = min(high - rule.lookback, low)  # from here on: inside every event's lookback
+    history: History = {}
+
+    def add(group: list[Any], value: Any, stamp: datetime, count: int) -> None:
+        key = tuple(_plain(name, v) for name, v in zip(rule.group_by, group, strict=True))
+        history.setdefault(key, []).append((stamp, _plain(rule.value_field or "", value), count))
+
+    ranges = [(edge, low)]
+    first_day = edge if edge == _midnight(edge) else _midnight(edge) + timedelta(days=1)
+    last_day = _midnight(low)
+    if _summarized(rule) and first_day < last_day:
+        # Whole days strictly inside [edge, low): every logon in them is inside every
+        # event's lookback and before every event, as the counted rows below are.
+        summary = db.execute(
+            select(
+                LogonSuccessDaily.username,
+                LogonSuccessDaily.source_ip,
+                func.max(LogonSuccessDaily.last_logon),
+                func.sum(LogonSuccessDaily.logons),
+            )
+            .where(
+                LogonSuccessDaily.username.in_([key[0] for key in keys]),
+                LogonSuccessDaily.day >= first_day.date(),
+                LogonSuccessDaily.day < last_day.date(),
+            )
+            .group_by(LogonSuccessDaily.username, LogonSuccessDaily.source_ip)
+        ).all()
+        for username, value, latest, count in summary:
+            add([username], value, latest, int(count))
+        ranges = [(edge, first_day), (last_day, low)]  # the partial days, from events
+    for start, stop in ranges:
+        if start >= stop:
             continue
-        key = group_key(rule, event)
-        if key is not None:
-            history.setdefault(key, []).append((event.timestamp, event.get(rule.value_field)))
+        counted = db.execute(
+            select(*group_columns, value_column, func.max(Event.timestamp), func.count())
+            .where(*common, Event.timestamp >= start, Event.timestamp < stop)
+            .group_by(*group_columns, value_column)
+        ).all()
+        for *group, value, latest, count in counted:
+            add(group, value, latest, count)
+    band = db.execute(
+        select(*group_columns, value_column, Event.timestamp)
+        .where(*common, Event.timestamp >= low - rule.lookback, Event.timestamp < edge)
+        .limit(MAX_CANDIDATES + 1)
+    ).all()
+    if len(band) > MAX_CANDIDATES:
+        raise TooManyCandidates
+    for *group, value, stamp in band:
+        add(group, value, stamp, 1)
     return history
 
 
@@ -132,7 +235,11 @@ def run(
         try:
             window = rule.window()
             events = _load(db, rule, start - window, end + window)
-            history = _history(db, rule, start - window) if rule.kind == "new_value" else None
+            history = (
+                _history(db, rule, events, start - window, end + window)
+                if rule.kind == "new_value"
+                else None
+            )
             found = [build(rule, version, match) for match in evaluate(rule, events, history)]
             if batch is not None:
                 found = [d for d in found if str(batch.id) in d.batch_ids]

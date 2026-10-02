@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, func, or_, select
+from sqlalchemy import ColumnElement, String, Uuid, column, func, or_, select, values
 from sqlalchemy.orm import Session
 
 from app.models.alert import ACTIVE_STATUSES, Alert
@@ -120,24 +120,48 @@ def for_identity(db: Session, identity: Identity) -> dict[str, Any]:
     )
 
 
-def open_alert_counts(db: Session, rows: list[Asset] | list[Identity]) -> dict[uuid.UUID, int]:
-    """Open alerts per row, for a list page (one query per row; pages are at most 200)."""
-    counts: dict[uuid.UUID, int] = {}
-    for row in rows:
-        involves = asset_alerts(row) if isinstance(row, Asset) else identity_alerts(row)
-        counts[row.id] = int(
-            db.scalar(select(func.count()).where(involves, Alert.status.in_(ACTIVE_STATUSES))) or 0
+def list_activity(
+    db: Session, rows: list[Asset] | list[Identity]
+) -> dict[uuid.UUID, tuple[int, datetime | None]]:
+    """Open alerts and the latest event for every row of a list page, in **one** statement
+    (Phase 14: it was two per row). The page's rows become a VALUES list; the same conditions
+    as `for_asset` / `for_identity` run as correlated subqueries per row inside PostgreSQL,
+    so each can still use its index."""
+    if not rows:
+        return {}
+    page = values(
+        column("id", Uuid), column("name", String), column("short", String), name="page"
+    ).data(
+        [
+            (r.id, r.hostname, r.hostname.split(".", 1)[0])
+            if isinstance(r, Asset)
+            else (r.id, r.username, r.username)
+            for r in rows
+        ]
+    )
+    if isinstance(rows[0], Asset):
+        involves = or_(
+            Alert.asset_id == page.c.id,
+            Alert.host == page.c.name,
+            _short(Alert.host) == page.c.short,
         )
-    return counts
-
-
-def last_seen(db: Session, rows: list[Asset] | list[Identity]) -> dict[uuid.UUID, datetime | None]:
-    found: dict[uuid.UUID, datetime | None] = {}
-    for row in rows:
-        latest = (
-            _latest(Event.asset_id == row.id, Event.host == row.hostname)
-            if isinstance(row, Asset)
-            else _latest(Event.identity_id == row.id, Event.username == row.username)
+        recorded, named = Event.asset_id == page.c.id, Event.host == page.c.name
+    else:
+        involves = or_(
+            Alert.identity_id == page.c.id,
+            Alert.username == page.c.name,
+            Alert.target_username == page.c.name,
         )
-        found[row.id] = db.scalar(latest)
-    return found
+        recorded, named = Event.identity_id == page.c.id, Event.username == page.c.name
+    open_alerts = (
+        select(func.count())
+        .select_from(Alert)
+        .where(involves, Alert.status.in_(ACTIVE_STATUSES))
+        .scalar_subquery()
+    )
+    latest = func.greatest(
+        select(func.max(Event.timestamp)).where(recorded).scalar_subquery(),
+        select(func.max(Event.timestamp)).where(named).scalar_subquery(),
+    )
+    result = db.execute(select(page.c.id, open_alerts, latest)).tuples()
+    return {row_id: (int(count or 0), seen) for row_id, count, seen in result}

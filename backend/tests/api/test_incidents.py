@@ -304,3 +304,75 @@ def test_admins_tune_the_correlation_windows(
     assert db_client.get("/api/settings", headers=analyst).status_code == 403
     (entry,) = audit_entries(db_session, "SETTINGS_CHANGED")
     assert entry.details["changes"] == {"correlation_window_minutes": {"from": 120, "to": 60}}
+
+
+# ---------- refusals (Phase 14: every error path of the incident actions) ----------
+
+
+def test_incident_actions_refuse_bad_input_without_side_effects(
+    db_client: TestClient,
+    db_session: Session,
+    chain: dict[str, Any],
+    admin: dict[str, str],
+    analyst: dict[str, str],
+) -> None:
+    ingest(db_client, admin, generate("brute_force", START, host="db-07", source_ip="198.51.100.9"))
+    (standalone,) = db_client.get("/api/alerts?host=db-07", headers=analyst).json()["items"]
+    member = chain["alerts"][0]["alert"]["id"]  # already part of the chain's incident
+    path = f"/api/incidents/{chain['id']}"
+    unknown = "00000000-0000-0000-0000-000000000000"
+    audit_before = len(audit_entries(db_session))
+    activity_before = len(chain["activity"])
+
+    refusals = [
+        (db_client.get(f"/api/incidents/{unknown}", headers=analyst), 404),
+        (act(db_client, analyst, f"/api/incidents/{unknown}/notes", body="x"), 404),
+        # Whitespace passes the schema's length check; the service refuses an empty note.
+        (act(db_client, analyst, f"{path}/notes", body="   \n  "), 400),
+        (act(db_client, analyst, f"{path}/evidence", tag="benign"), 400),  # neither
+        (act(db_client, analyst, f"{path}/evidence", event_id=unknown, alert_id=member), 400),
+        (act(db_client, analyst, f"{path}/evidence", event_id=unknown), 404),
+        (act(db_client, analyst, f"{path}/evidence", alert_id=unknown), 404),
+        (act(db_client, analyst, f"{path}/evidence", alert_id=member, action="UNPIN"), 409),
+        (act(db_client, analyst, f"{path}/alerts", alert_id=unknown, reason="why not"), 404),
+        (act(db_client, analyst, f"{path}/alerts", alert_id=member, reason="again"), 409),
+        (
+            act(db_client, analyst, f"{path}/alerts/{standalone['id']}/unlink", reason="nope"),
+            404,
+        ),
+        (db_client.patch(path, json={"title": "  ab  "}, headers=analyst), 400),
+        (act(db_client, analyst, f"/api/alerts/{unknown}/escalate", reason="why not"), 404),
+    ]
+    for response, expected in refusals:
+        assert response.status_code == expected, (response.request.url, response.text)
+        assert set(response.json()) == {"error"}  # the standard error body
+
+    # Renaming to the current title is accepted and changes nothing.
+    same = db_client.patch(path, json={"title": f"  {chain['title']}  "}, headers=analyst)
+    assert same.status_code == 200 and not same.json()["title_edited"]
+
+    # Nothing above left a trace in the incident or the audit log.
+    after = db_client.get(path, headers=analyst).json()
+    assert len(after["activity"]) == activity_before
+    assert after["evidence"] == [] and after["notes"] == []
+    assert len(audit_entries(db_session)) == audit_before
+
+
+def test_a_resolved_incident_takes_no_new_alerts(
+    db_client: TestClient, chain: dict[str, Any], admin: dict[str, str], analyst: dict[str, str]
+) -> None:
+    ingest(db_client, admin, generate("brute_force", START, host="db-07", source_ip="198.51.100.9"))
+    (standalone,) = db_client.get("/api/alerts?host=db-07", headers=analyst).json()["items"]
+    path = f"/api/incidents/{chain['id']}"
+    resolved = act(
+        db_client,
+        analyst,
+        f"{path}/transition",
+        status="RESOLVED",
+        disposition="confirmed_malicious",
+        resolution="Host rebuilt",
+    )
+    assert resolved.status_code == 200, resolved.text
+    refused = act(db_client, analyst, f"{path}/alerts", alert_id=standalone["id"], reason="late")
+    assert refused.status_code == 409
+    assert "reopen it first" in refused.json()["error"]["message"]

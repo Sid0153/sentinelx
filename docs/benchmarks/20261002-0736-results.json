@@ -1,0 +1,992 @@
+{
+  "environment": {
+    "when": "2026-10-02T07:36:46+00:00",
+    "commit": "cf05fe3",
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10",
+    "cpu": "13th Gen Intel(R) Core(TM) i7-13700HX",
+    "logical_cpus": 18,
+    "memory_gb": 15.7,
+    "docker": "29.8.0 | Docker Desktop | 18 CPUs | 8178003968 bytes",
+    "postgres": "PostgreSQL 16.15 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+    "select_1_round_trip_ms": 0.58,
+    "postgres_settings": {
+      "shared_buffers": "128MB",
+      "work_mem": "4MB",
+      "effective_cache_size": "4GB",
+      "max_connections": "100",
+      "ssl": "on"
+    },
+    "connection_ssl": true,
+    "table_rows": {
+      "raw_events": 1001572,
+      "events": 921106,
+      "alerts": 149,
+      "alert_events": 1227,
+      "incidents": 61,
+      "audit_logs": 332
+    },
+    "database_size": "1316 MB",
+    "database": "sentinelx_bench"
+  },
+  "parameters": {
+    "records": "1000000",
+    "batch_size": "1000",
+    "days": "7",
+    "attack_every": "10000",
+    "seed": "14",
+    "fresh": "True",
+    "out": "..\\docs\\benchmarks"
+  },
+  "load": {
+    "records": 1001572,
+    "events": 921106,
+    "batches": 2000,
+    "batches_not_completed": 0,
+    "elapsed_s": 2993.7,
+    "records_per_s": 334.6,
+    "events_per_s": 307.7,
+    "batch_wall_ms": {
+      "median": 1521.3,
+      "p95": 2162.6,
+      "max": 4514.0
+    },
+    "detections": 173,
+    "alerts_created": 149,
+    "incidents_created": 61,
+    "attacks_injected": 100,
+    "by_progress": [
+      {
+        "batches": "0-199",
+        "events_before": 0,
+        "median_wall_ms_per_1000": 1735.2,
+        "median_store_ms": 481.4,
+        "median_detect_ms": 334.5
+      },
+      {
+        "batches": "200-399",
+        "events_before": 92131,
+        "median_wall_ms_per_1000": 2258.1,
+        "median_store_ms": 489.2,
+        "median_detect_ms": 534.0
+      },
+      {
+        "batches": "400-599",
+        "events_before": 184211,
+        "median_wall_ms_per_1000": 3371.2,
+        "median_store_ms": 484.6,
+        "median_detect_ms": 751.0
+      },
+      {
+        "batches": "600-799",
+        "events_before": 276377,
+        "median_wall_ms_per_1000": 3332.4,
+        "median_store_ms": 418.2,
+        "median_detect_ms": 935.5
+      },
+      {
+        "batches": "800-999",
+        "events_before": 368618,
+        "median_wall_ms_per_1000": 3933.4,
+        "median_store_ms": 542.5,
+        "median_detect_ms": 1190.5
+      },
+      {
+        "batches": "1000-1199",
+        "events_before": 460797,
+        "median_wall_ms_per_1000": 4838.6,
+        "median_store_ms": 428.5,
+        "median_detect_ms": 1216.5
+      },
+      {
+        "batches": "1200-1399",
+        "events_before": 552774,
+        "median_wall_ms_per_1000": 4491.4,
+        "median_store_ms": 385.9,
+        "median_detect_ms": 1196.5
+      },
+      {
+        "batches": "1400-1599",
+        "events_before": 644701,
+        "median_wall_ms_per_1000": 4682.2,
+        "median_store_ms": 342.8,
+        "median_detect_ms": 1227.0
+      },
+      {
+        "batches": "1600-1799",
+        "events_before": 736765,
+        "median_wall_ms_per_1000": 4922.1,
+        "median_store_ms": 361.0,
+        "median_detect_ms": 1361.0
+      },
+      {
+        "batches": "1800-1999",
+        "events_before": 829015,
+        "median_wall_ms_per_1000": 5210.3,
+        "median_store_ms": 352.1,
+        "median_detect_ms": 1463.0
+      }
+    ]
+  },
+  "reads": [
+    {
+      "endpoint": "Dashboard summary",
+      "request": "GET /api/dashboard/summary",
+      "median_ms": 126.9,
+      "p95_ms": 238.4,
+      "max_ms": 297.2,
+      "statements": 17,
+      "db_execution_ms": 88.04,
+      "plan": {
+        "execution_ms": 33.4,
+        "planning_ms": 0.03,
+        "nodes": [
+          "Aggregate",
+          "Gather",
+          "Aggregate",
+          "Index Only Scan raw_events (ix_raw_events_source_id)"
+        ],
+        "sql": "SELECT count(*) AS count_1 \nFROM raw_events",
+        "params": {},
+        "text": "Finalize Aggregate  (cost=35670.94..35670.95 rows=1 width=8) (actual time=38.007..41.072 rows=1 loops=1)\n  Buffers: shared hit=10138\n  ->  Gather  (cost=35670.73..35670.94 rows=2 width=8) (actual time=37.833..41.065 rows=3 loops=1)\n        Workers Planned: 2\n        Workers Launched: 2\n        Buffers: shared hit=10138\n        ->  Partial Aggregate  (cost=34670.73..34670.74 rows=1 width=8) (actual time=35.459..35.460 rows=1 loops=3)\n              Buffers: shared hit=10138\n              ->  Parallel Index Only Scan using ix_raw_events_source_id on raw_events  (cost=0.42..33627.49 rows=417295 width=0) (actual time=0.021..22.759 rows=333857 loops=3)\n                    Heap Fetches: 197561\n                    Buffers: shared hit=10138\nPlanning Time: 0.057 ms\nExecution Time: 41.119 ms"
+      }
+    },
+    {
+      "endpoint": "Dashboard trends, 14 days",
+      "request": "GET /api/dashboard/trends",
+      "median_ms": 135.0,
+      "p95_ms": 146.0,
+      "max_ms": 203.4,
+      "statements": 4,
+      "db_execution_ms": 172.28,
+      "plan": {
+        "execution_ms": 171.88,
+        "planning_ms": 0.45,
+        "nodes": [
+          "Aggregate",
+          "Index Only Scan events (ix_events_username_ts)"
+        ],
+        "sql": "SELECT CAST(timezone(%(timezone_2)s::VARCHAR, events.timestamp) AS DATE) AS timezone_1, count(*) AS count_1 \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE GROUP BY 1",
+        "params": {
+          "timezone_2": "UTC",
+          "timestamp_1": "2026-09-19 00:00:00+00:00",
+          "timestamp_2": "2026-10-02 07:36:11.434466+00:00"
+        },
+        "text": "HashAggregate  (cost=93635.98..114647.52 rows=921054 width=12) (actual time=174.175..174.399 rows=8 loops=1)\n  Group Key: (timezone('UTC'::text, \"timestamp\"))::date\n  Planned Partitions: 16  Batches: 1  Memory Usage: 3097kB\n  Buffers: shared hit=13550\n  ->  Index Only Scan using ix_events_username_ts on events  (cost=0.42..41826.69 rows=921054 width=4) (actual time=2.688..121.163 rows=921106 loops=1)\n        Index Cond: ((\"timestamp\" >= '2026-09-19 00:00:00+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:11.434466+00'::timestamp with time zone))\n        Heap Fetches: 9406\n        Buffers: shared hit=13550\nPlanning:\n  Buffers: shared hit=9\nPlanning Time: 0.150 ms\nJIT:\n  Functions: 6\n  Options: Inlining false, Optimization false, Expressions true, Deforming true\n  Timing: Generation 0.238 ms, Inlining 0.000 ms, Optimization 0.105 ms, Emission 2.590 ms, Total 2.933 ms\nExecution Time: 175.870 ms"
+      }
+    },
+    {
+      "endpoint": "Event explorer, last 24 h",
+      "request": "GET /api/events",
+      "median_ms": 8.9,
+      "p95_ms": 26.7,
+      "max_ms": 27.2,
+      "statements": 2,
+      "db_execution_ms": 0.08,
+      "plan": {
+        "execution_ms": 0.04,
+        "planning_ms": 0.03,
+        "nodes": [
+          "Index Scan users (pk_users)"
+        ],
+        "sql": "SELECT users.id AS users_id, users.email AS users_email, users.password_hash AS users_password_hash, users.role AS users_role, users.is_active AS users_is_active, users.failed_login_count AS users_failed_login_count, users.locked_until AS users_locked_until, users.last_login_at AS users_last_login_at, users.created_at AS users_created_at, users.mfa_enabled AS users_mfa_enabled, users.totp_salt AS users_totp_salt, users.totp_pending_salt AS users_totp_pending_salt, users.totp_last_step AS users_totp_last_step, users.mfa_recovery_hashes AS users_mfa_recovery_hashes, users.must_change_password AS users_must_change_password \nFROM users \nWHERE users.id = %(pk_1)s::UUID",
+        "params": {
+          "pk_1": "eec47306-b90a-479e-b891-ec6ee699ee91"
+        },
+        "text": "Index Scan using pk_users on users  (cost=0.14..8.16 rows=1 width=1461) (actual time=0.023..0.023 rows=1 loops=1)\n  Index Cond: (id = 'eec47306-b90a-479e-b891-ec6ee699ee91'::uuid)\n  Buffers: shared hit=2\nPlanning Time: 0.032 ms\nExecution Time: 0.048 ms"
+      }
+    },
+    {
+      "endpoint": "Event explorer, 7 days, one account",
+      "request": "GET /api/events",
+      "median_ms": 10.9,
+      "p95_ms": 15.5,
+      "max_ms": 17.5,
+      "statements": 2,
+      "db_execution_ms": 0.12,
+      "plan": {
+        "execution_ms": 0.09,
+        "planning_ms": 0.19,
+        "nodes": [
+          "Limit",
+          "Incremental Sort",
+          "Index Scan events (ix_events_username_ts)"
+        ],
+        "sql": "SELECT events.id, events.raw_event_id, events.source_id, events.source_type, events.timestamp, events.ingested_at, events.host, events.host_ip, events.event_category, events.event_action, events.event_outcome, events.username, events.user_domain, events.target_username, events.source_ip, events.source_port, events.destination_ip, events.destination_port, events.protocol, events.service, events.process_name, events.parent_process_name, events.command_line, events.session_id, events.message, events.attributes, events.source_ip_scope, events.asset_id, events.asset_criticality, events.identity_id, events.identity_privileged, events.simulated \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE AND events.username = %(username_1)s::VARCHAR ORDER BY events.timestamp DESC, events.id DESC \n LIMIT %(param_1)s::INTEGER",
+        "params": {
+          "timestamp_1": "2026-09-25 05:46:08+00:00",
+          "timestamp_2": "2026-10-02 05:46:08+00:00",
+          "username_1": "user007",
+          "param_1": 51
+        },
+        "text": "Limit  (cost=4.15..195.88 rows=51 width=458) (actual time=0.039..0.055 rows=51 loops=1)\n  Buffers: shared hit=52\n  ->  Incremental Sort  (cost=4.15..27936.11 rows=7430 width=458) (actual time=0.038..0.052 rows=51 loops=1)\n        Sort Key: \"timestamp\" DESC, id DESC\n        Presorted Key: \"timestamp\"\n        Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 40kB  Peak Memory: 40kB\n        Buffers: shared hit=52\n        ->  Index Scan Backward using ix_events_username_ts on events  (cost=0.42..27601.76 rows=7430 width=458) (actual time=0.014..0.041 rows=52 loops=1)\n              Index Cond: (((username)::text = 'user007'::text) AND (\"timestamp\" >= '2026-09-25 05:46:08+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 05:46:08+00'::timestamp with time zone))\n              Buffers: shared hit=52\nPlanning:\n  Buffers: shared hit=9\nPlanning Time: 0.143 ms\nExecution Time: 0.072 ms"
+      }
+    },
+    {
+      "endpoint": "Event explorer, 7 days, one host",
+      "request": "GET /api/events",
+      "median_ms": 7.6,
+      "p95_ms": 17.1,
+      "max_ms": 18.7,
+      "statements": 2,
+      "db_execution_ms": 0.12,
+      "plan": {
+        "execution_ms": 0.08,
+        "planning_ms": 0.14,
+        "nodes": [
+          "Limit",
+          "Incremental Sort",
+          "Index Scan events (ix_events_host_ts)"
+        ],
+        "sql": "SELECT events.id, events.raw_event_id, events.source_id, events.source_type, events.timestamp, events.ingested_at, events.host, events.host_ip, events.event_category, events.event_action, events.event_outcome, events.username, events.user_domain, events.target_username, events.source_ip, events.source_port, events.destination_ip, events.destination_port, events.protocol, events.service, events.process_name, events.parent_process_name, events.command_line, events.session_id, events.message, events.attributes, events.source_ip_scope, events.asset_id, events.asset_criticality, events.identity_id, events.identity_privileged, events.simulated \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE AND events.host = %(host_1)s::VARCHAR ORDER BY events.timestamp DESC, events.id DESC \n LIMIT %(param_1)s::INTEGER",
+        "params": {
+          "timestamp_1": "2026-09-25 05:46:08+00:00",
+          "timestamp_2": "2026-10-02 05:46:08+00:00",
+          "host_1": "srv-007",
+          "param_1": 51
+        },
+        "text": "Limit  (cost=4.40..208.66 rows=51 width=458) (actual time=0.037..0.052 rows=51 loops=1)\n  Buffers: shared hit=54\n  ->  Incremental Sort  (cost=4.40..7461.96 rows=1862 width=458) (actual time=0.037..0.049 rows=51 loops=1)\n        Sort Key: \"timestamp\" DESC, id DESC\n        Presorted Key: \"timestamp\"\n        Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 41kB  Peak Memory: 41kB\n        Buffers: shared hit=54\n        ->  Index Scan Backward using ix_events_host_ts on events  (cost=0.42..7378.17 rows=1862 width=458) (actual time=0.017..0.039 rows=52 loops=1)\n              Index Cond: (((host)::text = 'srv-007'::text) AND (\"timestamp\" >= '2026-09-25 05:46:08+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 05:46:08+00'::timestamp with time zone))\n              Buffers: shared hit=54\nPlanning:\n  Buffers: shared hit=9\nPlanning Time: 0.127 ms\nExecution Time: 0.069 ms"
+      }
+    },
+    {
+      "endpoint": "Alert queue",
+      "request": "GET /api/alerts",
+      "median_ms": 13.0,
+      "p95_ms": 39.0,
+      "max_ms": 39.5,
+      "statements": 3,
+      "db_execution_ms": 0.28,
+      "plan": {
+        "execution_ms": 0.21,
+        "planning_ms": 0.04,
+        "nodes": [
+          "Limit",
+          "Sort",
+          "Seq Scan alerts"
+        ],
+        "sql": "SELECT alerts.id, alerts.rule_id, alerts.rule_version, alerts.indicator, alerts.kind, alerts.category, alerts.title, alerts.description, alerts.severity, alerts.confidence, alerts.status, alerts.disposition, alerts.priority_score, alerts.priority_band, alerts.priority_breakdown, alerts.risk_model_version, alerts.dedup_key, alerts.group_values, alerts.host, alerts.username, alerts.target_username, alerts.source_ip, alerts.destination_ip, alerts.asset_id, alerts.identity_id, alerts.first_event_at, alerts.last_event_at, alerts.event_count, alerts.evidence_truncated, alerts.peak_count, alerts.detection_count, alerts.explanation, alerts.facts, alerts.entities, alerts.investigation, alerts.response, alerts.mitre, alerts.history, alerts.previous_alert_id, alerts.simulated, alerts.created_at, alerts.updated_at, alerts.status_changed_at, alerts.status_changed_by, alerts.triaged_at, alerts.resolved_at, alerts.resolved_by, alerts.status_note \nFROM alerts ORDER BY alerts.priority_score DESC, alerts.last_event_at DESC, alerts.id \n LIMIT %(param_1)s::INTEGER OFFSET %(param_2)s::INTEGER",
+        "params": {
+          "param_1": 50,
+          "param_2": 0
+        },
+        "text": "Limit  (cost=61.13..61.26 rows=50 width=2549) (actual time=0.150..0.153 rows=50 loops=1)\n  Buffers: shared hit=54\n  ->  Sort  (cost=61.13..61.54 rows=165 width=2549) (actual time=0.149..0.151 rows=50 loops=1)\n        Sort Key: priority_score DESC, last_event_at DESC, id\n        Sort Method: top-N heapsort  Memory: 197kB\n        Buffers: shared hit=54\n        ->  Seq Scan on alerts  (cost=0.00..55.65 rows=165 width=2549) (actual time=0.002..0.027 rows=149 loops=1)\n              Buffers: shared hit=54\nPlanning Time: 0.041 ms\nExecution Time: 0.200 ms"
+      }
+    },
+    {
+      "endpoint": "Alerts grouped by host",
+      "request": "GET /api/alerts/groups",
+      "median_ms": 13.2,
+      "p95_ms": 28.7,
+      "max_ms": 208.2,
+      "statements": 3,
+      "db_execution_ms": 0.49,
+      "plan": {
+        "execution_ms": 0.25,
+        "planning_ms": 0.08,
+        "nodes": [
+          "Aggregate",
+          "Aggregate",
+          "Seq Scan alerts"
+        ],
+        "sql": "SELECT count(*) AS count_1 \nFROM (SELECT alerts.host AS host, count(*) AS count_2, count(*) FILTER (WHERE alerts.status IN (%(status_1_1)s::VARCHAR, %(status_1_2)s::VARCHAR, %(status_1_3)s::VARCHAR)) AS anon_2, max(alerts.priority_score) AS max_1, max(alerts.last_event_at) AS max_2 \nFROM alerts \nWHERE alerts.host IS NOT NULL GROUP BY alerts.host) AS anon_1",
+        "params": {
+          "status_1_1": "NEW",
+          "status_1_2": "TRIAGED",
+          "status_1_3": "IN_PROGRESS"
+        },
+        "text": "Aggregate  (cost=57.95..57.96 rows=1 width=8) (actual time=0.091..0.091 rows=1 loops=1)\n  Buffers: shared hit=54\n  ->  HashAggregate  (cost=56.06..56.90 rows=84 width=36) (actual time=0.082..0.087 rows=76 loops=1)\n        Group Key: alerts.host\n        Batches: 1  Memory Usage: 24kB\n        Buffers: shared hit=54\n        ->  Seq Scan on alerts  (cost=0.00..55.65 rows=165 width=8) (actual time=0.005..0.062 rows=149 loops=1)\n              Filter: (host IS NOT NULL)\n              Buffers: shared hit=54\nPlanning Time: 0.066 ms\nExecution Time: 0.106 ms"
+      }
+    },
+    {
+      "endpoint": "Incident queue",
+      "request": "GET /api/incidents",
+      "median_ms": 9.0,
+      "p95_ms": 15.2,
+      "max_ms": 21.8,
+      "statements": 3,
+      "db_execution_ms": 0.16,
+      "plan": {
+        "execution_ms": 0.11,
+        "planning_ms": 0.04,
+        "nodes": [
+          "Limit",
+          "Sort",
+          "Seq Scan incidents"
+        ],
+        "sql": "SELECT incidents.id, incidents.number, incidents.title, incidents.title_edited, incidents.summary, incidents.created_reason, incidents.status, incidents.severity, incidents.risk_score, incidents.risk_band, incidents.risk_breakdown, incidents.risk_model_version, incidents.assigned_to, incidents.hosts, incidents.usernames, incidents.source_ips, incidents.tactics, incidents.techniques, incidents.alert_count, incidents.first_activity_at, incidents.last_activity_at, incidents.simulated, incidents.disposition, incidents.resolution, incidents.resolved_at, incidents.resolved_by, incidents.closed_at, incidents.related_incident_id, incidents.created_at, incidents.updated_at \nFROM incidents ORDER BY incidents.risk_score DESC, incidents.last_activity_at DESC, incidents.number \n LIMIT %(param_1)s::INTEGER OFFSET %(param_2)s::INTEGER",
+        "params": {
+          "param_1": 50,
+          "param_2": 0
+        },
+        "text": "Limit  (cost=12.28..12.40 rows=50 width=1625) (actual time=0.072..0.076 rows=50 loops=1)\n  Buffers: shared hit=10\n  ->  Sort  (cost=12.28..12.42 rows=58 width=1625) (actual time=0.072..0.073 rows=50 loops=1)\n        Sort Key: risk_score DESC, last_activity_at DESC, number\n        Sort Method: quicksort  Memory: 123kB\n        Buffers: shared hit=10\n        ->  Seq Scan on incidents  (cost=0.00..10.58 rows=58 width=1625) (actual time=0.002..0.009 rows=61 loops=1)\n              Buffers: shared hit=10\nPlanning Time: 0.035 ms\nExecution Time: 0.104 ms"
+      }
+    },
+    {
+      "endpoint": "Busiest incident",
+      "request": "GET /api/incidents/530edbfb-9c0a-4512-92ee-b80089c88dbb",
+      "median_ms": 18.2,
+      "p95_ms": 43.6,
+      "max_ms": 55.2,
+      "statements": 8,
+      "db_execution_ms": 0.35,
+      "plan": {
+        "execution_ms": 0.07,
+        "planning_ms": 0.2,
+        "nodes": [
+          "Sort",
+          "Nested Loop",
+          "Seq Scan incident_alerts",
+          "Index Scan alerts (pk_alerts)"
+        ],
+        "sql": "SELECT incident_alerts.incident_id, incident_alerts.alert_id, incident_alerts.link_strength, incident_alerts.shared_entities, incident_alerts.reason, incident_alerts.link_source, incident_alerts.linked_by, incident_alerts.linked_at, alerts.id, alerts.rule_id, alerts.rule_version, alerts.indicator, alerts.kind, alerts.category, alerts.title, alerts.description, alerts.severity, alerts.confidence, alerts.status, alerts.disposition, alerts.priority_score, alerts.priority_band, alerts.priority_breakdown, alerts.risk_model_version, alerts.dedup_key, alerts.group_values, alerts.host, alerts.username, alerts.target_username, alerts.source_ip, alerts.destination_ip, alerts.asset_id, alerts.identity_id, alerts.first_event_at, alerts.last_event_at, alerts.event_count, alerts.evidence_truncated, alerts.peak_count, alerts.detection_count, alerts.explanation, alerts.facts, alerts.entities, alerts.investigation, alerts.response, alerts.mitre, alerts.history, alerts.previous_alert_id, alerts.simulated, alerts.created_at, alerts.updated_at, alerts.status_changed_at, alerts.status_changed_by, alerts.triaged_at, alerts.resolved_at, alerts.resolved_by, alerts.status_note \nFROM incident_alerts JOIN alerts ON alerts.id = incident_alerts.alert_id \nWHERE incident_alerts.incident_id = %(incident_id_1)s::UUID ORDER BY alerts.first_event_at, alerts.last_event_at, alerts.rule_id, alerts.id",
+        "params": {
+          "incident_id_1": "530edbfb-9c0a-4512-92ee-b80089c88dbb"
+        },
+        "text": "Sort  (cost=34.78..34.79 rows=5 width=2740) (actual time=0.036..0.070 rows=4 loops=1)\n  Sort Key: alerts.first_event_at, alerts.last_event_at, alerts.rule_id, incident_alerts.alert_id\n  Sort Method: quicksort  Memory: 33kB\n  Buffers: shared hit=12\n  ->  Nested Loop  (cost=0.14..34.72 rows=5 width=2740) (actual time=0.014..0.057 rows=4 loops=1)\n        Buffers: shared hit=12\n        ->  Seq Scan on incident_alerts  (cost=0.00..5.84 rows=5 width=191) (actual time=0.004..0.010 rows=4 loops=1)\n              Filter: (incident_id = '530edbfb-9c0a-4512-92ee-b80089c88dbb'::uuid)\n              Rows Removed by Filter: 130\n              Buffers: shared hit=4\n        ->  Index Scan using pk_alerts on alerts  (cost=0.14..5.76 rows=1 width=2549) (actual time=0.002..0.002 rows=1 loops=4)\n              Index Cond: (id = incident_alerts.alert_id)\n              Buffers: shared hit=8\nPlanning:\n  Buffers: shared hit=10\nPlanning Time: 0.199 ms\nExecution Time: 0.108 ms"
+      }
+    },
+    {
+      "endpoint": "Busiest incident timeline",
+      "request": "GET /api/incidents/530edbfb-9c0a-4512-92ee-b80089c88dbb/timeline",
+      "median_ms": 15.8,
+      "p95_ms": 28.9,
+      "max_ms": 34.0,
+      "statements": 7,
+      "db_execution_ms": 0.7,
+      "plan": {
+        "execution_ms": 0.26,
+        "planning_ms": 0.48,
+        "nodes": [
+          "Limit",
+          "Sort",
+          "Append",
+          "Nested Loop",
+          "Aggregate",
+          "Hash Join",
+          "Seq Scan alert_events",
+          "Hash",
+          "Seq Scan incident_alerts",
+          "Index Scan events (pk_events)",
+          "Nested Loop",
+          "Seq Scan incident_alerts",
+          "Index Scan alerts (pk_alerts)",
+          "Subquery Scan",
+          "Seq Scan incident_activity"
+        ],
+        "sql": "SELECT anon_1.at, anon_1.kind, anon_1.ref \nFROM (SELECT events.timestamp AS at, %(param_1)s::VARCHAR AS kind, CAST(events.id AS VARCHAR) AS ref \nFROM events \nWHERE events.id IN (SELECT alert_events.event_id \nFROM alert_events \nWHERE alert_events.alert_id IN (SELECT incident_alerts.alert_id \nFROM incident_alerts \nWHERE incident_alerts.incident_id = %(incident_id_1)s::UUID)) UNION ALL SELECT alerts.created_at AS at, %(param_2)s::VARCHAR AS kind, CAST(alerts.id AS VARCHAR) AS ref \nFROM alerts \nWHERE alerts.id IN (SELECT incident_alerts.alert_id \nFROM incident_alerts \nWHERE incident_alerts.incident_id = %(incident_id_1)s::UUID) UNION ALL SELECT incident_activity.created_at AS at, %(param_3)s::VARCHAR AS kind, lpad(CAST(incident_activity.seq AS VARCHAR), %(lpad_1)s::INTEGER, %(lpad_2)s::VARCHAR) AS ref \nFROM incident_activity \nWHERE incident_activity.incident_id = %(incident_id_2)s::UUID) AS anon_1 ORDER BY anon_1.at, anon_1.kind, anon_1.ref \n LIMIT %(param_4)s::INTEGER",
+        "params": {
+          "param_1": "1event",
+          "incident_id_1": "530edbfb-9c0a-4512-92ee-b80089c88dbb",
+          "param_2": "2alert",
+          "param_3": "3activity",
+          "lpad_1": 20,
+          "lpad_2": "0",
+          "incident_id_2": "530edbfb-9c0a-4512-92ee-b80089c88dbb",
+          "param_4": 101
+        },
+        "text": "Limit  (cost=401.57..401.70 rows=51 width=72) (actual time=0.262..0.266 rows=25 loops=1)\n  Buffers: shared hit=99\n  ->  Sort  (cost=401.57..401.70 rows=51 width=72) (actual time=0.262..0.264 rows=25 loops=1)\n        Sort Key: events.\"timestamp\", ('1event'::character varying), ((events.id)::character varying)\n        Sort Method: quicksort  Memory: 28kB\n        Buffers: shared hit=99\n        ->  Append  (cost=33.96..400.12 rows=51 width=72) (actual time=0.188..0.253 rows=25 loops=1)\n              Buffers: shared hit=99\n              ->  Nested Loop  (cost=33.96..354.53 rows=40 width=72) (actual time=0.188..0.219 rows=16 loops=1)\n                    Buffers: shared hit=79\n                    ->  HashAggregate  (cost=33.54..33.94 rows=40 width=16) (actual time=0.169..0.171 rows=16 loops=1)\n                          Group Key: alert_events.event_id\n                          Batches: 1  Memory Usage: 24kB\n                          Buffers: shared hit=15\n                          ->  Hash Join  (cost=5.90..33.44 rows=40 width=16) (actual time=0.020..0.165 rows=28 loops=1)\n                                Hash Cond: (alert_events.alert_id = incident_alerts.alert_id)\n                                Buffers: shared hit=15\n                                ->  Seq Scan on alert_events  (cost=0.00..24.03 rows=1303 width=32) (actual time=0.002..0.049 rows=1227 loops=1)\n                                      Buffers: shared hit=11\n                                ->  Hash  (cost=5.84..5.84 rows=5 width=16) (actual time=0.011..0.011 rows=4 loops=1)\n                                      Buckets: 1024  Batches: 1  Memory Usage: 9kB\n                                      Buffers: shared hit=4\n                                      ->  Seq Scan on incident_alerts  (cost=0.00..5.84 rows=5 width=16) (actual time=0.002..0.007 rows=4 loops=1)\n                                            Filter: (incident_id = '530edbfb-9c0a-4512-92ee-b80089c88dbb'::uuid)\n                                            Rows Removed by Filter: 130\n                                            Buffers: shared hit=4\n                    ->  Index Scan using pk_events on events  (cost=0.42..8.01 rows=1 width=24) (actual time=0.003..0.003 rows=1 loops=16)\n                          Index Cond: (id = alert_events.event_id)\n                          Buffers: shared hit=64\n              ->  Nested Loop  (cost=0.14..34.74 rows=5 width=72) (actual time=0.010..0.018 rows=4 loops=1)\n                    Buffers: shared hit=12\n                    ->  Seq Scan on incident_alerts incident_alerts_1  (cost=0.00..5.84 rows=5 width=16) (actual time=0.003..0.007 rows=4 loops=1)\n                          Filter: (incident_id = '530edbfb-9c0a-4512-92ee-b80089c88dbb'::uuid)\n                          Rows Removed by Filter: 130\n                          Buffers: shared hit=4\n                    ->  Index Scan using pk_alerts on alerts  (cost=0.14..5.76 rows=1 width=24) (actual time=0.002..0.002 rows=1 loops=4)\n                          Index Cond: (id = incident_alerts_1.alert_id)\n                          Buffers: shared hit=8\n              ->  Subquery Scan on \"*SELECT* 3\"  (cost=0.00..10.59 rows=6 width=72) (actual time=0.005..0.014 rows=5 loops=1)\n                    Buffers: shared hit=8\n                    ->  Seq Scan on incident_activity  (cost=0.00..10.53 rows=6 width=72) (actual time=0.004..0.013 rows=5 loops=1)\n                          Filter: (incident_id = '530edbfb-9c0a-4512-92ee-b80089c88dbb'::uuid)\n                          Rows Removed by Filter: 190\n                          Buffers: shared hit=8\nPlanning:\n  Buffers: shared hit=34\nPlanning Time: 0.572 ms\nExecution Time: 0.340 ms"
+      }
+    },
+    {
+      "endpoint": "Busiest alert evidence",
+      "request": "GET /api/alerts/4a43addf-1896-48e4-af67-f8000a2c2edd/events",
+      "median_ms": 13.0,
+      "p95_ms": 27.9,
+      "max_ms": 30.0,
+      "statements": 4,
+      "db_execution_ms": 1.66,
+      "plan": {
+        "execution_ms": 1.5,
+        "planning_ms": 0.44,
+        "nodes": [
+          "Limit",
+          "Sort",
+          "Nested Loop",
+          "Nested Loop",
+          "Seq Scan alert_events",
+          "Memoize",
+          "Index Scan events (pk_events)",
+          "Index Scan raw_events (pk_raw_events)"
+        ],
+        "sql": "SELECT events.id, events.raw_event_id, events.source_id, events.source_type, events.timestamp, events.ingested_at, events.host, events.host_ip, events.event_category, events.event_action, events.event_outcome, events.username, events.user_domain, events.target_username, events.source_ip, events.source_port, events.destination_ip, events.destination_port, events.protocol, events.service, events.process_name, events.parent_process_name, events.command_line, events.session_id, events.message, events.attributes, events.source_ip_scope, events.asset_id, events.asset_criticality, events.identity_id, events.identity_privileged, events.simulated, raw_events.id AS id_1, raw_events.source_id AS source_id_1, raw_events.batch_id, raw_events.received_at, raw_events.raw_data, raw_events.fingerprint, raw_events.parse_status, raw_events.parse_detail, raw_events.simulated AS simulated_1 \nFROM events JOIN raw_events ON raw_events.id = events.raw_event_id \nWHERE events.id IN (SELECT alert_events.event_id \nFROM alert_events \nWHERE alert_events.alert_id = %(alert_id_1)s::UUID) ORDER BY events.timestamp, events.id \n LIMIT %(param_1)s::INTEGER OFFSET %(param_2)s::INTEGER",
+        "params": {
+          "alert_id_1": "4a43addf-1896-48e4-af67-f8000a2c2edd",
+          "param_1": 50,
+          "param_2": 0
+        },
+        "text": "Limit  (cost=2149.85..2149.97 rows=50 width=772) (actual time=1.084..1.089 rows=50 loops=1)\n  Buffers: shared hit=1883\n  ->  Sort  (cost=2149.85..2150.45 rows=242 width=772) (actual time=1.083..1.086 rows=50 loops=1)\n        Sort Key: events.\"timestamp\", events.id\n        Sort Method: top-N heapsort  Memory: 75kB\n        Buffers: shared hit=1883\n        ->  Nested Loop  (cost=0.86..2141.81 rows=242 width=772) (actual time=0.023..0.951 rows=234 loops=1)\n              Buffers: shared hit=1883\n              ->  Nested Loop  (cost=0.43..1985.95 rows=242 width=458) (actual time=0.015..0.556 rows=234 loops=1)\n                    Buffers: shared hit=947\n                    ->  Seq Scan on alert_events  (cost=0.00..27.29 rows=242 width=16) (actual time=0.005..0.048 rows=234 loops=1)\n                          Filter: (alert_id = '4a43addf-1896-48e4-af67-f8000a2c2edd'::uuid)\n                          Rows Removed by Filter: 993\n                          Buffers: shared hit=11\n                    ->  Memoize  (cost=0.43..8.35 rows=1 width=458) (actual time=0.002..0.002 rows=1 loops=234)\n                          Cache Key: alert_events.event_id\n                          Cache Mode: logical\n                          Hits: 0  Misses: 234  Evictions: 0  Overflows: 0  Memory Usage: 97kB\n                          Buffers: shared hit=936\n                          ->  Index Scan using pk_events on events  (cost=0.42..8.34 rows=1 width=458) (actual time=0.002..0.002 rows=1 loops=234)\n                                Index Cond: (id = alert_events.event_id)\n                                Buffers: shared hit=936\n              ->  Index Scan using pk_raw_events on raw_events  (cost=0.42..0.64 rows=1 width=314) (actual time=0.001..0.001 rows=1 loops=234)\n                    Index Cond: (id = events.raw_event_id)\n                    Buffers: shared hit=936\nPlanning:\n  Buffers: shared hit=30\nPlanning Time: 0.365 ms\nExecution Time: 1.191 ms"
+      }
+    },
+    {
+      "endpoint": "Assets list",
+      "request": "GET /api/assets",
+      "median_ms": 20.9,
+      "p95_ms": 62.8,
+      "max_ms": 78.6,
+      "statements": 4,
+      "db_execution_ms": 6.27,
+      "plan": {
+        "execution_ms": 6.1,
+        "planning_ms": 0.22,
+        "nodes": [
+          "Values Scan",
+          "Aggregate",
+          "Seq Scan alerts",
+          "Result",
+          "Limit",
+          "Index Scan events (ix_events_timestamp_id)",
+          "Result",
+          "Limit",
+          "Index Only Scan events (ix_events_host_ts)"
+        ],
+        "sql": "SELECT page.id, (SELECT count(*) AS count_1 \nFROM alerts \nWHERE (alerts.asset_id = page.id OR alerts.host = page.name OR split_part(alerts.host, %(split_part_1)s::VARCHAR, %(split_part_2)s::INTEGER) = page.short) AND alerts.status IN (%(status_1_1)s::VARCHAR, %(status_1_2)s::VARCHAR, %(status_1_3)s::VARCHAR)) AS anon_1, greatest((SELECT max(events.timestamp) AS max_1 \nFROM events \nWHERE events.asset_id = page.id), (SELECT max(events.timestamp) AS max_2 \nFROM events \nWHERE events.host = page.name)) AS greatest_1 \nFROM (VALUES (%(param_1)s::UUID, %(param_2)s::VARCHAR, %(param_3)s::VARCHAR), (%(param_4)s::UUID, %(param_5)s::VARCHAR, %(param_6)s::VARCHAR), (%(param_7)s::UUID, %(param_8)s::VARCHAR, %(param_9)s::VARCHAR), (%(param_10)s::UUID, %(param_11)s::VARCHAR, %(param_12)s::VARCHAR), (%(param_13)s::UUID, %(param_14)s::VARCHAR, %(param_15)s::VARCHAR), (%(param_16)s::UUID, %(param_17)s::VARCHAR, %(param_18)s::VARCHAR), (%(param_19)s::UUID, %(param_20)s::VARCHAR, %(param_21)s::VARCHAR), (%(param_22)s::UUID, %(param_23)s::VARCHAR, %(param_24)s::VARCHAR), (%(param_25)s::UUID, %(param_26)s::VARCHAR, %(param_27)s::VARCHAR), (%(param_28)s::UUID, %(param_29)s::VARCHAR, %(param_30)s::VARCHAR), (%(param_31)s::UUID, %(param_32)s::VARCHAR, %(param_33)s::VARCHAR), (%(param_34)s::UUID, %(param_35)s::VARCHAR, %(param_36)s::VARCHAR), (%(param_37)s::UUID, %(param_38)s::VARCHAR, %(param_39)s::VARCHAR), (%(param_40)s::UUID, %(param_41)s::VARCHAR, %(param_42)s::VARCHAR), (%(param_43)s::UUID, %(param_44)s::VARCHAR, %(param_45)s::VARCHAR), (%(param_46)s::UUID, %(param_47)s::VARCHAR, %(param_48)s::VARCHAR), (%(param_49)s::UUID, %(param_50)s::VARCHAR, %(param_51)s::VARCHAR), (%(param_52)s::UUID, %(param_53)s::VARCHAR, %(param_54)s::VARCHAR), (%(param_55)s::UUID, %(param_56)s::VARCHAR, %(param_57)s::VARCHAR), (%(param_58)s::UUID, %(param_59)s::VARCHAR, %(param_60)s::VARCHAR), (%(param_61)s::UUID, %(param_62)s::VARCHAR, %(param_63)s::VARCHAR), (%(param_64)s::UUID, %(param_65)s::VARCHAR, %(param_66)s::VARCHAR), (%(param_67)s::UUID, %(param_68)s::VARCHAR, %(param_69)s::VARCHAR), (%(param_70)s::UUID, %(param_71)s::VARCHAR, %(param_72)s::VARCHAR), (%(param_73)s::UUID, %(param_74)s::VARCHAR, %(param_75)s::VARCHAR), (%(param_76)s::UUID, %(param_77)s::VARCHAR, %(param_78)s::VARCHAR), (%(param_79)s::UUID, %(param_80)s::VARCHAR, %(param_81)s::VARCHAR), (%(param_82)s::UUID, %(param_83)s::VARCHAR, %(param_84)s::VARCHAR), (%(param_85)s::UUID, %(param_86)s::VARCHAR, %(param_87)s::VARCHAR), (%(param_88)s::UUID, %(param_89)s::VARCHAR, %(param_90)s::VARCHAR), (%(param_91)s::UUID, %(param_92)s::VARCHAR, %(param_93)s::VARCHAR), (%(param_94)s::UUID, %(param_95)s::VARCHAR, %(param_96)s::VARCHAR), (%(param_97)s::UUID, %(param_98)s::VARCHAR, %(param_99)s::VARCHAR), (%(param_100)s::UUID, %(param_101)s::VARCHAR, %(param_102)s::VARCHAR), (%(param_103)s::UUID, %(param_104)s::VARCHAR, %(param_105)s::VARCHAR), (%(param_106)s::UUID, %(param_107)s::VARCHAR, %(param_108)s::VARCHAR), (%(param_109)s::UUID, %(param_110)s::VARCHAR, %(param_111)s::VARCHAR), (%(param_112)s::UUID, %(param_113)s::VARCHAR, %(param_114)s::VARCHAR), (%(param_115)s::UUID, %(param_116)s::VARCHAR, %(param_117)s::VARCHAR), (%(param_118)s::UUID, %(param_119)s::VARCHAR, %(param_120)s::VARCHAR), (%(param_121)s::UUID, %(param_122)s::VARCHAR, %(param_123)s::VARCHAR), (%(param_124)s::UUID, %(param_125)s::VARCHAR, %(param_126)s::VARCHAR), (%(param_127)s::UUID, %(param_128)s::VARCHAR, %(param_129)s::VARCHAR), (%(param_130)s::UUID, %(param_131)s::VARCHAR, %(param_132)s::VARCHAR), (%(param_133)s::UUID, %(param_134)s::VARCHAR, %(param_135)s::VARCHAR), (%(param_136)s::UUID, %(param_137)s::VARCHAR, %(param_138)s::VARCHAR), (%(param_139)s::UUID, %(param_140)s::VARCHAR, %(param_141)s::VARCHAR), (%(param_142)s::UUID, %(param_143)s::VARCHAR, %(param_144)s::VARCHAR), (%(param_145)s::UUID, %(param_146)s::VARCHAR, %(param_147)s::VARCHAR), (%(param_148)s::UUID, %(param_149)s::VARCHAR, %(param_150)s::VARCHAR)) AS page (id, name, short)",
+        "params": {
+          "split_part_1": ".",
+          "split_part_2": 1,
+          "param_1": "5940255c-e097-4d52-bc00-44a4f265174b",
+          "param_2": "srv-000",
+          "param_3": "srv-000",
+          "param_4": "368c77e1-e702-4092-bd1b-23cedc72131b",
+          "param_5": "srv-001",
+          "param_6": "srv-001",
+          "param_7": "dee9ad41-771d-484a-b35d-e58ad3d4537f",
+          "param_8": "srv-002",
+          "param_9": "srv-002",
+          "param_10": "2ad4f548-382e-4b9b-9d5e-b43a8f5ea34f",
+          "param_11": "srv-003",
+          "param_12": "srv-003",
+          "param_13": "84e9208b-97bd-4ad8-8578-56438d14e852",
+          "param_14": "srv-004",
+          "param_15": "srv-004",
+          "param_16": "be16189a-2989-4809-87f8-21c098e66cbb",
+          "param_17": "srv-005",
+          "param_18": "srv-005",
+          "param_19": "29fa38c8-92dc-4468-946d-1e20ef01e293",
+          "param_20": "srv-006",
+          "param_21": "srv-006",
+          "param_22": "61cf0f60-c028-4699-a776-ac0e4293011f",
+          "param_23": "srv-007",
+          "param_24": "srv-007",
+          "param_25": "c20c139b-b089-43de-a2fd-952550bd2be7",
+          "param_26": "srv-008",
+          "param_27": "srv-008",
+          "param_28": "399f0e61-ff5e-48fc-8e98-0dae98cd28f5",
+          "param_29": "srv-009",
+          "param_30": "srv-009",
+          "param_31": "2744f8e2-bfdf-4c88-adf6-5151eb524f22",
+          "param_32": "srv-010",
+          "param_33": "srv-010",
+          "param_34": "d5a67e0c-c0ba-4fde-b3e7-41019782f203",
+          "param_35": "srv-011",
+          "param_36": "srv-011",
+          "param_37": "2dd6824d-e05e-4b29-aa94-f93e4f360966",
+          "param_38": "srv-012",
+          "param_39": "srv-012",
+          "param_40": "d8d5bdc0-0d02-4f11-a8fa-19fffab16e10",
+          "param_41": "srv-013",
+          "param_42": "srv-013",
+          "param_43": "1c950c7b-105f-4be3-ae1c-65245cc25f11",
+          "param_44": "srv-014",
+          "param_45": "srv-014",
+          "param_46": "d1e932f8-6ca2-4023-9496-308aeff9a558",
+          "param_47": "srv-015",
+          "param_48": "srv-015",
+          "param_49": "6ff4db46-0909-43f0-b631-6897568c8acf",
+          "param_50": "srv-016",
+          "param_51": "srv-016",
+          "param_52": "32ec5de7-05e3-4a16-88ac-a2978d9026f5",
+          "param_53": "srv-017",
+          "param_54": "srv-017",
+          "param_55": "a8ef7c83-58a8-49bf-ad66-8b3f80171a11",
+          "param_56": "srv-018",
+          "param_57": "srv-018",
+          "param_58": "58c20c89-5e17-4e22-b8ab-d131af8cb14c",
+          "param_59": "srv-019",
+          "param_60": "srv-019",
+          "param_61": "ca42e86e-78ee-4490-a871-555e8d7c10de",
+          "param_62": "srv-020",
+          "param_63": "srv-020",
+          "param_64": "c3740421-c058-4472-b7f6-2eaf3dbf568b",
+          "param_65": "srv-021",
+          "param_66": "srv-021",
+          "param_67": "bb2512c1-94b9-4fda-bf49-ca395cb36ed2",
+          "param_68": "srv-022",
+          "param_69": "srv-022",
+          "param_70": "c25738a6-5839-4f4e-a21d-b174ea3de4b0",
+          "param_71": "srv-023",
+          "param_72": "srv-023",
+          "param_73": "a6d62a02-ceb3-4930-ba77-e8ff4a9831ce",
+          "param_74": "srv-024",
+          "param_75": "srv-024",
+          "param_76": "40975913-aa5b-4447-8f83-9cece8799f6e",
+          "param_77": "srv-025",
+          "param_78": "srv-025",
+          "param_79": "8e621953-3516-47c2-b35f-d1db0d47a45f",
+          "param_80": "srv-026",
+          "param_81": "srv-026",
+          "param_82": "5d199696-3308-4def-9cdb-9792d8d75203",
+          "param_83": "srv-027",
+          "param_84": "srv-027",
+          "param_85": "b36cacac-ab76-4bbb-a445-f6cdb0738c82",
+          "param_86": "srv-028",
+          "param_87": "srv-028",
+          "param_88": "c69ad857-9e0b-4089-8039-bf7194ea07e8",
+          "param_89": "srv-029",
+          "param_90": "srv-029",
+          "param_91": "bc71b883-a643-46d5-b11e-bf8ebe358e54",
+          "param_92": "srv-030",
+          "param_93": "srv-030",
+          "param_94": "eda2d77c-8191-457f-9dcb-e7a962625f21",
+          "param_95": "srv-031",
+          "param_96": "srv-031",
+          "param_97": "fce94817-742e-477a-a375-766f13a27f08",
+          "param_98": "srv-032",
+          "param_99": "srv-032",
+          "param_100": "555245f5-da45-4aa6-800f-53ca13e347b6",
+          "param_101": "srv-033",
+          "param_102": "srv-033",
+          "param_103": "1b0c3747-4c0e-4f56-9784-c7e59c8adf76",
+          "param_104": "srv-034",
+          "param_105": "srv-034",
+          "param_106": "7db504ca-49a5-40cc-8658-4c1e8f73b54d",
+          "param_107": "srv-035",
+          "param_108": "srv-035",
+          "param_109": "396cd705-8cac-4dc3-baf0-ff639b9631b6",
+          "param_110": "srv-036",
+          "param_111": "srv-036",
+          "param_112": "bfb86694-70ca-40a0-b2c2-7cf1a076f5dc",
+          "param_113": "srv-037",
+          "param_114": "srv-037",
+          "param_115": "7d6347d3-ef5f-4f0b-88a9-6b983629c9ce",
+          "param_116": "srv-038",
+          "param_117": "srv-038",
+          "param_118": "2f50d64d-fb64-4d83-92bf-7dd534289ce0",
+          "param_119": "srv-039",
+          "param_120": "srv-039",
+          "param_121": "73dc9f6f-3ee2-4eb8-94ad-0bf906684c26",
+          "param_122": "srv-040",
+          "param_123": "srv-040",
+          "param_124": "d104a5c3-0625-4484-a72c-19b223c9f80b",
+          "param_125": "srv-041",
+          "param_126": "srv-041",
+          "param_127": "9a8bf168-987e-4fc3-aed7-cfe1f1cbb90a",
+          "param_128": "srv-042",
+          "param_129": "srv-042",
+          "param_130": "7036a3c1-52d5-4714-befd-99cfa29b2f9e",
+          "param_131": "srv-043",
+          "param_132": "srv-043",
+          "param_133": "56f89680-0209-4d11-9923-5a48c0e3e6da",
+          "param_134": "srv-044",
+          "param_135": "srv-044",
+          "param_136": "4667fe0a-35f0-4b4b-96a2-53e019b16e82",
+          "param_137": "srv-045",
+          "param_138": "srv-045",
+          "param_139": "1a77c303-e21e-460c-b854-57976b7538ec",
+          "param_140": "srv-046",
+          "param_141": "srv-046",
+          "param_142": "16a8eefd-2755-4608-b04f-1e3f51299a73",
+          "param_143": "srv-047",
+          "param_144": "srv-047",
+          "param_145": "c6b9576d-826b-4cb3-b348-3271af80e74a",
+          "param_146": "srv-048",
+          "param_147": "srv-048",
+          "param_148": "a92f472b-147a-4745-98f0-7e3faa050530",
+          "param_149": "srv-049",
+          "param_150": "srv-049",
+          "status_1_1": "NEW",
+          "status_1_2": "TRIAGED",
+          "status_1_3": "IN_PROGRESS"
+        },
+        "text": "Values Scan on \"*VALUES*\"  (cost=0.00..5904.84 rows=50 width=32) (actual time=0.154..7.551 rows=50 loops=1)\n  Buffers: shared hit=12576\n  SubPlan 1\n    ->  Aggregate  (cost=57.93..57.94 rows=1 width=8) (actual time=0.042..0.042 rows=1 loops=50)\n          Buffers: shared hit=2700\n          ->  Seq Scan on alerts  (cost=0.00..57.92 rows=5 width=0) (actual time=0.022..0.041 rows=1 loops=50)\n                Filter: (((status)::text = ANY ('{NEW,TRIAGED,IN_PROGRESS}'::text[])) AND ((asset_id = \"*VALUES*\".column1) OR ((host)::text = (\"*VALUES*\".column2)::text) OR (split_part((host)::text, '.'::text, 1) = (\"*VALUES*\".column3)::text)))\n                Rows Removed by Filter: 148\n                Buffers: shared hit=2700\n  SubPlan 3\n    ->  Result  (cost=59.61..59.62 rows=1 width=8) (actual time=0.090..0.090 rows=1 loops=50)\n          Buffers: shared hit=9675\n          InitPlan 2 (returns $4)\n            ->  Limit  (cost=0.42..59.61 rows=1 width=8) (actual time=0.088..0.088 rows=1 loops=50)\n                  Buffers: shared hit=9675\n                  ->  Index Scan using ix_events_timestamp_id on events  (cost=0.42..142219.78 rows=2403 width=8) (actual time=0.088..0.088 rows=1 loops=50)\n                        Index Cond: (\"timestamp\" IS NOT NULL)\n                        Filter: (asset_id = \"*VALUES*\".column1)\n                        Rows Removed by Filter: 438\n                        Buffers: shared hit=9675\n  SubPlan 5\n    ->  Result  (cost=0.51..0.52 rows=1 width=8) (actual time=0.016..0.016 rows=1 loops=50)\n          Buffers: shared hit=201\n          InitPlan 4 (returns $6)\n            ->  Limit  (cost=0.42..0.51 rows=1 width=8) (actual time=0.016..0.016 rows=1 loops=50)\n                  Buffers: shared hit=201\n                  ->  Index Only Scan Backward using ix_events_host_ts on events events_1  (cost=0.42..177.36 rows=2047 width=8) (actual time=0.016..0.016 rows=1 loops=50)\n                        Index Cond: ((host = (\"*VALUES*\".column2)::text) AND (\"timestamp\" IS NOT NULL))\n                        Heap Fetches: 50\n                        Buffers: shared hit=201\nPlanning Time: 0.238 ms\nExecution Time: 7.635 ms"
+      }
+    },
+    {
+      "endpoint": "Identities list",
+      "request": "GET /api/identities",
+      "median_ms": 33.1,
+      "p95_ms": 53.8,
+      "max_ms": 53.8,
+      "statements": 4,
+      "db_execution_ms": 3.51,
+      "plan": {
+        "execution_ms": 3.35,
+        "planning_ms": 0.22,
+        "nodes": [
+          "Values Scan",
+          "Aggregate",
+          "Seq Scan alerts",
+          "Result",
+          "Limit",
+          "Index Scan events (ix_events_timestamp_id)",
+          "Result",
+          "Limit",
+          "Index Only Scan events (ix_events_username_ts)"
+        ],
+        "sql": "SELECT page.id, (SELECT count(*) AS count_1 \nFROM alerts \nWHERE (alerts.identity_id = page.id OR alerts.username = page.name OR alerts.target_username = page.name) AND alerts.status IN (%(status_1_1)s::VARCHAR, %(status_1_2)s::VARCHAR, %(status_1_3)s::VARCHAR)) AS anon_1, greatest((SELECT max(events.timestamp) AS max_1 \nFROM events \nWHERE events.identity_id = page.id), (SELECT max(events.timestamp) AS max_2 \nFROM events \nWHERE events.username = page.name)) AS greatest_1 \nFROM (VALUES (%(param_1)s::UUID, %(param_2)s::VARCHAR, %(param_3)s::VARCHAR), (%(param_4)s::UUID, %(param_5)s::VARCHAR, %(param_6)s::VARCHAR), (%(param_7)s::UUID, %(param_8)s::VARCHAR, %(param_9)s::VARCHAR), (%(param_10)s::UUID, %(param_11)s::VARCHAR, %(param_12)s::VARCHAR), (%(param_13)s::UUID, %(param_14)s::VARCHAR, %(param_15)s::VARCHAR), (%(param_16)s::UUID, %(param_17)s::VARCHAR, %(param_18)s::VARCHAR), (%(param_19)s::UUID, %(param_20)s::VARCHAR, %(param_21)s::VARCHAR), (%(param_22)s::UUID, %(param_23)s::VARCHAR, %(param_24)s::VARCHAR), (%(param_25)s::UUID, %(param_26)s::VARCHAR, %(param_27)s::VARCHAR), (%(param_28)s::UUID, %(param_29)s::VARCHAR, %(param_30)s::VARCHAR), (%(param_31)s::UUID, %(param_32)s::VARCHAR, %(param_33)s::VARCHAR), (%(param_34)s::UUID, %(param_35)s::VARCHAR, %(param_36)s::VARCHAR), (%(param_37)s::UUID, %(param_38)s::VARCHAR, %(param_39)s::VARCHAR), (%(param_40)s::UUID, %(param_41)s::VARCHAR, %(param_42)s::VARCHAR), (%(param_43)s::UUID, %(param_44)s::VARCHAR, %(param_45)s::VARCHAR), (%(param_46)s::UUID, %(param_47)s::VARCHAR, %(param_48)s::VARCHAR), (%(param_49)s::UUID, %(param_50)s::VARCHAR, %(param_51)s::VARCHAR), (%(param_52)s::UUID, %(param_53)s::VARCHAR, %(param_54)s::VARCHAR), (%(param_55)s::UUID, %(param_56)s::VARCHAR, %(param_57)s::VARCHAR), (%(param_58)s::UUID, %(param_59)s::VARCHAR, %(param_60)s::VARCHAR), (%(param_61)s::UUID, %(param_62)s::VARCHAR, %(param_63)s::VARCHAR), (%(param_64)s::UUID, %(param_65)s::VARCHAR, %(param_66)s::VARCHAR), (%(param_67)s::UUID, %(param_68)s::VARCHAR, %(param_69)s::VARCHAR), (%(param_70)s::UUID, %(param_71)s::VARCHAR, %(param_72)s::VARCHAR), (%(param_73)s::UUID, %(param_74)s::VARCHAR, %(param_75)s::VARCHAR), (%(param_76)s::UUID, %(param_77)s::VARCHAR, %(param_78)s::VARCHAR), (%(param_79)s::UUID, %(param_80)s::VARCHAR, %(param_81)s::VARCHAR), (%(param_82)s::UUID, %(param_83)s::VARCHAR, %(param_84)s::VARCHAR), (%(param_85)s::UUID, %(param_86)s::VARCHAR, %(param_87)s::VARCHAR), (%(param_88)s::UUID, %(param_89)s::VARCHAR, %(param_90)s::VARCHAR), (%(param_91)s::UUID, %(param_92)s::VARCHAR, %(param_93)s::VARCHAR), (%(param_94)s::UUID, %(param_95)s::VARCHAR, %(param_96)s::VARCHAR), (%(param_97)s::UUID, %(param_98)s::VARCHAR, %(param_99)s::VARCHAR), (%(param_100)s::UUID, %(param_101)s::VARCHAR, %(param_102)s::VARCHAR), (%(param_103)s::UUID, %(param_104)s::VARCHAR, %(param_105)s::VARCHAR), (%(param_106)s::UUID, %(param_107)s::VARCHAR, %(param_108)s::VARCHAR), (%(param_109)s::UUID, %(param_110)s::VARCHAR, %(param_111)s::VARCHAR), (%(param_112)s::UUID, %(param_113)s::VARCHAR, %(param_114)s::VARCHAR), (%(param_115)s::UUID, %(param_116)s::VARCHAR, %(param_117)s::VARCHAR), (%(param_118)s::UUID, %(param_119)s::VARCHAR, %(param_120)s::VARCHAR), (%(param_121)s::UUID, %(param_122)s::VARCHAR, %(param_123)s::VARCHAR), (%(param_124)s::UUID, %(param_125)s::VARCHAR, %(param_126)s::VARCHAR), (%(param_127)s::UUID, %(param_128)s::VARCHAR, %(param_129)s::VARCHAR), (%(param_130)s::UUID, %(param_131)s::VARCHAR, %(param_132)s::VARCHAR), (%(param_133)s::UUID, %(param_134)s::VARCHAR, %(param_135)s::VARCHAR), (%(param_136)s::UUID, %(param_137)s::VARCHAR, %(param_138)s::VARCHAR), (%(param_139)s::UUID, %(param_140)s::VARCHAR, %(param_141)s::VARCHAR), (%(param_142)s::UUID, %(param_143)s::VARCHAR, %(param_144)s::VARCHAR), (%(param_145)s::UUID, %(param_146)s::VARCHAR, %(param_147)s::VARCHAR), (%(param_148)s::UUID, %(param_149)s::VARCHAR, %(param_150)s::VARCHAR)) AS page (id, name, short)",
+        "params": {
+          "param_1": "89ee9596-f26e-4c1f-a55a-306aba5d90cc",
+          "param_2": "user000",
+          "param_3": "user000",
+          "param_4": "67207e74-63e0-494c-90c9-60c40643825b",
+          "param_5": "user001",
+          "param_6": "user001",
+          "param_7": "9c65c0d6-c1fb-426e-8b5c-3405c25d4e6f",
+          "param_8": "user002",
+          "param_9": "user002",
+          "param_10": "16b85c21-c50a-46bd-afb9-f0715f4e1527",
+          "param_11": "user003",
+          "param_12": "user003",
+          "param_13": "0b5ef866-975d-40bc-a8f6-9bc5afed3eb1",
+          "param_14": "user004",
+          "param_15": "user004",
+          "param_16": "25b0372e-8d50-47ee-b812-97d833cfb981",
+          "param_17": "user005",
+          "param_18": "user005",
+          "param_19": "15f0a6d5-d7ba-49f1-812d-d310ad40dd06",
+          "param_20": "user006",
+          "param_21": "user006",
+          "param_22": "2e84233a-9cc4-4eae-9e72-9b1907400724",
+          "param_23": "user007",
+          "param_24": "user007",
+          "param_25": "102997c7-959b-4dee-9b0a-148853ece533",
+          "param_26": "user008",
+          "param_27": "user008",
+          "param_28": "a6e3f5fc-560a-4fa0-9a0b-2d0bd0c0b213",
+          "param_29": "user009",
+          "param_30": "user009",
+          "param_31": "f6cb3786-ae29-4eda-b209-dc50ed5cc1cb",
+          "param_32": "user010",
+          "param_33": "user010",
+          "param_34": "9303e8ac-78b0-46ca-b56d-25280ac3d830",
+          "param_35": "user011",
+          "param_36": "user011",
+          "param_37": "939b3fd7-1dee-41a1-873f-20c567b6694b",
+          "param_38": "user012",
+          "param_39": "user012",
+          "param_40": "65550bcf-47ff-4d83-ab06-9903c172344a",
+          "param_41": "user013",
+          "param_42": "user013",
+          "param_43": "64e414ee-3cc8-4598-ab4d-21d2c3e44fd6",
+          "param_44": "user014",
+          "param_45": "user014",
+          "param_46": "99bfe555-f80e-44a3-ab89-26a7229c0fac",
+          "param_47": "user015",
+          "param_48": "user015",
+          "param_49": "97528086-1b4f-4159-8559-120afc4c5e5e",
+          "param_50": "user016",
+          "param_51": "user016",
+          "param_52": "4d6ccae2-bc79-4148-8678-7ff360924250",
+          "param_53": "user017",
+          "param_54": "user017",
+          "param_55": "2ef65d61-440e-4d25-b8a4-7be1fe162f39",
+          "param_56": "user018",
+          "param_57": "user018",
+          "param_58": "75d7394d-d4cf-4105-baac-109a5a95afb1",
+          "param_59": "user019",
+          "param_60": "user019",
+          "param_61": "e172d5b6-89b5-44af-825c-b094045c996d",
+          "param_62": "user020",
+          "param_63": "user020",
+          "param_64": "dbc2072a-f6d4-4be8-8398-9e82d2abe039",
+          "param_65": "user021",
+          "param_66": "user021",
+          "param_67": "01aeb85a-5cc0-46fb-a7f4-0546a73b1b9b",
+          "param_68": "user022",
+          "param_69": "user022",
+          "param_70": "b82c7aba-847a-498b-8ed0-cca5747c0db0",
+          "param_71": "user023",
+          "param_72": "user023",
+          "param_73": "d3c1c248-8cbe-426d-b27c-54b5f99fa8aa",
+          "param_74": "user024",
+          "param_75": "user024",
+          "param_76": "a05133ef-4e65-4da8-bae5-80fd889c72e5",
+          "param_77": "user025",
+          "param_78": "user025",
+          "param_79": "c0530393-e1b6-45fc-8aa1-656a21ddcd93",
+          "param_80": "user026",
+          "param_81": "user026",
+          "param_82": "739ee9f1-2ee1-4661-8abc-fcf6692897cd",
+          "param_83": "user027",
+          "param_84": "user027",
+          "param_85": "7fd7edd4-7bb9-423c-9ea4-8b5bc8abba3b",
+          "param_86": "user028",
+          "param_87": "user028",
+          "param_88": "a7617dec-7eb3-479a-be03-8abb2b0564f0",
+          "param_89": "user029",
+          "param_90": "user029",
+          "param_91": "b766ddd6-0d4f-4908-8c38-07f3bec5e342",
+          "param_92": "user030",
+          "param_93": "user030",
+          "param_94": "a0a78141-8439-438d-9350-c25aefcc9a4a",
+          "param_95": "user031",
+          "param_96": "user031",
+          "param_97": "d79878c9-18c5-4d62-9195-2d3f3ca6d357",
+          "param_98": "user032",
+          "param_99": "user032",
+          "param_100": "dd73aab2-e443-4e0a-af68-aea48f65e5d1",
+          "param_101": "user033",
+          "param_102": "user033",
+          "param_103": "e21c3f7b-cc8d-45ae-8fe1-2b179e63d183",
+          "param_104": "user034",
+          "param_105": "user034",
+          "param_106": "95547e73-a155-4d8c-9d49-e3cc0b1152c5",
+          "param_107": "user035",
+          "param_108": "user035",
+          "param_109": "ab7282b7-5d37-47b8-8ea0-05e42b5b5f4e",
+          "param_110": "user036",
+          "param_111": "user036",
+          "param_112": "b5d854c1-636b-457a-b611-6857630f0bc3",
+          "param_113": "user037",
+          "param_114": "user037",
+          "param_115": "35470e35-a735-4560-b05e-e7d78ca81502",
+          "param_116": "user038",
+          "param_117": "user038",
+          "param_118": "03f4747c-14a6-404e-95ed-541906027d42",
+          "param_119": "user039",
+          "param_120": "user039",
+          "param_121": "a94c6ebd-6c7b-4010-9a2f-92985d7b4384",
+          "param_122": "user040",
+          "param_123": "user040",
+          "param_124": "e239f96c-6145-4862-95b0-44d3246baa83",
+          "param_125": "user041",
+          "param_126": "user041",
+          "param_127": "1bf6d509-81a0-4be2-86a6-67114519aadd",
+          "param_128": "user042",
+          "param_129": "user042",
+          "param_130": "cb0f39d0-5f3e-48a0-a4c6-6ddcfd747a28",
+          "param_131": "user043",
+          "param_132": "user043",
+          "param_133": "83a089f1-a121-45a4-b138-dce806cdef0f",
+          "param_134": "user044",
+          "param_135": "user044",
+          "param_136": "678c6793-99e5-4697-adb2-27cb41c16137",
+          "param_137": "user045",
+          "param_138": "user045",
+          "param_139": "0551bec5-43cc-4c8b-ba5e-2db0f2d547bd",
+          "param_140": "user046",
+          "param_141": "user046",
+          "param_142": "9954d9ec-3172-49d7-88b4-49290aa69360",
+          "param_143": "user047",
+          "param_144": "user047",
+          "param_145": "8f97254b-b2a7-475b-b42d-691638e5ec53",
+          "param_146": "user048",
+          "param_147": "user048",
+          "param_148": "1a3c0e21-05af-461d-bdb7-1ae83b4966a8",
+          "param_149": "user049",
+          "param_150": "user049",
+          "status_1_1": "NEW",
+          "status_1_2": "TRIAGED",
+          "status_1_3": "IN_PROGRESS"
+        },
+        "text": "Values Scan on \"*VALUES*\"  (cost=0.00..3852.50 rows=50 width=32) (actual time=0.129..3.513 rows=50 loops=1)\n  Buffers: shared hit=6466\n  SubPlan 1\n    ->  Aggregate  (cost=57.53..57.54 rows=1 width=8) (actual time=0.032..0.032 rows=1 loops=50)\n          Buffers: shared hit=2700\n          ->  Seq Scan on alerts  (cost=0.00..57.51 rows=11 width=0) (actual time=0.026..0.031 rows=0 loops=50)\n                Filter: (((status)::text = ANY ('{NEW,TRIAGED,IN_PROGRESS}'::text[])) AND ((identity_id = \"*VALUES*\".column1) OR ((username)::text = (\"*VALUES*\".column2)::text) OR ((target_username)::text = (\"*VALUES*\".column2)::text)))\n                Rows Removed by Filter: 149\n                Buffers: shared hit=2700\n  SubPlan 3\n    ->  Result  (cost=18.97..18.98 rows=1 width=8) (actual time=0.026..0.026 rows=1 loops=50)\n          Buffers: shared hit=3565\n          InitPlan 2 (returns $3)\n            ->  Limit  (cost=0.42..18.97 rows=1 width=8) (actual time=0.026..0.026 rows=1 loops=50)\n                  Buffers: shared hit=3565\n                  ->  Index Scan using ix_events_timestamp_id on events  (cost=0.42..142219.78 rows=7669 width=8) (actual time=0.025..0.025 rows=1 loops=50)\n                        Index Cond: (\"timestamp\" IS NOT NULL)\n                        Filter: (identity_id = \"*VALUES*\".column1)\n                        Rows Removed by Filter: 147\n                        Buffers: shared hit=3565\n  SubPlan 5\n    ->  Result  (cost=0.50..0.51 rows=1 width=8) (actual time=0.011..0.011 rows=1 loops=50)\n          Buffers: shared hit=201\n          InitPlan 4 (returns $5)\n            ->  Limit  (cost=0.42..0.50 rows=1 width=8) (actual time=0.011..0.011 rows=1 loops=50)\n                  Buffers: shared hit=201\n                  ->  Index Only Scan Backward using ix_events_username_ts on events events_1  (cost=0.42..563.77 rows=7368 width=8) (actual time=0.011..0.011 rows=1 loops=50)\n                        Index Cond: ((username = (\"*VALUES*\".column2)::text) AND (\"timestamp\" IS NOT NULL))\n                        Heap Fetches: 50\n                        Buffers: shared hit=201\nPlanning Time: 0.359 ms\nExecution Time: 3.600 ms"
+      }
+    },
+    {
+      "endpoint": "Hunt: 7 days, outside /24",
+      "request": "POST /api/hunt/query",
+      "median_ms": 11.4,
+      "p95_ms": 12.6,
+      "max_ms": 13.2,
+      "statements": 5,
+      "db_execution_ms": 0.39,
+      "plan": {
+        "execution_ms": 0.25,
+        "planning_ms": 0.15,
+        "nodes": [
+          "Limit",
+          "Sort",
+          "Bitmap Heap Scan events",
+          "Bitmap Index Scan (ix_events_source_ip_ts)"
+        ],
+        "sql": "SELECT events.id, events.raw_event_id, events.source_id, events.source_type, events.timestamp, events.ingested_at, events.host, events.host_ip, events.event_category, events.event_action, events.event_outcome, events.username, events.user_domain, events.target_username, events.source_ip, events.source_port, events.destination_ip, events.destination_port, events.protocol, events.service, events.process_name, events.parent_process_name, events.command_line, events.session_id, events.message, events.attributes, events.source_ip_scope, events.asset_id, events.asset_criticality, events.identity_id, events.identity_privileged, events.simulated \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE AND (events.source_ip <<= %(source_ip_1)s) ORDER BY events.timestamp DESC, events.id DESC \n LIMIT %(param_1)s::INTEGER",
+        "params": {
+          "timestamp_1": "2026-09-25 07:36:17.212165+00:00",
+          "timestamp_2": "2026-10-02 07:36:17.212165+00:00",
+          "source_ip_1": "203.0.113.0/24",
+          "param_1": 51
+        },
+        "text": "Limit  (cost=6115.77..6115.77 rows=1 width=458) (actual time=0.213..0.218 rows=51 loops=1)\n  Buffers: shared hit=143\n  ->  Sort  (cost=6115.77..6115.77 rows=1 width=458) (actual time=0.213..0.215 rows=51 loops=1)\n        Sort Key: \"timestamp\" DESC, id DESC\n        Sort Method: top-N heapsort  Memory: 77kB\n        Buffers: shared hit=143\n        ->  Bitmap Heap Scan on events  (cost=71.98..6115.76 rows=1 width=458) (actual time=0.036..0.155 rows=386 loops=1)\n              Recheck Cond: ((\"timestamp\" >= '2026-09-25 07:36:17.212165+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:17.212165+00'::timestamp with time zone))\n              Filter: (source_ip <<= '203.0.113.0/24'::inet)\n              Heap Blocks: exact=136\n              Buffers: shared hit=143\n              ->  Bitmap Index Scan on ix_events_source_ip_ts  (cost=0.00..71.98 rows=1816 width=0) (actual time=0.025..0.025 rows=386 loops=1)\n                    Index Cond: ((source_ip >= '203.0.113.0/24'::inet) AND (source_ip <= '203.0.113.255'::inet) AND (\"timestamp\" >= '2026-09-25 07:36:17.212165+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:17.212165+00'::timestamp with time zone))\n                    Buffers: shared hit=7\nPlanning:\n  Buffers: shared hit=15\nPlanning Time: 0.216 ms\nExecution Time: 0.256 ms"
+      }
+    },
+    {
+      "endpoint": "Hunt: 7 days, command line contains",
+      "request": "POST /api/hunt/query",
+      "median_ms": 13.5,
+      "p95_ms": 32.1,
+      "max_ms": 39.1,
+      "statements": 5,
+      "db_execution_ms": 2.35,
+      "plan": {
+        "execution_ms": 1.22,
+        "planning_ms": 0.12,
+        "nodes": [
+          "Aggregate",
+          "Limit",
+          "Bitmap Heap Scan events",
+          "Bitmap Index Scan (ix_events_command_line_folded_trgm)"
+        ],
+        "sql": "SELECT count(*) AS count_1 \nFROM (SELECT events.id AS id \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE AND translate(events.command_line, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') LIKE %(translate_1)s::VARCHAR ESCAPE '\\' \n LIMIT %(param_1)s::INTEGER) AS anon_1",
+        "params": {
+          "timestamp_1": "2026-09-25 07:36:17.582682+00:00",
+          "timestamp_2": "2026-10-02 07:36:17.582682+00:00",
+          "translate_1": "%powershell%",
+          "param_1": 10001
+        },
+        "text": "Aggregate  (cost=770.54..770.55 rows=1 width=8) (actual time=1.013..1.013 rows=1 loops=1)\n  Buffers: shared hit=161\n  ->  Limit  (cost=766.51..770.53 rows=1 width=16) (actual time=0.861..1.011 rows=12 loops=1)\n        Buffers: shared hit=161\n        ->  Bitmap Heap Scan on events  (cost=766.51..770.53 rows=1 width=16) (actual time=0.860..1.010 rows=12 loops=1)\n              Recheck Cond: (translate(command_line, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'::text, 'abcdefghijklmnopqrstuvwxyz'::text) ~~ '%powershell%'::text)\n              Filter: ((\"timestamp\" >= '2026-09-25 07:36:17.582682+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:17.582682+00'::timestamp with time zone))\n              Heap Blocks: exact=12\n              Buffers: shared hit=161\n              ->  Bitmap Index Scan on ix_events_command_line_folded_trgm  (cost=0.00..766.51 rows=1 width=0) (actual time=0.843..0.843 rows=12 loops=1)\n                    Index Cond: (translate(command_line, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'::text, 'abcdefghijklmnopqrstuvwxyz'::text) ~~ '%powershell%'::text)\n                    Buffers: shared hit=149\nPlanning:\n  Buffers: shared hit=6\nPlanning Time: 0.095 ms\nExecution Time: 1.024 ms"
+      }
+    },
+    {
+      "endpoint": "Hunt: 7 days, host and failures",
+      "request": "POST /api/hunt/query",
+      "median_ms": 14.9,
+      "p95_ms": 127.1,
+      "max_ms": 163.2,
+      "statements": 5,
+      "db_execution_ms": 2.71,
+      "plan": {
+        "execution_ms": 1.4,
+        "planning_ms": 0.1,
+        "nodes": [
+          "Aggregate",
+          "Limit",
+          "Bitmap Heap Scan events",
+          "Bitmap Index Scan (ix_events_host_ts)"
+        ],
+        "sql": "SELECT count(*) AS count_1 \nFROM (SELECT events.id AS id \nFROM events \nWHERE events.timestamp >= %(timestamp_1)s::TIMESTAMP WITH TIME ZONE AND events.timestamp <= %(timestamp_2)s::TIMESTAMP WITH TIME ZONE AND events.host = %(host_1)s::VARCHAR AND events.event_outcome = %(event_outcome_1)s::VARCHAR \n LIMIT %(param_1)s::INTEGER) AS anon_1",
+        "params": {
+          "timestamp_1": "2026-09-25 07:36:18.401032+00:00",
+          "timestamp_2": "2026-10-02 07:36:18.401032+00:00",
+          "host_1": "srv-046",
+          "event_outcome_1": "failure",
+          "param_1": 10001
+        },
+        "text": "Aggregate  (cost=6194.34..6194.35 rows=1 width=8) (actual time=1.096..1.096 rows=1 loops=1)\n  Buffers: shared hit=2282\n  ->  Limit  (cost=71.45..6193.91 rows=34 width=16) (actual time=0.466..1.091 rows=68 loops=1)\n        Buffers: shared hit=2282\n        ->  Bitmap Heap Scan on events  (cost=71.45..6193.91 rows=34 width=16) (actual time=0.466..1.088 rows=68 loops=1)\n              Recheck Cond: (((host)::text = 'srv-046'::text) AND (\"timestamp\" >= '2026-09-25 07:36:18.401032+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:18.401032+00'::timestamp with time zone))\n              Filter: ((event_outcome)::text = 'failure'::text)\n              Rows Removed by Filter: 2300\n              Heap Blocks: exact=2264\n              Buffers: shared hit=2282\n              ->  Bitmap Index Scan on ix_events_host_ts  (cost=0.00..71.44 rows=1841 width=0) (actual time=0.289..0.289 rows=2368 loops=1)\n                    Index Cond: (((host)::text = 'srv-046'::text) AND (\"timestamp\" >= '2026-09-25 07:36:18.401032+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:18.401032+00'::timestamp with time zone))\n                    Buffers: shared hit=18\nPlanning:\n  Buffers: shared hit=5\nPlanning Time: 0.094 ms\nExecution Time: 1.130 ms"
+      }
+    },
+    {
+      "endpoint": "Hunt template: success after failures, 7 days",
+      "request": "POST /api/hunt/templates/success_after_failures/run",
+      "median_ms": 1106.6,
+      "p95_ms": 1174.3,
+      "max_ms": 1191.1,
+      "statements": 4,
+      "db_execution_ms": 1111.76,
+      "plan": {
+        "execution_ms": 1111.68,
+        "planning_ms": 0.21,
+        "nodes": [
+          "Limit",
+          "Nested Loop",
+          "Index Scan events (ix_events_timestamp_id)",
+          "Aggregate",
+          "Index Scan events (ix_events_source_ip_ts)"
+        ],
+        "sql": "\n        SELECT s.id AS event_id, s.timestamp, s.host, s.username,\n               host(s.source_ip) AS source_ip, f.failures, f.first_failure_at\n        FROM events AS s\n        CROSS JOIN LATERAL (\n            SELECT count(*) AS failures, min(e.timestamp) AS first_failure_at\n            FROM events AS e\n            WHERE e.event_category = 'authentication'\n              AND e.event_action = 'logon'\n              AND e.event_outcome = 'failure'\n              AND e.username = s.username\n              AND e.source_ip = s.source_ip\n              AND e.timestamp >= s.timestamp - make_interval(mins => %(within_minutes)s)\n              AND e.timestamp < s.timestamp\n        ) AS f\n        WHERE s.timestamp BETWEEN %(start)s AND %(end)s\n          AND s.event_category = 'authentication'\n          AND s.event_action = 'logon'\n          AND s.event_outcome = 'success'\n          AND s.username IS NOT NULL AND s.source_ip IS NOT NULL\n          AND f.failures >= %(min_failures)s\n        ORDER BY s.timestamp DESC, s.id DESC\n        LIMIT %(limit)s\n    ",
+        "params": {
+          "within_minutes": 10,
+          "start": "2026-09-25 07:36:42.067128+00:00",
+          "end": "2026-10-02 07:36:42.067128+00:00",
+          "min_failures": 3,
+          "limit": 201
+        },
+        "text": "Limit  (cost=41.15..8379.73 rows=201 width=89) (actual time=25.831..1131.223 rows=38 loops=1)\n  Buffers: shared hit=2591095 read=50660\n  ->  Nested Loop  (cost=41.15..8348622.29 rows=201241 width=89) (actual time=25.830..1131.201 rows=38 loops=1)\n        Buffers: shared hit=2591095 read=50660\n        ->  Index Scan using ix_events_timestamp_id on events s  (cost=0.42..148250.86 rows=201241 width=48) (actual time=0.013..186.879 rows=455442 loops=1)\n              Index Cond: ((\"timestamp\" >= '2026-09-25 07:36:42.067128+00'::timestamp with time zone) AND (\"timestamp\" <= '2026-10-02 07:36:42.067128+00'::timestamp with time zone))\n              Filter: ((username IS NOT NULL) AND (source_ip IS NOT NULL) AND ((event_category)::text = 'authentication'::text) AND ((event_action)::text = 'logon'::text) AND ((event_outcome)::text = 'success'::text))\n              Rows Removed by Filter: 455558\n              Buffers: shared hit=378881 read=7174\n        ->  Aggregate  (cost=40.72..40.74 rows=1 width=16) (actual time=0.002..0.002 rows=0 loops=455442)\n              Filter: (count(*) >= '3'::smallint)\n              Rows Removed by Filter: 1\n              Buffers: shared hit=2212214 read=43486\n              ->  Index Scan using ix_events_source_ip_ts on events e  (cost=0.43..40.72 rows=1 width=8) (actual time=0.002..0.002 rows=0 loops=455442)\n                    Index Cond: ((source_ip = s.source_ip) AND (\"timestamp\" >= (s.\"timestamp\" - '00:10:00'::interval)) AND (\"timestamp\" < s.\"timestamp\"))\n                    Filter: (((event_category)::text = 'authentication'::text) AND ((event_action)::text = 'logon'::text) AND ((event_outcome)::text = 'failure'::text) AND ((username)::text = (s.username)::text))\n                    Rows Removed by Filter: 2\n                    Buffers: shared hit=2212214 read=43486\nPlanning:\n  Buffers: shared read=5\nPlanning Time: 0.262 ms\nExecution Time: 1131.314 ms"
+      }
+    },
+    {
+      "endpoint": "Detection metrics, 30 days",
+      "request": "GET /api/detections/metrics",
+      "median_ms": 9.2,
+      "p95_ms": 32.5,
+      "max_ms": 75.9,
+      "statements": 3,
+      "db_execution_ms": 0.24,
+      "plan": {
+        "execution_ms": 0.18,
+        "planning_ms": 0.06,
+        "nodes": [
+          "Aggregate",
+          "Sort",
+          "Seq Scan alerts"
+        ],
+        "sql": "SELECT alerts.rule_id, count(*) AS count_1, count(*) FILTER (WHERE alerts.status IN (%(status_1_1)s::VARCHAR, %(status_1_2)s::VARCHAR, %(status_1_3)s::VARCHAR)) AS anon_1, count(*) FILTER (WHERE alerts.status = %(status_2)s::VARCHAR AND alerts.disposition = %(disposition_1)s::VARCHAR) AS anon_2, count(*) FILTER (WHERE alerts.status = %(status_2)s::VARCHAR AND alerts.disposition = %(disposition_2)s::VARCHAR) AS anon_3, count(*) FILTER (WHERE alerts.status = %(status_3)s::VARCHAR) AS anon_4, percentile_cont(%(percentile_cont_1)s) WITHIN GROUP (ORDER BY CAST(EXTRACT(epoch FROM alerts.triaged_at - alerts.created_at) AS FLOAT)) AS anon_5, percentile_cont(%(percentile_cont_2)s) WITHIN GROUP (ORDER BY CAST(CASE WHEN ((alerts.status NOT IN (%(status_4_1)s::VARCHAR, %(status_4_2)s::VARCHAR, %(status_4_3)s::VARCHAR))) THEN EXTRACT(epoch FROM alerts.resolved_at - alerts.created_at) END AS FLOAT)) AS anon_6 \nFROM alerts \nWHERE alerts.created_at >= %(created_at_1)s::TIMESTAMP WITH TIME ZONE AND alerts.created_at <= %(created_at_2)s::TIMESTAMP WITH TIME ZONE GROUP BY alerts.rule_id",
+        "params": {
+          "status_2": "RESOLVED",
+          "disposition_1": "confirmed_malicious",
+          "disposition_2": "benign_expected",
+          "status_3": "FALSE_POSITIVE",
+          "percentile_cont_1": 0.5,
+          "percentile_cont_2": 0.5,
+          "created_at_1": "2026-09-02 07:36:45.758040+00:00",
+          "created_at_2": "2026-10-02 07:36:45.758040+00:00",
+          "status_1_1": "NEW",
+          "status_1_2": "TRIAGED",
+          "status_1_3": "IN_PROGRESS",
+          "status_4_1": "NEW",
+          "status_4_2": "TRIAGED",
+          "status_4_3": "IN_PROGRESS"
+        },
+        "text": "GroupAggregate  (cost=62.55..72.16 rows=8 width=65) (actual time=0.112..0.143 rows=8 loops=1)\n  Group Key: rule_id\n  Buffers: shared hit=54\n  ->  Sort  (cost=62.55..62.96 rows=165 width=119) (actual time=0.101..0.105 rows=149 loops=1)\n        Sort Key: rule_id\n        Sort Method: quicksort  Memory: 31kB\n        Buffers: shared hit=54\n        ->  Seq Scan on alerts  (cost=0.00..56.48 rows=165 width=119) (actual time=0.004..0.073 rows=149 loops=1)\n              Filter: ((created_at >= '2026-09-02 07:36:45.75804+00'::timestamp with time zone) AND (created_at <= '2026-10-02 07:36:45.75804+00'::timestamp with time zone))\n              Buffers: shared hit=54\nPlanning Time: 0.060 ms\nExecution Time: 0.174 ms"
+      }
+    },
+    {
+      "endpoint": "ATT&CK coverage, 30 days",
+      "request": "GET /api/mitre/coverage",
+      "median_ms": 9.0,
+      "p95_ms": 22.0,
+      "max_ms": 36.2,
+      "statements": 3,
+      "db_execution_ms": 1.15,
+      "plan": {
+        "execution_ms": 1.06,
+        "planning_ms": 0.33,
+        "nodes": [
+          "Aggregate",
+          "Sort",
+          "Hash Join",
+          "Hash Join",
+          "Hash Join",
+          "Seq Scan alerts",
+          "Hash",
+          "Seq Scan detection_rule_techniques",
+          "Hash",
+          "Index Scan detection_rules (pk_detection_rules)",
+          "Hash",
+          "Seq Scan mitre_techniques"
+        ],
+        "sql": "SELECT detection_rule_techniques.technique_id, detection_rule_techniques.indicator, detection_rule_techniques.reason, mitre_techniques.name, mitre_techniques.tactics, detection_rules.rule_id, detection_rules.name AS name_1, detection_rules.category, detection_rules.library_definition ->> %(library_definition_1)s::TEXT AS anon_1, detection_rules.overrides ->> %(overrides_1)s::TEXT AS anon_2, detection_rules.enabled, count(alerts.id) FILTER (WHERE alerts.created_at >= %(created_at_1)s::TIMESTAMP WITH TIME ZONE AND alerts.created_at <= %(created_at_2)s::TIMESTAMP WITH TIME ZONE) AS anon_3, max(alerts.created_at) AS max_1 \nFROM detection_rule_techniques JOIN detection_rules ON detection_rules.rule_id = detection_rule_techniques.rule_id JOIN mitre_techniques ON mitre_techniques.technique_id = detection_rule_techniques.technique_id LEFT OUTER JOIN alerts ON alerts.rule_id = detection_rule_techniques.rule_id AND (detection_rule_techniques.indicator = %(indicator_1)s::VARCHAR OR alerts.indicator = detection_rule_techniques.indicator) \nWHERE detection_rules.in_library IS true GROUP BY detection_rule_techniques.technique_id, detection_rule_techniques.indicator, detection_rule_techniques.reason, mitre_techniques.name, mitre_techniques.tactics, detection_rules.rule_id ORDER BY detection_rule_techniques.technique_id, detection_rules.rule_id",
+        "params": {
+          "library_definition_1": "severity",
+          "overrides_1": "severity",
+          "created_at_1": "2026-09-02 07:36:46.013564+00:00",
+          "created_at_2": "2026-10-02 07:36:46.013564+00:00",
+          "indicator_1": ""
+        },
+        "text": "GroupAggregate  (cost=134.96..139.64 rows=110 width=1250) (actual time=0.479..0.699 rows=17 loops=1)\n  Group Key: detection_rule_techniques.technique_id, detection_rules.rule_id, detection_rule_techniques.indicator, detection_rule_techniques.reason, mitre_techniques.name, mitre_techniques.tactics\n  Buffers: shared hit=77\n  ->  Sort  (cost=134.96..135.24 rows=110 width=2572) (actual time=0.439..0.449 rows=215 loops=1)\n        Sort Key: detection_rule_techniques.technique_id, detection_rules.rule_id, detection_rule_techniques.indicator, detection_rule_techniques.reason, mitre_techniques.name, mitre_techniques.tactics\n        Sort Method: quicksort  Memory: 368kB\n        Buffers: shared hit=65\n        ->  Hash Join  (cost=71.89..131.23 rows=110 width=2572) (actual time=0.047..0.208 rows=215 loops=1)\n              Hash Cond: ((detection_rule_techniques.technique_id)::text = (mitre_techniques.technique_id)::text)\n              Buffers: shared hit=65\n              ->  Hash Join  (cost=58.74..117.78 rows=110 width=2122) (actual time=0.035..0.169 rows=215 loops=1)\n                    Hash Cond: ((detection_rule_techniques.rule_id)::text = (detection_rules.rule_id)::text)\n                    Buffers: shared hit=64\n                    ->  Hash Right Join  (cost=12.47..71.22 rows=110 width=738) (actual time=0.014..0.119 rows=215 loops=1)\n                          Hash Cond: ((alerts.rule_id)::text = (detection_rule_techniques.rule_id)::text)\n                          Join Filter: (((detection_rule_techniques.indicator)::text = ''::text) OR ((alerts.indicator)::text = (detection_rule_techniques.indicator)::text))\n                          Rows Removed by Join Filter: 84\n                          Buffers: shared hit=55\n                          ->  Seq Scan on alerts  (cost=0.00..55.65 rows=165 width=46) (actual time=0.002..0.037 rows=149 loops=1)\n                                Buffers: shared hit=54\n                          ->  Hash  (cost=11.10..11.10 rows=110 width=714) (actual time=0.009..0.009 rows=17 loops=1)\n                                Buckets: 1024  Batches: 1  Memory Usage: 11kB\n                                Buffers: shared hit=1\n                                ->  Seq Scan on detection_rule_techniques  (cost=0.00..11.10 rows=110 width=714) (actual time=0.001..0.002 rows=17 loops=1)\n                                      Buffers: shared hit=1\n                    ->  Hash  (cost=46.15..46.15 rows=9 width=1434) (actual time=0.020..0.020 rows=9 loops=1)\n                          Buckets: 1024  Batches: 1  Memory Usage: 21kB\n                          Buffers: shared hit=9\n                          ->  Index Scan using pk_detection_rules on detection_rules  (cost=0.14..46.15 rows=9 width=1434) (actual time=0.007..0.011 rows=9 loops=1)\n                                Filter: (in_library IS TRUE)\n                                Buffers: shared hit=9\n              ->  Hash  (cost=11.40..11.40 rows=140 width=500) (actual time=0.010..0.010 rows=12 loops=1)\n                    Buckets: 1024  Batches: 1  Memory Usage: 10kB\n                    Buffers: shared hit=1\n                    ->  Seq Scan on mitre_techniques  (cost=0.00..11.40 rows=140 width=500) (actual time=0.003..0.003 rows=12 loops=1)\n                          Buffers: shared hit=1\nPlanning:\n  Buffers: shared hit=6\nPlanning Time: 0.231 ms\nExecution Time: 0.803 ms"
+      }
+    },
+    {
+      "endpoint": "Audit log",
+      "request": "GET /api/audit",
+      "median_ms": 7.7,
+      "p95_ms": 12.9,
+      "max_ms": 15.0,
+      "statements": 3,
+      "db_execution_ms": 0.13,
+      "plan": {
+        "execution_ms": 0.06,
+        "planning_ms": 0.03,
+        "nodes": [
+          "Limit",
+          "Incremental Sort",
+          "Index Scan audit_logs (ix_audit_logs_occurred_at)"
+        ],
+        "sql": "SELECT audit_logs.id, audit_logs.seq, audit_logs.prev_hash, audit_logs.entry_hash, audit_logs.occurred_at, audit_logs.action, audit_logs.result, audit_logs.actor_id, audit_logs.actor_label, audit_logs.entity_type, audit_logs.entity_id, audit_logs.client_ip, audit_logs.request_id, audit_logs.details \nFROM audit_logs ORDER BY audit_logs.occurred_at DESC, audit_logs.id \n LIMIT %(param_1)s::INTEGER OFFSET %(param_2)s::INTEGER",
+        "params": {
+          "param_1": 50,
+          "param_2": 0
+        },
+        "text": "Limit  (cost=0.26..7.46 rows=50 width=609) (actual time=0.030..0.040 rows=50 loops=1)\n  Buffers: shared hit=4\n  ->  Incremental Sort  (cost=0.26..48.07 rows=332 width=609) (actual time=0.030..0.038 rows=50 loops=1)\n        Sort Key: occurred_at DESC, id\n        Presorted Key: occurred_at\n        Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 41kB  Peak Memory: 41kB\n        Buffers: shared hit=4\n        ->  Index Scan Backward using ix_audit_logs_occurred_at on audit_logs  (cost=0.15..33.13 rows=332 width=609) (actual time=0.015..0.021 rows=51 loops=1)\n              Buffers: shared hit=4\nPlanning Time: 0.028 ms\nExecution Time: 0.059 ms"
+      }
+    }
+  ]
+}

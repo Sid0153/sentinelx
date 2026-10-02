@@ -208,3 +208,29 @@ def test_columns_compared_without_folding_are_stored_without_capitals() -> None:
         assert value is None or value == value.translate(ASCII_LOWER), name
     # Set at enrichment from fixed enums (IpScope, Criticality), not by the normalizer.
     assert LOWERCASE_COLUMNS - set(event) == {"source_ip_scope", "asset_criticality"}
+
+
+def new_value_rule(**changes: Any) -> dict[str, Any]:
+    data = rule("AUTH-004").model_dump(mode="json", by_alias=True)
+    data.update(changes)
+    return data
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        # The engine counts its history in SQL (Phase 14): the filter must be exact there...
+        (
+            {"match": {"field": "message", "op": "matches", "value": "Accepted .*"}},
+            "must be exact in SQL",
+        ),
+        ({"match": {"field": "attributes.method", "op": "eq", "value": "x"}}, "exact in SQL"),
+        # ...and every field a stored column, not a derived one.
+        ({"group_by": ["target_account"]}, "stored columns only"),
+        ({"value_field": "destination"}, "stored columns only"),
+    ],
+)
+def test_new_value_rules_must_be_countable_in_sql(changes: dict[str, Any], message: str) -> None:
+    with pytest.raises(ValidationError, match=message):
+        Rule.model_validate(new_value_rule(**changes))
+    Rule.model_validate(new_value_rule())  # the shipped AUTH-004 itself is fine

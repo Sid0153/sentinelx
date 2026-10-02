@@ -22,6 +22,7 @@ from app.models.incident import (
 )
 from app.models.rate_limit import RateLimitCounter
 from app.models.refresh_token import RefreshToken
+from app.models.summary import EventDailyCount, LogonSuccessDaily
 from app.models.user import Role, User
 
 __all__ = [
@@ -33,6 +34,7 @@ __all__ = [
     "DetectionRuleTechnique",
     "DetectionRuleVersion",
     "DetectionRun",
+    "EventDailyCount",
     "AuditLog",
     "Event",
     "Identity",
@@ -43,6 +45,7 @@ __all__ = [
     "IncidentNote",
     "IngestionBatch",
     "LogSource",
+    "LogonSuccessDaily",
     "MitreTechnique",
     "RateLimitCounter",
     "RawEvent",

@@ -278,8 +278,8 @@ def logon(seconds: float, ip: str, user: str = "alice") -> DetectionEvent:
 
 def history(
     days: int, ip: str = "10.0.2.41"
-) -> dict[tuple[object, ...], list[tuple[datetime, object]]]:
-    return {("alice",): [(T0 - timedelta(days=d), ip) for d in range(1, days + 1)]}
+) -> dict[tuple[object, ...], list[tuple[datetime, object, int]]]:
+    return {("alice",): [(T0 - timedelta(days=d), ip, 1) for d in range(1, days + 1)]}
 
 
 def test_logon_from_a_known_network_is_not_unusual() -> None:
@@ -297,13 +297,31 @@ def test_accounts_without_enough_history_are_not_judged() -> None:
 
 
 def test_history_older_than_the_lookback_does_not_count() -> None:
-    old = {("alice",): [(T0 - timedelta(days=20 + d), "10.0.2.41") for d in range(10)]}
+    old = {("alice",): [(T0 - timedelta(days=20 + d), "10.0.2.41", 1) for d in range(10)]}
     assert detect("AUTH-004", [logon(0, "203.0.113.200")], history=old) == []
 
 
 def test_a_new_network_is_reported_once_per_run() -> None:
     events = [logon(0, "203.0.113.200"), logon(60, "203.0.113.201")]
     assert len(detect("AUTH-004", events, history=history(6))) == 1
+
+
+@pytest.mark.parametrize("ip", [None, "", "not-an-address", "999.1.1.1"])
+def test_a_logon_without_a_usable_address_is_not_a_new_network(ip: str | None) -> None:
+    """Missing or malformed addresses are skipped, not reported as never seen before."""
+    assert detect("AUTH-004", [logon(0, ip)], history=history(6)) == []  # type: ignore[arg-type]
+
+
+def test_malformed_history_does_not_count_towards_the_minimum() -> None:
+    junk = {("alice",): history(4)[("alice",)] + [(T0 - timedelta(days=1), "garbage", 1)] * 3}
+    assert detect("AUTH-004", [logon(0, "203.0.113.200")], history=junk) == []
+
+
+def test_ipv6_networks_are_compared_by_slash_64() -> None:
+    v6 = history(6, ip="2001:db8:1::5")
+    assert detect("AUTH-004", [logon(0, "2001:db8:1::99")], history=v6) == []
+    (detection,) = detect("AUTH-004", [logon(0, "2001:db8:2::1")], history=v6)
+    assert detection.facts["value"] == "2001:db8:2::/64"
 
 
 # ---------- single (PRIV-001, PROC-001) ----------

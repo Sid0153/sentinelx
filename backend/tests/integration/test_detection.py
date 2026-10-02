@@ -523,3 +523,114 @@ def test_batches_a_crash_left_without_detection_are_flagged(
         BatchStatus.STORED,
         BatchStatus.PROCESSED,
     )
+
+
+# ---------- AUTH-004 history counted in SQL (Phase 14) ----------
+
+
+def _view(
+    rule: Any, history: dict[tuple[Any, ...], list[tuple[datetime, Any, int]]], event: Any
+) -> tuple[int, set[str]]:
+    """What the evaluator sees for one event: the count and the values within its lookback."""
+    from app.detection.evaluators.common import group_key
+    from app.detection.evaluators.new_value import transform
+
+    since = event.timestamp - rule.lookback
+    entries = [
+        (n, transform(rule, v))
+        for stamp, v, n in history.get(group_key(rule, event) or (), [])
+        if since <= stamp < event.timestamp
+    ]
+    return sum(n for n, v in entries if v is not None), {v for _, v in entries if v is not None}
+
+
+def test_counted_history_equals_reading_every_earlier_event(
+    db_session: Session, seeded_rules: Library
+) -> None:
+    """Exactness of the SQL counting: for every event of a run, the count and the networks
+    within its lookback equal what reading every earlier event one by one gives, including
+    entries in the band at the old edge of the lookback (inside for some events only)."""
+    import random
+
+    rule = seeded_rules.rules["AUTH-004"]
+    assert rule.lookback is not None
+    low = START - timedelta(hours=4)
+    high = low + timedelta(hours=3)
+    rng = random.Random(7)  # noqa: S311  (test data)
+    networks = ["10.0.2", "10.0.3", "10.0.9", "203.0.113"]
+    lines = []
+    for user in ("alice", "bob", "carol", "dave"):
+        # A few addresses per account, as people have, over the lookback and a day beyond it.
+        own = [f"{rng.choice(networks)}.{rng.randint(1, 250)}" for _ in range(4)]
+        for _ in range(150):
+            moment = (
+                low
+                - rule.lookback
+                - timedelta(days=1)
+                + rng.random() * (rule.lookback + timedelta(days=1))
+            )
+            lines.append(accepted(moment, rng.choice(own), user))
+        for minutes in (10, 40, 70, 100, 130, 170):  # inside the edge band on purpose
+            moment = low - rule.lookback + timedelta(minutes=minutes)
+            lines.append(accepted(moment, f"10.0.{rng.randint(20, 30)}.5", user))
+    lines += [  # failures and other accounts never count
+        f"{(low - timedelta(days=2)).isoformat()} web-01 sshd[1]: Failed password for alice "
+        "from 10.0.77.1 port 1 ssh2",
+        accepted(low - timedelta(days=1), "10.0.88.1", "erin"),
+    ]
+    run_lines = [
+        accepted(low + timedelta(minutes=m), f"{rng.choice(networks)}.7", user)
+        for m in (0, 45, 90, 150, 180)
+        for user in ("alice", "bob", "carol")
+    ]
+    send(db_session, lines + run_lines, detect=False)
+
+    events = engine._load(db_session, rule, low, high)
+    assert len(events) == len(run_lines)
+    counted = engine._history(db_session, rule, events, low, high)
+    reference: dict[tuple[Any, ...], list[tuple[datetime, Any, int]]] = {}
+    for earlier in engine._load(
+        db_session, rule, low - rule.lookback, low - timedelta(microseconds=1)
+    ):
+        if rule.match is not None and rule.match.evaluate(earlier):
+            reference.setdefault((earlier.username,), []).append(
+                (earlier.timestamp, earlier.source_ip, 1)
+            )
+    for event in events:
+        assert _view(rule, counted, event) == _view(rule, reference, event), event.timestamp
+
+    # It really is counted, and the edge band really was read row by row.
+    assert sum(len(v) for v in counted.values()) < sum(len(v) for v in reference.values()) / 3
+    assert any(n == 1 for entries in counted.values() for _, _, n in entries)
+    assert ("dave",) not in counted and ("erin",) not in counted  # only the run's accounts
+
+
+def test_a_long_history_no_longer_exceeds_the_candidate_cap(
+    db_session: Session, seeded_rules: Library, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before Phase 14 every earlier logon was loaded: past MAX_CANDIDATES of them the rule
+    failed with too_many_candidates on every batch (measured: docs/performance.md)."""
+    monkeypatch.setattr(engine, "MAX_CANDIDATES", 50)
+    history = [
+        accepted(START - timedelta(days=1 + i / 20), f"10.0.2.{i % 200 + 1}") for i in range(120)
+    ]
+    send(db_session, history, detect=False)
+    unusual = send(db_session, [accepted(START, "203.0.113.200")])
+    detection_run = batch_run(db_session, unusual)
+    assert detection_run.rule_results["AUTH-004"]["error"] is None
+    (detection,) = [d for d in detection_run.detections if d["rule_id"] == "AUTH-004"]
+    assert detection["facts"]["history_count"] == 120
+
+
+def test_only_the_summarized_question_reads_the_logon_summary(seeded_rules: Library) -> None:
+    """`logon_success_daily` answers one question (successful logons per account and
+    address); a new_value rule asking anything else must count from events."""
+    auth004 = seeded_rules.rules["AUTH-004"]
+    assert engine._summarized(auth004)
+    extra = auth004.model_dump(mode="json", by_alias=True)
+    extra["match"]["all"].append({"field": "host", "op": "eq", "value": "web-01"})
+    other_value = {**auth004.model_dump(mode="json", by_alias=True), "value_field": "host"}
+    failures = auth004.model_dump(mode="json", by_alias=True)
+    failures["match"]["all"][2] = {"field": "event_outcome", "op": "eq", "value": "failure"}
+    for changed in (extra, other_value, failures):
+        assert not engine._summarized(type(auth004).model_validate(changed))

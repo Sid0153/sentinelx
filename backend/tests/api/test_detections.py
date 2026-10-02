@@ -98,6 +98,11 @@ def test_an_admin_tunes_a_rule_and_the_versions_show_it(
     assert [(v["version"], v["source"]) for v in versions] == [(2, "admin"), (1, "library")]
     assert versions[0]["change_reason"] == "fewer alerts on the bastion"
     assert len(audit_entries(db_session, "RULE_UPDATED")) == 1
+    # Bounded (Phase 14): the newest `limit` versions only, never more than 200.
+    newest = db_client.get("/api/detections/AUTH-001/versions?limit=1", headers=admin).json()
+    assert [v["version"] for v in newest] == [2]
+    too_many = db_client.get("/api/detections/AUTH-001/versions?limit=201", headers=admin)
+    assert too_many.status_code == 422
 
 
 @pytest.mark.parametrize(

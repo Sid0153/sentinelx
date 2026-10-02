@@ -12,9 +12,10 @@
 | ✅ Unit (pure cores) | pytest | none | Parsers, normalization, enrichment, event schema, auth primitives, client IP, redaction, demo generators; later conditions, evaluators, explanation, correlation scoring, risk |
 | ✅ Integration | pytest | **real PostgreSQL** (Docker) | Migrations up/down, models match migrations, every constraint and append-only trigger, index fit per query shape, event store round trip; later detection runs and the advisory lock |
 | ✅ API | pytest + TestClient | real PostgreSQL | Validation, status codes, pagination, filtering, the route-access matrix (every route × every role), audit records, ingestion end to end, CLI commands |
-| ✅ Frontend | Vitest + Testing Library | mocked `fetch` per route | Pages in real states (loading, empty, error, data), sign-in and session renewal, role-based controls, URL state, cross-tab refresh lock |
-| ✅ Smoke | GitHub Actions + Docker Compose | real stack | Images start healthy; hardening; security headers; database outage → 503 and recovery; `scripts/auth_smoke.py`; `scripts/ingest_smoke.py`; a simulated scenario through the CLI; forged `X-Forwarded-For` on both ports; no secret in logs |
-| Performance (Phase 14) | benchmark script | real PostgreSQL | Measured ingest rate and detection latency on generated data, recorded with the machine spec |
+| ✅ Frontend | Vitest + Testing Library | mocked `fetch` per route | Pages in real states (loading, empty, error, data), sign-in and session renewal, role-based controls, URL state, cross-tab refresh lock. CI fails under 90 % lines / 78 % branches (Phase 14) |
+| ✅ Smoke | GitHub Actions + Docker Compose | real stack | Images start healthy; hardening; security headers; database outage → 503 and recovery; `scripts/auth_smoke.py`; `scripts/ingest_smoke.py`; `scripts/security_smoke.py`; a simulated scenario through the CLI; forged `X-Forwarded-For` on both ports; no secret in logs |
+| ✅ Query budget (Phase 14) | pytest | real PostgreSQL | Statements per request do not grow with the data (no N+1), on list and detail pages; every list response is bounded |
+| ✅ Performance (Phase 14) | `backend/benchmarks/run.py` | real PostgreSQL (own `_bench` database) | Ingest rate, detection time as the tables grow, read latency and query plans on 1 million generated records; [performance.md](performance.md) |
 
 PostgreSQL rather than SQLite, because triggers, partial unique indexes, `inet`, `bytea`, JSONB,
 `pg_trgm` and advisory locks are part of the design.
@@ -196,6 +197,36 @@ cases, and a meta-test fails if a rule is added that no demo scenario triggers)
   TLS 1.3, plaintext refused, the server key absent from the backend; the audit chain
   verifies; HSTS sent.
 
+**Test completion and performance** ✅ (Phase 14; `tests/api/test_query_budget.py`,
+`tests/unit/test_benchmark_workload.py`, additions across the suites, `frontend/tests/*`)
+- A coverage review (backend lines left unexecuted, frontend coverage measured for the first
+  time: 88 % lines, 76 % branches) chose behaviour that had no test, not lines for their own
+  sake. Added: every refusal of the incident actions (404/409/400, and that none leaves an
+  activity entry or audit record), a resolved incident refusing new alerts; AUTH-004 with
+  missing or malformed addresses, malformed history, IPv6 /64 comparison; parser shapes
+  (sudo/su bookkeeping, "command not allowed", impossible ISO dates, useradd without a name,
+  Windows logoff, `DOMAIN\user`); UI: every timeline activity kind, rename/assign/unpin with
+  a refusal, closed incidents read-only, missing records, inventory filters and editing, hunt
+  value typing and validation messages. Frontend coverage is now 91.7 % lines, 81.2 % branches.
+- Query budget: each list endpoint is measured on a small and a five-times-larger data set
+  with the session's identity map cleared (as in production); the statement count may not
+  grow. **It found three N+1 queries** (asset and identity lists: two statements per row;
+  saved hunts: one per hunt), now one statement per page. A second test checks the rewritten
+  list figures equal each record's own activity, row by row. Detail pages: an incident with
+  five alerts costs what one with one alert costs; long timeline and evidence pages cost
+  what short ones cost.
+- Bounded responses: every list or page in the OpenAPI schema has a capped `limit`, or is on a
+  short list with the reason it cannot grow (mutation-checked). This found two unbounded
+  lists, now bounded: rule versions (`limit`, default 100) and saved hunts (100 per user).
+- The benchmark workload is tested: deterministic, every record parses, ordinary activity
+  alone triggers no rule, every injected attack is detected.
+- Per-day summaries (`tests/integration/test_daily_summaries.py`): after ingestion across
+  midnight with re-sent duplicates, after hand-made inserts, and after four concurrent batches
+  for the same accounts and days, both summary tables equal a fresh `GROUP BY` over the rows;
+  the concurrent batches neither deadlock nor lose a count. AUTH-004's history from the
+  summary equals reading every earlier event, event by event (mutation-checked); only the
+  successful-logon question may use it (tested).
+
 **Auth / RBAC / audit** ✅ (Phase 3)
 - Login success and failure, lockout, rate limit, refresh rotation, reuse detection (and
   post-logout refreshes *not* treated as reuse), logout revocation.
@@ -227,6 +258,9 @@ Backend (from `backend/`, with `TEST_DATABASE_URL` set): `ruff check .`, `ruff f
 --require-hashes --disable-pip` (and `requirements-dev.txt`).
 Frontend (from `frontend/`): `npm run lint`, `npm run typecheck`, `npm test`, `npm run
 build`, `npm audit --audit-level=moderate`.
-Against a running stack: `python3 scripts/auth_smoke.py <url> <admin> <password>` and
-`python3 scripts/ingest_smoke.py <url> <admin> <password>`.
+Frontend coverage (as CI runs it): `npm run test:coverage`.
+Against a running stack: `python3 scripts/auth_smoke.py <url> <admin> <password>`,
+`python3 scripts/ingest_smoke.py <url> <admin> <password>` and
+`python3 scripts/security_smoke.py <url> <admin> <password>`.
+Benchmark (own database, never the test or app one): see [performance.md](performance.md#reproducing).
 CI runs all of these, plus gitleaks over the full history.
