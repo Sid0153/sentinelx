@@ -40,7 +40,7 @@ versions (see [Upgrades](#upgrades)).
 
 ## Development (local demonstration)
 
-The [README](../README.md#run-it-locally) has the commands: copy `.env.example` to `.env`, set
+The [README](../README.md#quick-start) and the [setup guide](setup.md) have the commands: copy `.env.example` to `.env`, set
 the three secrets, `docker compose up -d --build --wait`, create the first admin. The app is on
 http://localhost:8081, the API docs on http://localhost:8001/api/docs.
 

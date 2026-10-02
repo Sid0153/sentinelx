@@ -72,6 +72,13 @@ function formatDetails(details: Record<string, unknown>): string {
     .join(" · ");
 }
 
+/** No actor: an unauthenticated request (a failed sign-in), or no request at all (an operator
+ * command such as `cli demo-load`, or the engine). */
+function actor(entry: AuditEntry): string {
+  if (entry.actor_label) return entry.actor_label;
+  return entry.request_id ? "anonymous" : "system";
+}
+
 function AuditRow({ entry }: { entry: AuditEntry }) {
   return (
     <tr className="border-t border-slate-800 align-top">
@@ -80,7 +87,7 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
       </td>
       <td className="py-2 pr-4 font-mono text-xs text-slate-100">{entry.action}</td>
       <td className={`py-2 pr-4 text-xs font-medium ${RESULT_STYLE[entry.result]}`}>{entry.result}</td>
-      <td className="py-2 pr-4 text-slate-300">{entry.actor_label ?? "anonymous"}</td>
+      <td className="py-2 pr-4 text-slate-300">{actor(entry)}</td>
       <td className="py-2 pr-4 font-mono text-xs text-slate-400">{entry.client_ip ?? "—"}</td>
       <td className="py-2 text-xs text-slate-400">{formatDetails(entry.details)}</td>
     </tr>

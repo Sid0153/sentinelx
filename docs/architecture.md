@@ -1,11 +1,11 @@
 # Architecture
 
-> Status: **implemented through Phase 5**: foundation, authentication and roles, audit log,
-> asset and identity inventory, the event model and store, and ingestion (parsing,
-> normalization, enrichment). Detection, alerts, correlation, incidents, hunting and the SOC UI
-> are still design; each section says which phase builds it. Package status is marked ✅ below.
-> Changes made during implementation are recorded in `docs/decisions/`, and
-> [feature-coverage.md](feature-coverage.md) tracks every feature of the brief.
+> Status: **everything described here is built and tested** (Phases 2–16). Phase numbers in
+> the text say when each part was built. Changes made during implementation are recorded in
+> `docs/decisions/`, and [feature-coverage.md](feature-coverage.md) tracks every feature of
+> the brief. Deployment: [deployment.md](deployment.md); what it cannot do:
+> [limitations.md](limitations.md); where it would go next:
+> [future-architecture.md](future-architecture.md).
 
 SentinelX is a security operations platform. It ingests security logs, normalizes them into
 one event model, runs detection rules over them, groups the resulting alerts into incidents,
@@ -15,19 +15,40 @@ It is a **modular monolith** ([ADR-001](decisions/0001-modular-monolith.md)): on
 service, one React single-page app and one PostgreSQL database
 ([ADR-002](decisions/0002-postgresql-event-store.md)).
 
-```
-                 Linux auth.log   Windows events (JSON)   nginx/Apache access logs
-                 app JSON logs    generic JSON events      demo generator (simulated)
-                         │                 │                        │
-                         └───── file upload / API batch / CLI ──────┘
-                                           │
-Browser ──► nginx (frontend) ──/api──► FastAPI ─────────────────────► PostgreSQL
-                                           │
-                     ingest → parse → normalize → enrich → store
-                                           │
-                             detection → alerts → correlation → incidents
-                                           │
-                              risk/context · ATT&CK · audit log
+```mermaid
+flowchart LR
+    subgraph sources["Log sources"]
+        linux["Linux auth.log"]
+        windows["Windows Security events (JSON)"]
+        web["nginx / Apache access logs"]
+        json["Application and generic JSON"]
+        demo["Demo generator (SIMULATED)"]
+    end
+    shipper["Log shipper<br/>(per-source ingest key)"]
+    cli["Operator CLI<br/>ingest-file, demo-load"]
+    browser["Analyst's browser<br/>React single-page app"]
+
+    subgraph host["One host: Docker Compose"]
+        nginx["nginx<br/>static app, /api proxy,<br/>TLS in production"]
+        subgraph api["FastAPI backend: one process, modular monolith"]
+            ingestion["Ingestion<br/>parse, normalize, enrich"]
+            detection["Detection<br/>9 YAML rules, 5 evaluator kinds"]
+            alerts["Alerts<br/>dedup, priority"]
+            correlation["Correlation<br/>incidents"]
+            hunting["Hunting, dashboard,<br/>context, ATT&CK"]
+            auth["Auth, RBAC, audit"]
+        end
+        db[("PostgreSQL 16<br/>append-only evidence,<br/>hash-chained audit log")]
+    end
+
+    linux & windows & web & json --> shipper
+    shipper -- "POST /api/ingest" --> nginx
+    demo --> cli
+    cli --> ingestion
+    browser -- "https" --> nginx
+    nginx -- "/api" --> api
+    ingestion --> detection --> alerts --> correlation
+    api -- "TLS, least-privilege role" --> db
 ```
 
 ## Why this shape
@@ -118,11 +139,32 @@ Rules we will enforce with tests or review:
 
 [ADR-008](decisions/0008-synchronous-bounded-pipeline.md) has the full reasoning. Summary:
 
-Implemented: steps 1–4 (Phase 5), in one transaction per batch, and step 5 plus the batch's
-detection states and the startup reconciler (Phase 6), step 6, alerts (Phase 7), and step 7,
-correlation (Phase 8). Files are sent as
+Steps 1–4 were built in Phase 5, step 5 (with the batch's detection states and the startup
+reconciler) in Phase 6, alerts in Phase 7 and correlation in Phase 8. Files are sent as
 `text/plain` to the same endpoint, so there is no separate upload route (and no multipart
 dependency).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Sender (shipper, CLI, demo)
+    participant I as Ingestion
+    participant D as Detection
+    participant A as Alerts
+    participant C as Correlation
+    participant P as PostgreSQL
+    S->>I: batch of raw records (at most 5,000 records, 5 MB)
+    I->>P: transaction A: raw records (always), normalized events, batch STORED
+    Note over I,P: committed: the evidence is safe even if detection fails
+    I->>D: run for the batch's time span
+    D->>P: transaction B, under an advisory lock: re-read each rule's window
+    D->>A: detections (rule, evidence, explanation, ATT&CK)
+    A->>P: create or extend alerts (one open alert per key), priority
+    A->>C: new and changed alerts
+    C->>P: link to an incident (with a reason) or open one
+    D->>P: detection run stored, batch PROCESSED
+    I-->>S: 201 with the batch report
+```
 
 ```
 POST /api/ingest/{source}  (JSON records or text/plain lines; also CLI ingest-file, demo-ingest)
@@ -208,9 +250,12 @@ answer. Full design, trade-offs and limits: [threat-hunting.md](threat-hunting.m
   `Timeline`, `EvidenceList`, `AttackTag`, `RiskBreakdown`, `EmptyState`.
 - Charts (severity distribution, trends) are small hand-written SVG components. A charting
   library is added only if these become hard to maintain.
-- Pages: `/login /dashboard /events /hunt /detections /detections/:id /alerts /alerts/:id
-  /incidents /incidents/:id /assets /identities /audit /settings` (users, log sources). The
-  demo is loaded and reset from the command line, not the UI ([demo.md](demo.md)).
+- Pages: `/login /dashboard /incidents /incidents/:id /alerts /alerts/:id /events /events/:id
+  /hunt /assets /assets/:id /identities /identities/:id /detections /detections/:id /coverage
+  /status /settings`, `/playground` for analysts and admins, and `/users /audit /correlation`
+  for admins
+  (`frontend/src/App.tsx`). The demo is loaded and reset from the command line, not the UI
+  ([demo.md](demo.md)).
 - Anything produced by the demo generator carries a visible **SIMULATED** label.
 
 ## Observability
@@ -221,17 +266,17 @@ checks at DEBUG), redaction of tokens / passwords / URL credentials as a safety 
 `/api/health` and `/api/ready` (database reachable **and** schema revision equals the code's
 Alembic head, so a deploy that skipped migrations reports not ready). The request ID comes
 from nginx (`$request_id`) or a safe caller-supplied value, is returned in `X-Request-ID`, and
-is included in every error body. Planned below:
+is included in every error body. Added since:
 
-- JSON logs with `request_id` (accepted from a trusted proxy or generated) and `user_id` where
-  known.
-- One summary log line per pipeline stage with counts and durations:
-  `ingest.batch_stored`, `detection.run_completed` (per-rule matches and time, errors),
-  `correlation.completed`.
-- Rule health is visible in the product: last run, last match, evaluation errors, match count.
-- `/api/health` (process up) and `/api/ready` (database reachable, migrations at head).
+- One summary log line per pipeline stage with counts and durations (`ingest.batch_stored`,
+  `detection.run_completed` with per-rule matches, time and errors).
+- Rule health in the product: per-rule last run, last match, match count and evaluation
+  errors on the detection pages, outcome metrics per rule (Phase 11).
+- `audit.chained` log lines carrying the audit chain's head, so a rewritten chain can be
+  detected from outside the database (Phase 13).
 - Logs never include passwords, tokens, or raw event bodies at INFO level. Raw events can
   carry attacker-controlled text and sometimes secrets, so they are logged only by reference.
+  CI checks that no generated secret appears in the containers' logs.
 
 ## Scale limits (honest)
 
@@ -247,7 +292,33 @@ is included in every error body. Planned below:
   reads stay at 8–27 ms with 921,000 events. Detection runs are serialized, so throughput does
   not scale with senders.
 
+## Deployment
+
+```mermaid
+flowchart TB
+    user["Analyst"] -- "https :8443 (production overlay)<br/>http :8081 (development)" --> fe
+    subgraph compose["Docker Compose project: every container non-root, read-only, no capabilities"]
+        fe["frontend: nginx-unprivileged<br/>172.28.0.10"]
+        be["backend: FastAPI + uvicorn<br/>migrates at start, then serves"]
+        db[("db: PostgreSQL 16<br/>TLS only, uid 70")]
+        certs["db-certs / site-certs<br/>one-shot: local CA and certificates"]
+        vol[("volume: pgdata")]
+    end
+    fe -- "/api" --> be
+    be -- "verify-full TLS<br/>least-privilege role" --> db
+    db --- vol
+    certs -. "certificates" .-> db
+    certs -. "certificates" .-> fe
+    ops["Operator"] -- "scripts/backup.sh, restore.sh,<br/>demo_reset.sh, python -m app.cli" --> be
+```
+
+Details, settings and procedures: [deployment.md](deployment.md) and
+[ADR-0014](decisions/0014-single-host-compose-deployment.md).
+
 ## Real-world extension plan
+
+The longer view (scaling out, a queue, partitioning, more sources) is in
+[future-architecture.md](future-architecture.md).
 
 How real sources would connect without changing detection:
 - **Linux**: a log shipper (rsyslog `omhttp`, Vector, Fluent Bit) posts auth.log lines to

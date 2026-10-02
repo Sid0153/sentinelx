@@ -22,7 +22,7 @@ starts only on "Proceed to Phase N".
 | 14 | Test completion; controlled benchmark (generated data, `EXPLAIN ANALYZE`) | Numbers recorded with machine spec, none invented | **Done** ([performance.md](performance.md), [testing.md](testing.md)) |
 | 15 | Production-style images, hardening checks in Compose smoke test, deployment docs | CI runs the production image | **Done** ([deployment.md](deployment.md), ADR-0014) |
 | 16 | Demo environment: scenario loader, 10 scenarios, reset, SIMULATED labels | Each scenario triggers exactly its documented rules (test) | **Done** ([demo.md](demo.md), ADR-0015) |
-| 17 | README, diagrams, screenshots, guides, limitations, future architecture | Docs match the code | Not started |
+| 17 | README, diagrams, screenshots, guides, limitations, future architecture | Docs match the code | **Done** ([README](../README.md), [setup.md](setup.md), [limitations.md](limitations.md), [future-architecture.md](future-architecture.md); `tests/unit/test_docs.py`) |
 | 18 | Full engineering review and fixes | Review report; misleading claims removed | Not started |
 | 19 | Interview and portfolio package (in git-ignored `portfolio/`) | Based only on what exists | Not started |
 

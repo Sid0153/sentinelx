@@ -38,7 +38,7 @@ export function PriorityBadge({ score, band }: { score: number; band: Level }) {
 
 export function LevelBadge({ level, label }: { level: Level; label: string }) {
   return (
-    <span className={`rounded border px-1.5 py-0.5 text-xs ${LEVEL_STYLE[level]}`}>
+    <span className={`whitespace-nowrap rounded border px-1.5 py-0.5 text-xs ${LEVEL_STYLE[level]}`}>
       {label}: {level}
     </span>
   );

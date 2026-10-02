@@ -125,6 +125,14 @@ describe("Audit page", () => {
     expect(screen.getByText("203.0.113.9")).toBeInTheDocument();
   });
 
+  it("labels entries without a request (operator commands, the engine) as the system", async () => {
+    const command = { ...entry, id: "a-2", action: "DEMO_LOADED", result: "SUCCESS" as const };
+    mockApi({ ...ADMIN, "GET /api/audit": page([{ ...command, client_ip: null, request_id: null }]) });
+    renderApp("/audit");
+    expect(await screen.findByText("system")).toBeInTheDocument();
+    expect(screen.queryByText("anonymous")).not.toBeInTheDocument();
+  });
+
   it("filters on the server and keeps the filter in the URL", async () => {
     const api = mockApi({ ...ADMIN, "GET /api/audit": page([entry]) });
     renderApp("/audit");

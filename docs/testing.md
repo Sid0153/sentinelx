@@ -1,9 +1,9 @@
 # Testing strategy
 
-> Status: **in force since Phase 2.** Items marked ✅ are implemented and run in CI; the others
-> are written in the phase that builds the feature. CI fails under 90 % backend line coverage.
-> Coverage is a floor, not the goal: the goal is behaviour tests like the ones below.
-> Current totals are in `CLAUDE.md` (updated each phase).
+> Status: **in force since Phase 2.** Every item below is implemented and runs in CI (✅).
+> CI fails under 90 % backend line coverage. Coverage is a floor, not the goal: the goal is
+> behaviour tests like the ones below. At Phase 17: 1,370 backend tests (98 % line coverage)
+> and 116 frontend tests; totals are kept current in the README.
 
 ## Layers
 
@@ -273,4 +273,7 @@ Against a running stack: `python3 scripts/auth_smoke.py <url> <admin> <password>
 Benchmark (own database, never the test or app one): see [performance.md](performance.md#reproducing).
 Production configuration and backup: [deployment.md](deployment.md); `tests/unit/test_deployment_docs.py`
 fails if a setting, a Compose variable or an `.env.example` entry is not documented there.
+The documentation itself (Phase 17): `tests/unit/test_docs.py` fails if a relative link or
+its anchor is broken, if `api.md` names a route that does not exist or misses one that does,
+or if any document names a CLI command, a script or a rule that does not exist.
 CI runs all of these, plus gitleaks over the full history.

@@ -1,10 +1,9 @@
-# API plan
+# API
 
-> Status: routes marked ✅ are implemented and tested (health, auth, users, audit, assets,
-> identities, sources, ingestion, events, detections, ATT&CK techniques, alerts, incidents,
-> settings, dashboard, hunt). Everything else is planned in the phase shown. OpenAPI is served at
-> `/api/docs` (disabled in production unless enabled explicitly) and exported to
-> `docs/openapi.json`. A test fails if the export is stale.
+> Status: every route below is implemented and tested (✅, with the phase that built it).
+> OpenAPI is served at `/api/docs` (disabled in production unless enabled explicitly) and
+> exported to [openapi.json](openapi.json). A test fails if the export is stale, and another
+> if a route is missing from the role table (`backend/tests/api/test_rbac.py`).
 
 Conventions:
 - Request bodies: at most 1 MiB (5 MB on ingest), refused with 413 `payload_too_large` by the
@@ -59,7 +58,7 @@ with every role plus an unauthenticated call.
 | POST `/api/detections/{rule_id}/test` | A | 12 ✅ | Detection playground: `{source_type, records (≤ 500, ≤ 256 KiB), timezone?, default_host?, changes?}`. Runs the real parser, enrichment and evaluator; stores nothing. Returns `triggered`, the rule as tried, a summary, the detections (explanation, severity, confidence, evidence lines, ATT&CK) and each line's outcome. What-if `changes` are checked like a real tune (400); `enabled` is refused |
 | GET `/api/detections/runs` · `/api/detections/runs/{run_id}` | V | 6 ✅ | Detection runs, newest first (`trigger` = `batch` / `manual`); one run with the per-rule outcome and every detection (explanation, facts, evidence event IDs, ATT&CK) |
 | POST `/api/detections/run` | AD | 6 ✅ | `{"from", "to"}` with time zones, at most 31 days (400 otherwise). Runs every enabled rule over the range; deterministic, so repeating it gives the same detections. Audited as `DETECTION_RUN_REQUESTED`. Returns the run (201) |
-| POST `/api/detections/{rule_id}/test` | A | 12 | Playground: evaluate supplied sample events, nothing stored |
+| POST `/api/detections/{rule_id}/test` | A | 12 ✅ | Playground: evaluate supplied sample events, nothing stored |
 | GET `/api/alerts/groups?by=` | V | 12 ✅ | The queue grouped by `rule`, `host`, `username` or `source_ip`, with the same filters as the list: per group alerts, open, highest priority and band, latest activity; at most 100 groups (highest priority first) and the `total`. A view only |
 | GET `/api/alerts` | V | 7 ✅ | The queue, by priority score then latest activity (`sort=recent`: latest activity). Filters: `status`, `severity`, `band` (each repeatable), `rule_id`, `host`, `username` (case-insensitive), `source_ip`, `since` / `until` on the alert's event times. 400 for an unknown level or a bad IP |
 | GET `/api/alerts/{alert_id}` | V | 7 ✅ | One alert: explanation and facts, priority breakdown, entities with inventory context, ATT&CK (with links), investigation and response steps, merged detections, status history (from the audit log), related alerts (sharing host, user or source within 24 h), previous alert, `allowed_transitions`, `incident_id` (Phase 8) |
@@ -71,8 +70,8 @@ with every role plus an unauthenticated call.
 | GET `/api/incidents/{incident_id}` | V | 8 ✅ | The workspace: summary, reason it was opened, risk breakdown, linked alerts with strength and reason, notes, current pins, activity, ATT&CK (with rules and links), grouped response, related incident, `allowed_transitions` |
 | GET `/api/incidents/{incident_id}/timeline` | V | 8 ✅ | Evidence events (each once, with citing rules and raw text; raw text null for viewers, 13), alerts and activity, oldest first; `limit` ≤ 200, keyset `cursor` |
 | POST `/api/incidents/{incident_id}/transition` | A | 8 ✅ | `{status, disposition?, resolution?, reason?}`: RESOLVED needs disposition + resolution, reopening a reason (400); not allowed 409; CLOSED final |
-| POST `/api/incidents/{incident_id}/assign` · `/notes` · `/evidence` | A | 8 ✅ | Assign (analysts/admins only, `null` unassigns); append-only note (1–10,000 characters; 201); pin/unpin an event or alert with a tag and comment. 409 on a closed incident |
-| POST `/api/incidents/{incident_id}/alerts` · `/alerts/{alert_id}/unlink` · PATCH `/api/incidents/{incident_id}` | A | 8 ✅ | Link an alert by hand, unlink it (both with a reason; an unlinked alert is never linked back by the engine), rename (the title then stays) |
+| POST `/api/incidents/{incident_id}/assign` · `/api/incidents/{incident_id}/notes` · `/api/incidents/{incident_id}/evidence` | A | 8 ✅ | Assign (analysts/admins only, `null` unassigns); append-only note (1–10,000 characters; 201); pin/unpin an event or alert with a tag and comment. 409 on a closed incident |
+| POST `/api/incidents/{incident_id}/alerts` · `/api/incidents/{incident_id}/alerts/{alert_id}/unlink` · PATCH `/api/incidents/{incident_id}` | A | 8 ✅ | Link an alert by hand, unlink it (both with a reason; an unlinked alert is never linked back by the engine), rename (the title then stays) |
 | GET `/api/mitre/techniques` | V | 6 ✅ | The ATT&CK techniques (pinned v19.2) SentinelX rules map to, with the rules mapped to each. Implemented coverage only, not all of ATT&CK |
 | GET `/api/mitre/coverage?days=` | V | 11 ✅ | "Implemented coverage": all 15 ATT&CK tactics in order (with the techniques covered under each), every technique the library maps to with its rules (state, severity, indicator, reason, alerts in the period, last trigger), and a summary. `days` 1–365 (default 30) |
 | GET `/api/detections/metrics?days=` | V | 11 ✅ | Per rule, for the alerts it created in the period: open, confirmed, benign, false positives, closed, false-positive rate (null until one is closed), median time to triage and to close, detections and last match |
@@ -84,7 +83,8 @@ with every role plus an unauthenticated call.
 | GET `/api/hunt/saved` · GET `/api/hunt/saved/{hunt_id}` | V | 10 ✅ | Your saved hunts and those shared by others; each with `valid` and `problem` (a definition from an older version is flagged, never run). A private hunt of someone else is 404 |
 | POST `/api/hunt/saved` · PATCH · DELETE `/api/hunt/saved/{hunt_id}` | A (owner) | 10 ✅ | Save (201; name unique per owner, 409; at most 100 saved hunts per user, 409 beyond, Phase 14), change name, description, definition or `shared`, delete (204). Owner only (403). Audited `HUNT_SAVED` / `HUNT_UPDATED` / `HUNT_DELETED` with name, kind and sharing, never filter values |
 | GET/PATCH `/api/settings` | AD | 8 ✅ | Correlation window (15–1,440 min) and sequence window (5–240 min, not longer). Audited as `SETTINGS_CHANGED`. Internal networks stay environment configuration (reviewed with deployments) |
-| GET `/api/demo/scenarios` · POST `/api/demo/run` · POST `/api/demo/reset` | AD, only when `DEMO_ENABLED` | 16 | Simulated data |
 
-Open decision for Phase 16: whether VIEWER may run demo scenarios on a public demo instance.
-The default is no.
+The demo environment has no API routes: it is loaded and reset by an operator on the server
+(`python -m app.cli demo-load`, `scripts/demo_reset.sh`; [demo.md](demo.md)). The design
+first planned admin routes behind a `DEMO_ENABLED` setting. Phase 16 dropped them, because a
+reset replaces the whole database (ADR-0015), which an API request should not be able to do.

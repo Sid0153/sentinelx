@@ -10,7 +10,7 @@ raw logs: [ADR-0006](decisions/0006-simulated-demo-data.md).
 
 ## Load it
 
-With the stack running ([README](../README.md#run-it-locally)) and an admin created:
+With the stack running ([setup guide](setup.md)) and an admin created:
 
 ```bash
 docker compose exec backend python -m app.cli demo-load

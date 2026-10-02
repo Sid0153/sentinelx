@@ -435,7 +435,7 @@ def _list_scenarios() -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("check-config", help="Validate settings and database access")
@@ -491,7 +491,11 @@ def main(argv: list[str] | None = None) -> int:
     detect = subcommands.add_parser("run-detection", help="Run the enabled rules over a range")
     detect.add_argument("--from", dest="start", required=True, help="ISO 8601 with a zone")
     detect.add_argument("--to", dest="end", required=True, help="ISO 8601 with a zone")
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     if args.command == "check-config":
         return _check_config()
     if args.command == "export-openapi":

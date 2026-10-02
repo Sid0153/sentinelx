@@ -1,7 +1,7 @@
 # Database design
 
-> Status: tables marked ✅ exist (migrations 0001–0007) and are tested; the rest are design and
-> are created in the phase shown. PostgreSQL 16. UUID primary keys (generated in the app)
+> Status: every table below exists (migrations 0001–0014) and is tested; the Phase column says
+> when it was added. PostgreSQL 16. UUID primary keys (generated in the app)
 > unless noted. All timestamps are `timestamptz`, stored in UTC. A test compares the SQLAlchemy
 > models with the migrated database and fails on any difference.
 
@@ -86,8 +86,9 @@ Phase 5.
 - **Append-only triggers** reject UPDATE and DELETE (per row) and TRUNCATE (per statement) on
   `audit_logs`, `raw_events`, `events`, `detection_rule_versions`, `incident_notes`,
   `incident_evidence` and `incident_activity`. They share one trigger function,
-  `reject_modification()`. How the demo is reset (Phase 16) will be designed without
-  weakening this ([ADR-0010](decisions/0010-evidence-storage.md)).
+  `reject_modification()`. The demo reset (Phase 16) does not weaken this: it replaces the
+  whole database ([ADR-0010](decisions/0010-evidence-storage.md),
+  [ADR-0015](decisions/0015-demo-environment-reset.md)).
 - The partial unique index `alerts(dedup_key) WHERE status IN ('NEW','TRIAGED','IN_PROGRESS')`
   makes "one active alert per key" a database guarantee, not just application logic.
 - `incident_alerts(alert_id)` is unique.

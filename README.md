@@ -1,94 +1,135 @@
 # SentinelX
 
-Security operations platform for detection, correlation, threat hunting and incident response.
+A security operations platform: it ingests security logs, detects attacks with explainable
+rules, correlates alerts into incidents, and gives analysts one place to investigate, hunt
+and record what they did.
 
-> **Status: Phase 16 (demo environment) complete.** Sign-in and roles, the audit log,
-> the asset and identity inventory, ingestion of five log formats into an append-only event
-> store, detection (9 rules mapped to ATT&CK v19.2), alerts (deduplicated, prioritized,
-> explained), and **incidents**: related alerts correlated into one investigation with a
-> stated reason for every link, a timeline rebuilt from stored events, notes, pinned evidence,
-> assignment and a status workflow (`/incidents`), and the **SOC dashboard**, event explorer,
-> asset, identity and detection-rule pages, and **threat hunting** (`/hunt`: structured
-> queries, reviewed templates, pivots, saved hunts), per-rule outcome metrics and an
-> implemented ATT&CK coverage view (`/coverage`), and a detection testing playground
-> (`/playground`), rule version comparison, time-boxed suppressions and a grouped alert queue.
-> Security review (Phase 13): least-privilege database role, per-source ingest keys for log
-> shippers, backend body limits, query-free proxy logs; then two-factor sign-in, admin password
-> reset, a hash-chained audit log, TLS to the database and shared rate limits; see
-> [docs/security.md](docs/security.md). Measured on 1 million generated records (Phase 14):
-> 713 records/s through the full pipeline on a laptop, flat as the data grows; paged reads at
-> 8–27 ms; numbers, method
-> and limits in [docs/performance.md](docs/performance.md).
-> [docs/roadmap.md](docs/roadmap.md) tracks what is built and what is not.
+> **Status: Phases 1–17 complete** ([roadmap](docs/roadmap.md)). Every feature of the brief is
+> mapped to its phase and status in [feature-coverage.md](docs/feature-coverage.md).
+> It is a **defensive** tool built as a portfolio project. Every attack it has seen is
+> SIMULATED: generated log records of a fictional company, sent through the real pipeline and
+> labelled as such everywhere. It has not been run against a real environment's logs.
 
-SentinelX is designed to:
-- ingest security logs: Linux auth.log, Windows security events (JSON), web access logs,
-  application JSON, generic JSON
-- parse and normalize them into one event model, keeping the raw record as evidence
-- enrich events with asset and identity context
-- run declarative detection rules (single-event, threshold, distinct-count, sequence,
-  new-value)
-- deduplicate and prioritize the resulting alerts
-- correlate alerts into incidents with a stated reason for every link
-- give analysts an investigation workspace (timeline, evidence, notes, ATT&CK mapping,
-  response guidance) and a threat-hunting interface
-- audit every security-relevant action
+![The incident workspace: four alerts correlated into one incident, each link with its reason, the risk breakdown and the timeline](docs/screenshots/incident-detail.png)
 
-It is a **defensive** tool. All attack scenarios are simulated log records sent through the
-normal pipeline. There is no offensive capability of any kind.
+## What it does
 
-## Run it locally
+```mermaid
+flowchart LR
+    logs["Security logs<br/>Linux, Windows, web,<br/>JSON"] --> ingest["Ingest<br/>parse, normalize,<br/>enrich"]
+    ingest --> store[("Append-only<br/>evidence")]
+    store --> detect["Detect<br/>9 rules,<br/>ATT&CK-mapped"]
+    detect --> alerts["Alerts<br/>deduplicated,<br/>prioritized"]
+    alerts --> incidents["Incidents<br/>correlated with<br/>a reason per link"]
+    incidents --> analyst["Analyst<br/>investigate, hunt,<br/>respond"]
+    analyst --> audit[("Hash-chained<br/>audit log")]
+```
 
-Requirements: Docker with Compose v2.
+- **Ingestion**: five formats (Linux auth.log, Windows Security events as JSON, nginx/Apache
+  access logs, application JSON, generic JSON). Formats come in through an API with
+  per-source keys, a file or the demo generator. Every raw record is kept as exact bytes,
+  even when it fails to parse ([event-model.md](docs/event-model.md)).
+- **Detection**: nine reviewed YAML rules using five evaluator kinds: single event,
+  threshold, distinct count, sequence and new value. The rules cover brute force, password
+  spraying, distributed brute force, success after failures, logons from new networks, sudo
+  root shells, privileged account creation, suspicious command lines and port scans. Every
+  detection explains itself in a sentence and maps to MITRE ATT&CK v19.2
+  ([detection-engine.md](docs/detection-engine.md), [mitre.md](docs/mitre.md)).
+- **Alerts**: one open alert per activity (deduplicated by evidence), ordered by a
+  transparent priority score (severity, confidence, asset criticality, privileged
+  accounts), with a status workflow and false-positive tracking
+  ([risk-model.md](docs/risk-model.md)).
+- **Incidents**: alerts that share a host and account, a host and source, or an outside
+  address are linked into one incident, each link with its reason. The timeline is rebuilt
+  from the stored events. Analysts can add notes and pin evidence, assign the incident and
+  move it through its statuses ([correlation.md](docs/correlation.md)).
+- **Threat hunting**: structured queries over the event store, reviewed templates, pivots
+  from any value, saved and shared hunts ([threat-hunting.md](docs/threat-hunting.md)).
+- **Detection engineering**: a playground to test a rule on sample lines, version history
+  and comparison, admin tuning within each rule's bounds, time-boxed suppressions, and an
+  implemented ATT&CK coverage view.
+- **Security**:
+  - Argon2id passwords, optional TOTP two-factor sign-in and role-based access enforced by
+    the backend (viewer, analyst, admin).
+  - Every security-relevant action audited in a hash-chained, append-only log.
+  - TLS to the database, a least-privilege database role, and hardened containers
+    ([security.md](docs/security.md)).
+
+## Screenshots
+
+From the demo environment (SIMULATED data), taken with `scripts/screenshots.mjs`.
+
+| | |
+|---|---|
+| ![SOC dashboard](docs/screenshots/dashboard.png) **Dashboard**: open work, top rules and sources, trends | ![Alert queue](docs/screenshots/alerts.png) **Alerts**: ordered by priority score |
+| ![Alert detail](docs/screenshots/alert-detail.png) **Alert**: explanation, evidence, priority breakdown, ATT&CK, response steps | ![Incident queue](docs/screenshots/incidents.png) **Incidents**: by risk |
+| ![Threat hunting](docs/screenshots/hunt.png) **Hunt**: everything one outside address did this week | ![Detection playground](docs/screenshots/playground.png) **Playground**: why a rule fires on sample lines |
+| ![Detection rules](docs/screenshots/detections.png) **Detections**: the rule library and its health | ![ATT&CK coverage](docs/screenshots/coverage.png) **Coverage**: implemented ATT&CK coverage |
+| ![Audit log](docs/screenshots/audit.png) **Audit log**: hash chain verified | ![Incident on a phone](docs/screenshots/incident-phone.png) **Phone width** |
+
+## Quick start
+
+Requirements: Docker with Compose v2. Full guide: [docs/setup.md](docs/setup.md).
 
 ```bash
+git clone https://github.com/Sid0153/sentinelx.git && cd sentinelx
 cp .env.example .env
-# set POSTGRES_PASSWORD (openssl rand -hex 24) and SECRET_KEY (openssl rand -hex 32) in .env
+# fill in POSTGRES_PASSWORD and APP_DB_PASSWORD (openssl rand -hex 24) and SECRET_KEY (openssl rand -hex 32)
 docker compose up -d --build --wait
+docker compose exec backend python -m app.cli create-admin --email you@example.com
+docker compose exec backend python -m app.cli demo-load
 ```
 
-- Create the first admin (there is no self-registration; the password is prompted, hidden):
-  `docker compose exec backend python -m app.cli create-admin --email you@example.com`
-- App: http://localhost:8081 (sign in, then: system status, users, audit log, account)
-- API health: http://localhost:8081/api/health · readiness: http://localhost:8081/api/ready
-- API docs (development only): http://localhost:8001/api/docs
-- Load the demo environment: a fictional company, three days of SIMULATED activity and one
-  example of every attack scenario (15 alerts, 5 incidents; [docs/demo.md](docs/demo.md)).
-  `scripts/demo_reset.sh` puts it back to the start, keeping the accounts:
+Open http://localhost:8081 and sign in. The demo is a fictional company with three days of
+ordinary activity and one example of every attack scenario: about 1,040 records, 15 alerts
+and 5 incidents. [docs/demo.md](docs/demo.md) walks through a demonstration;
+`scripts/demo_reset.sh` starts it over and keeps the accounts.
 
-  ```bash
-  docker compose exec backend python -m app.cli demo-load
-  ```
+Every port is bound to 127.0.0.1: 8081 (the app), 8001 (the API directly, with its docs at
+`/api/docs` in development) and 5433 (PostgreSQL). The production configuration (https,
+production settings, only the site published) and backups:
+[docs/deployment.md](docs/deployment.md).
 
-- Ingest one simulated scenario (marked SIMULATED everywhere) or a real log file:
+## Architecture
 
-  ```bash
-  docker compose exec backend python -m app.cli create-source --name web-01-auth --type linux_auth
-  docker compose exec backend python -m app.cli demo-scenarios
-  docker compose exec backend python -m app.cli demo-ingest --scenario brute_force_success       --source web-01-auth --host web-01 --user root --source-ip 203.0.113.45 --count 12
-  curl -X POST http://localhost:8081/api/ingest/<source-id> -H "Authorization: Bearer <token>"        -H "Content-Type: text/plain" --data-binary @auth.log
-  ```
+A modular monolith: one FastAPI backend, one React single-page app behind nginx, and one
+PostgreSQL database, run with Docker Compose. Ingestion stores evidence in its own
+transaction, so detection can never lose it. Detection then re-reads its windows from the
+database, which makes it stateless and safe to re-run. Alerts and correlation happen in the
+same transaction as detection, so a batch's results appear all at once or not at all.
+[docs/architecture.md](docs/architecture.md) has the diagrams, the module boundaries, the
+pipeline and its failure modes. [docs/future-architecture.md](docs/future-architecture.md)
+covers how it would scale and connect to real sources, and what would trigger each step.
+The decisions and their alternatives are in [docs/decisions/](docs/decisions/README.md)
+(15 ADRs).
 
-- Detection runs after every batch (the demo-ingest output ends with
-  `PROCESSED, 2 detections` for the scenario above). The rules are loaded at start-up; to see
-  them, their ATT&CK mapping and the stored runs, or to re-run detection over a time range:
+## API
 
-  ```bash
-  curl http://localhost:8081/api/detections -H "Authorization: Bearer <token>"
-  curl http://localhost:8081/api/detections/runs -H "Authorization: Bearer <token>"
-  docker compose exec backend python -m app.cli run-detection --from 2026-09-26T00:00:00+00:00 --to 2026-09-27T00:00:00+00:00
-  ```
+REST under `/api`, every route behind a role checked by the backend. The route table and
+roles are in [docs/api.md](docs/api.md), and the OpenAPI document is
+[docs/openapi.json](docs/openapi.json) (a test fails if it is stale). A test also fails if a
+route is missing from the access table. Log shippers post batches to
+`POST /api/ingest/{source_id}` with that source's `X-Ingest-Key`.
 
-**Production configuration** (https, production settings, only the site published) and
-backups: [docs/deployment.md](docs/deployment.md).
+## Testing
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
-scripts/backup.sh
-```
+- **Backend**: 1,370 tests at 98% line coverage. API and integration tests run on a real
+  PostgreSQL, not a mock. They cover parsers against malformed input, each rule on its
+  scenario, real concurrency, query budgets, the RBAC table and the audit chain.
+- **Frontend**: 116 tests with coverage floors.
+- **CI**: on every push, lint, types, dependency audits, a secret scan and an image
+  vulnerability scan. It also starts the development stack and the production configuration
+  (over https) and runs end-to-end scripts, a backup and restore, and a demo load and reset.
 
-Every port is bound to 127.0.0.1. The host ports (5433, 8001, 8081) are chosen so the stack
-can run next to others that use the usual 5432, 8000 and 8080.
+Strategy: [docs/testing.md](docs/testing.md). Measured performance on 1 million generated
+records (713 records/s through the full pipeline, paged reads in 8–27 ms):
+[docs/performance.md](docs/performance.md).
+
+## Limitations
+
+A lab-scale platform, not a SIEM: one host, five log formats, nine rules, simulated data
+only, no retention policy, no lateral-movement correlation, no notifications. The full list,
+with reasons: [docs/limitations.md](docs/limitations.md).
 
 ## Develop
 
@@ -99,7 +140,7 @@ python -m venv .venv
 .venv/Scripts/activate            # Windows; on Linux/macOS: source .venv/bin/activate
 pip install --require-hashes -r requirements-dev.txt
 docker compose up -d db           # from the repository root
-# create a scratch database once: docker compose exec db psql -U sentinelx -c "CREATE DATABASE sentinelx_test"
+# once: docker compose exec db psql -U sentinelx -c "CREATE DATABASE sentinelx_test"
 export TEST_DATABASE_URL=postgresql+psycopg://sentinelx:PASSWORD@127.0.0.1:5433/sentinelx_test
 ruff check . && mypy && pytest --cov=app
 ```
@@ -112,21 +153,24 @@ proxies `/api` to the Compose backend), `npm test`, `npm run lint`, `npm run typ
 
 | Document | Contents |
 |---|---|
-| [feature-coverage.md](docs/feature-coverage.md) | **Every feature of the brief, its phase and its status** |
-| [architecture.md](docs/architecture.md) | System shape, modules, pipeline, failure modes, frontend, observability, scale limits, extension plan |
+| [setup.md](docs/setup.md) | **Setup guide**: install, first admin, demo, sending your own logs, troubleshooting |
+| [demo.md](docs/demo.md) | **Demo guide**: the company, the story and its expected results, a walkthrough, reset |
+| [feature-coverage.md](docs/feature-coverage.md) | Every feature of the brief, its phase and its status |
+| [architecture.md](docs/architecture.md) | Diagrams, modules, pipeline, failure modes, frontend, observability, scale limits |
+| [future-architecture.md](docs/future-architecture.md) | Queue, parallel detection, partitioning, search, more sources, HA, and what triggers each |
+| [limitations.md](docs/limitations.md) | What SentinelX does not do, in one place |
 | [event-model.md](docs/event-model.md) | Normalized schema, supported sources, duplicates, enrichment |
 | [detection-engine.md](docs/detection-engine.md) | Rule format, evaluator kinds, the 9-rule library and its known weaknesses, alerts, dedup, workflow |
 | [correlation.md](docs/correlation.md) | Alert → incident correlation, incident lifecycle, timeline |
 | [threat-hunting.md](docs/threat-hunting.md) | Structured hunt queries, templates, pivoting, limits |
-| [risk-model.md](docs/risk-model.md) | SentinelX priority score (project-specific, not an industry standard) |
 | [mitre.md](docs/mitre.md) | ATT&CK mappings, verified against attack.mitre.org (v19.2) |
+| [risk-model.md](docs/risk-model.md) | SentinelX priority score (project-specific, not an industry standard) |
+| [security.md](docs/security.md) | Authentication, RBAC, audit, the Phase 13 review, threat model, residual risks |
+| [api.md](docs/api.md) | Routes and roles |
 | [database-schema.md](docs/database-schema.md) | Tables, integrity rules, indexes |
-| [api.md](docs/api.md) | Routes and roles (implemented and planned) |
-| [security.md](docs/security.md) | Auth, RBAC, audit, threat model |
 | [testing.md](docs/testing.md) | Test strategy |
 | [performance.md](docs/performance.md) | Measured throughput and read latency on 1 million records |
 | [deployment.md](docs/deployment.md) | Production configuration, TLS, configuration reference, backup and restore, upgrades |
-| [demo.md](docs/demo.md) | The demo environment: the company, the story and its expected results, a walkthrough, reset |
 | [decisions/](docs/decisions/README.md) | Architecture decision records |
 | [repository-assessment.md](docs/repository-assessment.md) | What existed before SentinelX, and what was reused from CloudSentinel |
 
