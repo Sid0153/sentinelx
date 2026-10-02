@@ -10,6 +10,7 @@ line and the first failure exits non-zero. All records are synthetic (RFC 5737 a
 import json
 import secrets
 import sys
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -54,7 +55,14 @@ class Client:
 
 def main(base: str, email: str, password: str) -> None:
     client = Client(base)
-    status, body = client.json("POST", "/api/auth/login", {"email": email, "password": password})
+    credentials = {"email": email, "password": password}
+    for _ in range(3):
+        status, body = client.json("POST", "/api/auth/login", credentials)
+        if status != 429:
+            break
+        # The other smoke scripts may have used this address's sign-in budget (10 per minute).
+        print("     (sign-in rate limit reached; waiting for the window to pass)")
+        time.sleep(61)
     check(status == 200, "sign in as admin", status)
     client.token = body["access_token"]
 
