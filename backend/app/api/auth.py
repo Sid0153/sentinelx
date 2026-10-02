@@ -10,10 +10,13 @@ from app.auth import account
 from app.auth.deps import CurrentUser
 from app.auth.passwords import hash_password, verify_password
 from app.auth.service import (
+    GuestUnavailableError,
     InvalidCredentialsError,
     InvalidRefreshTokenError,
     MfaRequiredError,
     authenticate,
+    authenticate_guest,
+    is_guest,
     revoke_all_for_user,
     revoke_refresh_token,
     rotate_session,
@@ -26,6 +29,7 @@ from app.core.rate_limit import RateLimiter
 from app.models.refresh_token import RevokedReason
 from app.models.user import User
 from app.schemas.auth import (
+    AuthOptions,
     ChangePasswordRequest,
     LoginRequest,
     MfaCode,
@@ -68,12 +72,22 @@ def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
     )
 
 
+def _public(user: User, settings: Settings) -> UserPublic:
+    return UserPublic.model_validate(user).model_copy(update={"is_guest": is_guest(user, settings)})
+
+
 def _token_response(access_token: str, user: User, settings: Settings) -> TokenResponse:
     return TokenResponse(
         access_token=access_token,
         expires_in=settings.access_token_expire_minutes * 60,
-        user=UserPublic.model_validate(user),
+        user=_public(user, settings),
     )
+
+
+def _not_guest(user: User, settings: Settings) -> None:
+    """The guest account is shared by every visitor: nobody may lock the others out of it."""
+    if is_guest(user, settings):
+        raise AppError(403, "The shared guest account cannot change its sign-in settings")
 
 
 def _check_login_rate(request: Request, db: DbSession) -> None:
@@ -124,6 +138,33 @@ def login(
     return _token_response(access_token, user, settings)
 
 
+@router.get("/options", response_model=AuthOptions)
+def options(settings: SettingsDep) -> AuthOptions:
+    """Public: whether the sign-in page offers "Explore as guest"."""
+    return AuthOptions(guest_access=settings.guest_email is not None)
+
+
+@router.post("/guest", response_model=TokenResponse, responses=error_responses(403, 404, 429))
+def guest_login(
+    request: Request, response: Response, db: DbSession, settings: SettingsDep
+) -> TokenResponse:
+    """Signs in as the shared, read-only guest account (only when GUEST_EMAIL is set).
+
+    No password: the account is public by design and can only read. The login rate limit
+    applies as for a normal sign-in."""
+    if settings.guest_email is None:
+        raise AppError(404, "Guest access is off")
+    _check_login_rate(request, db)
+    try:
+        user = authenticate_guest(db, settings)
+    except GuestUnavailableError:
+        logger.error("auth.guest_unavailable")
+        raise AppError(403, "Guest access is not available") from None
+    access_token, refresh_token = start_session(db, user, settings)
+    _set_refresh_cookie(response, refresh_token, settings)
+    return _token_response(access_token, user, settings)
+
+
 @router.post("/refresh", response_model=TokenResponse, responses=error_responses(401))
 def refresh(
     request: Request, response: Response, db: DbSession, settings: SettingsDep
@@ -158,19 +199,20 @@ def logout(request: Request, db: DbSession, settings: SettingsDep) -> Response:
 
 
 @router.get("/me", response_model=UserPublic, responses=error_responses(401))
-def me(user: CurrentUser) -> UserPublic:
-    return UserPublic.model_validate(user)
+def me(user: CurrentUser, settings: SettingsDep) -> UserPublic:
+    return _public(user, settings)
 
 
 @router.post(
     "/change-password",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses=error_responses(400, 401),
+    responses=error_responses(400, 401, 403),
 )
 def change_password(
     payload: ChangePasswordRequest, user: CurrentUser, db: DbSession, settings: SettingsDep
 ) -> Response:
     """Ends every session of the user, including this one: all devices sign in again."""
+    _not_guest(user, settings)
     if not verify_password(user.password_hash, payload.current_password):
         record(
             db,
@@ -203,20 +245,22 @@ def change_password(
     return response
 
 
-@router.post("/mfa/setup", response_model=MfaSetup, responses=error_responses(401, 409))
+@router.post("/mfa/setup", response_model=MfaSetup, responses=error_responses(401, 403, 409))
 def mfa_setup(user: CurrentUser, db: DbSession, settings: SettingsDep) -> MfaSetup:
     """Step 1 of turning on two-factor sign-in: a new secret for the authenticator app."""
+    _not_guest(user, settings)
     secret, uri = account.start_mfa_setup(db, user, settings)
     return MfaSetup(secret=secret, otpauth_uri=uri)
 
 
 @router.post(
-    "/mfa/enable", response_model=MfaRecoveryCodes, responses=error_responses(400, 401, 409)
+    "/mfa/enable", response_model=MfaRecoveryCodes, responses=error_responses(400, 401, 403, 409)
 )
 def mfa_enable(
     payload: MfaCode, user: CurrentUser, db: DbSession, settings: SettingsDep
 ) -> MfaRecoveryCodes:
     """Step 2: a code from the app proves it is set up. Returns recovery codes, once."""
+    _not_guest(user, settings)
     return MfaRecoveryCodes(recovery_codes=account.enable_mfa(db, user, payload.code, settings))
 
 

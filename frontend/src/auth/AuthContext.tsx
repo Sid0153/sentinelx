@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { currentUser, login, logout, restoreSession, type SecondFactor } from "../services/auth";
+import { currentUser, guestLogin, login, logout, restoreSession, type SecondFactor } from "../services/auth";
 import { onSessionExpired } from "../services/http";
 import type { Role, User } from "../types/api";
 
@@ -20,6 +20,8 @@ type AuthState =
 interface AuthContextValue {
   state: AuthState;
   signIn: (email: string, password: string, second?: SecondFactor) => Promise<void>;
+  /** A public demo's read-only guest (only when the server offers it). */
+  signInAsGuest: () => Promise<void>;
   signOut: (reason?: "signed_out" | "password_changed") => Promise<void>;
   /** Reloads the signed-in user (after turning two-factor sign-in on or off). */
   reloadUser: () => Promise<void>;
@@ -58,6 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: "authenticated", user });
   }, []);
 
+  const signInAsGuest = useCallback(async () => {
+    const user = await guestLogin();
+    setState({ status: "authenticated", user });
+  }, []);
+
   const reloadUser = useCallback(async () => {
     const user = await currentUser();
     setState({ status: "authenticated", user });
@@ -73,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ state, signIn, signOut, reloadUser }),
-    [state, signIn, signOut, reloadUser],
+    () => ({ state, signIn, signInAsGuest, signOut, reloadUser }),
+    [state, signIn, signInAsGuest, signOut, reloadUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

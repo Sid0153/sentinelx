@@ -94,3 +94,28 @@ def test_role_names_and_passwords_are_checked(db_engine: Engine) -> None:
             setup_app_role(connection, 'app"; DROP TABLE users; --', "a-long-test-password-123")
         with pytest.raises(ValueError, match="16 characters"):
             setup_app_role(connection, "sx_app", "short")
+
+
+def test_an_existing_role_with_more_rights_is_refused(db_engine: Engine) -> None:
+    """On a later start only the password is updated (a hosted owner may not restate
+    attributes): the role's rights are checked instead, and a powerful role is never used."""
+    role = f"sx_app_{uuid.uuid4().hex[:8]}"
+    with db_engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            connection.execute(text(f'CREATE ROLE "{role}" LOGIN CREATEDB'))
+            with pytest.raises(ValueError, match="rights beyond rows"):
+                setup_app_role(connection, role, "a-long-test-password-123")
+        finally:
+            transaction.rollback()
+
+
+def test_setting_up_again_only_changes_the_password(db_engine: Engine) -> None:
+    role = f"sx_app_{uuid.uuid4().hex[:8]}"
+    with db_engine.connect() as connection:
+        transaction = connection.begin()
+        try:
+            first = setup_app_role(connection, role, "a-long-test-password-123")
+            assert setup_app_role(connection, role, "another-long-password-456") == first
+        finally:
+            transaction.rollback()

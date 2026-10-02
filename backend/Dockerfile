@@ -27,6 +27,6 @@ USER app
 EXPOSE 8000
 
 HEALTHCHECK --interval=15s --timeout=3s --start-period=30s --retries=5 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/ready', timeout=2)" || exit 1
+    CMD python -c "import os, urllib.request as r; r.urlopen('http://127.0.0.1:%s/api/ready' % os.environ.get('PORT', '8000'), timeout=2)" || exit 1
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

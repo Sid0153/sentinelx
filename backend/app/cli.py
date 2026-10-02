@@ -17,6 +17,8 @@
         [--host web-01] [--user root] [--source-ip 203.0.113.45] [--count 12] [--interval 3]
     python -m app.cli demo-load [--start 2026-09-25T12:00:00Z]  # the whole demo environment
     python -m app.cli demo-status      # exit 3 if the database holds real (non-simulated) records
+    python -m app.cli demo-load --if-empty  # load only into an empty database (entrypoint)
+    python -m app.cli ensure-guest     # the read-only guest of a public demo (GUEST_EMAIL)
 
 There is no public registration: the first ADMIN is created here, and admins create everyone
 else. The password is read from a hidden prompt (or SENTINELX_ADMIN_PASSWORD for automation),
@@ -232,13 +234,20 @@ def _parse_anchor(value: str) -> tuple[int, str] | None:
     return int(seq), digest
 
 
-def _demo_load(start: str | None, previous_head: str | None) -> int:
+def _demo_load(start: str | None, previous_head: str | None, if_empty: bool = False) -> int:
     from datetime import UTC, datetime
 
     from app.core.config import get_settings
     from app.database.session import get_session_factory
     from app.demo.environment import default_anchor
-    from app.demo.loader import load
+    from app.demo.loader import load, status
+
+    if if_empty:
+        with get_session_factory()() as db:
+            current = status(db)
+        if current.simulated_records or current.real_records:
+            print("Demo not loaded: the database already holds records")
+            return 0
 
     now = datetime.now(UTC)
     try:
@@ -275,6 +284,38 @@ def _demo_load(start: str | None, previous_head: str | None) -> int:
         f"{report.records} records ({report.duplicates} already stored), "
         f"{report.alerts_created} new alerts, {report.incidents_created} new incidents"
     )
+    return 0
+
+
+def _ensure_guest() -> int:
+    """Creates the public demo's guest account (GUEST_EMAIL) as a VIEWER, with a random
+    password nobody knows: guests sign in through POST /api/auth/guest only."""
+    import secrets
+
+    from app.core.config import get_settings
+    from app.database.session import get_session_factory
+    from app.models.user import Role
+    from app.users.service import create_user, get_user_by_email
+
+    email = get_settings().guest_email
+    if email is None:
+        print("GUEST_EMAIL is not set: no guest account", file=sys.stderr)
+        return 1
+    with get_session_factory()() as db:
+        existing = get_user_by_email(db, email)
+        if existing is None:
+            create_user(db, email, secrets.token_urlsafe(32), Role.VIEWER)
+            print(f"Guest account {email} created (VIEWER, read-only)")
+            return 0
+        if existing.role != Role.VIEWER or not existing.is_active:
+            # Never hand an analyst's or admin's account to every visitor.
+            print(
+                f"GUEST_EMAIL names an account that is not an active VIEWER ({existing.role}); "
+                "guest access stays unavailable",
+                file=sys.stderr,
+            )
+            return 1
+    print(f"Guest account {email} ready (VIEWER, read-only)")
     return 0
 
 
@@ -473,6 +514,14 @@ def build_parser() -> argparse.ArgumentParser:
     demo_load.add_argument(
         "--previous-audit-head", help="SEQ:HASH of the replaced audit log (scripts/demo_reset.sh)"
     )
+    demo_load.add_argument(
+        "--if-empty",
+        action="store_true",
+        help="Load only if the database holds no records yet (a hosted demo's first start)",
+    )
+    subcommands.add_parser(
+        "ensure-guest", help="Create the public demo's read-only guest account (GUEST_EMAIL)"
+    )
     subcommands.add_parser(
         "demo-status", help="Count simulated and real records (exit 3 if any are real)"
     )
@@ -511,7 +560,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "demo-scenarios":
         return _list_scenarios()
     if args.command == "demo-load":
-        return _demo_load(args.start, args.previous_audit_head)
+        return _demo_load(args.start, args.previous_audit_head, args.if_empty)
+    if args.command == "ensure-guest":
+        return _ensure_guest()
     if args.command == "demo-status":
         return _demo_status()
     if args.command == "seed-rules":

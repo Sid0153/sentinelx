@@ -39,5 +39,7 @@ def test_nothing_documented_that_does_not_exist() -> None:
     known = {name.upper() for name in Settings.model_fields}
     for name in ("docker-compose.yml", "docker-compose.prod.yml", ".env.example"):
         known |= set(re.findall(r"[A-Z][A-Z0-9_]{2,}", (ROOT / name).read_text(encoding="utf-8")))
-    known |= {"PORT", "COMPOSE_FILE"}  # docker-entrypoint.sh; the shell variable Compose reads
+    entrypoint = (ROOT / "backend" / "docker-entrypoint.sh").read_text(encoding="utf-8")
+    known |= set(re.findall(r"\$\{([A-Z][A-Z0-9_]*)", entrypoint))  # PORT, DEMO_AUTOLOAD, ...
+    known |= {"COMPOSE_FILE"}  # the shell variable Compose reads
     assert DOCUMENTED - known == set()

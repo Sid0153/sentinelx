@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
 import { Button, ErrorMessage, Field, inputClass } from "../components/ui";
+import { authOptions } from "../services/auth";
 import { ApiError } from "../services/http";
 
 interface LocationState {
@@ -27,7 +28,7 @@ function messageFor(error: unknown, codeStep: boolean): string {
 }
 
 export function LoginPage() {
-  const { state, signIn } = useAuth();
+  const { state, signIn, signInAsGuest } = useAuth();
   const location = useLocation();
   const { from, reason } = (location.state ?? {}) as LocationState;
   const [email, setEmail] = useState("");
@@ -38,6 +39,18 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [guestAccess, setGuestAccess] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Only a public demo offers it; if the question fails, the page simply does not.
+    authOptions()
+      .then((options) => !cancelled && setGuestAccess(options.guest_access))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (state.status === "authenticated") {
     // Only same-app paths: a crafted "from" must not send the user to another site.
@@ -68,6 +81,22 @@ export function LoginPage() {
         if (codeStep) setCode("");
         else setPassword("");
       }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function onGuest() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signInAsGuest();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError && caught.status === 429
+          ? "Too many attempts. Wait a minute and try again."
+          : "Guest access is not available right now.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -155,6 +184,17 @@ export function LoginPage() {
             {submitting ? "Signing in…" : codeStep ? "Verify" : "Sign in"}
           </Button>
         </form>
+        {guestAccess && !codeStep && (
+          <div className="mt-4 space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm">
+            <p className="text-slate-300">
+              This is a public demo. Every record in it is <strong>simulated</strong>: a fictional
+              company, attacked on paper.
+            </p>
+            <Button type="button" variant="secondary" disabled={submitting} onClick={onGuest} className="w-full">
+              Explore as guest (read-only)
+            </Button>
+          </div>
+        )}
         <p className="mt-4 text-center text-xs text-slate-400">
           Accounts are created by an administrator. There is no self-registration.
         </p>

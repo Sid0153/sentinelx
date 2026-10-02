@@ -32,6 +32,9 @@ class UserPublic(BaseModel):
     last_login_at: datetime | None
     mfa_enabled: bool = False
     must_change_password: bool = False
+    # The shared, read-only account of a public demo (GUEST_EMAIL): its sign-in settings
+    # cannot be changed, and the app says it is a guest.
+    is_guest: bool = False
 
 
 class UserCreate(BaseModel):

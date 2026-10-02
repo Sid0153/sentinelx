@@ -1,4 +1,4 @@
-import type { MfaSetup, TokenResponse, User } from "../types/api";
+import type { AuthOptions, MfaSetup, TokenResponse, User } from "../types/api";
 import { apiRequest, refreshSession, tokenStore } from "./http";
 
 /** The second step of a two-factor sign-in: a code from the app, or a recovery code. */
@@ -14,6 +14,18 @@ export async function login(email: string, password: string, second: SecondFacto
     body: { email, password, ...second },
     anonymous: true,
   });
+  tokenStore.set(data.access_token);
+  return data.user;
+}
+
+/** Whether this deployment offers "Explore as guest" (a public demo). */
+export function authOptions(): Promise<AuthOptions> {
+  return apiRequest<AuthOptions>("/auth/options", { anonymous: true });
+}
+
+/** Signs in as the shared, read-only guest of a public demo. No password. */
+export async function guestLogin(): Promise<User> {
+  const data = await apiRequest<TokenResponse>("/auth/guest", { method: "POST", anonymous: true });
   tokenStore.set(data.access_token);
   return data.user;
 }

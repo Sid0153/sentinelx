@@ -96,6 +96,12 @@ update the doc (and add an ADR for decisions) in the same change.
   or rule must be updated in every document that names it. `api.md` must list every route
   with its full path. Screenshots come from `scripts/screenshots.mjs` on a throwaway stack
   with the demo loaded and a throwaway account (its email appears in the pictures).
+- Free public deployment (`render.yaml`, docs/deployment.md): Render + Neon, as CloudSentinel.
+  The guest (`GUEST_EMAIL`) must stay a VIEWER: notes and activity are append-only, so a
+  writing guest would leave permanent text for other visitors. `scripts/hosted_check.sh` (CI job
+  "hosted") rehearses it at 512 MB / 0.1 CPU against a non-superuser owner like Neon's: keep
+  role setup free of statements only a superuser may run. `tests/unit/test_render_blueprint.py`
+  keeps render.yaml consistent.
 - Restores go into an empty database (`scripts/restore.sh`): never load data into a migrated
   database, or the audit chain is recomputed and the daily summaries count twice.
 - Every image must pass `trivy image --severity HIGH,CRITICAL --ignore-unfixed` (CI). The

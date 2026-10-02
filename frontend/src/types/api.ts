@@ -43,6 +43,12 @@ export interface User {
   last_login_at: string | null;
   mfa_enabled: boolean;
   must_change_password: boolean; // after an admin reset: nothing else works until changed
+  is_guest?: boolean; // the shared, read-only account of a public demo
+}
+
+/** What the sign-in page may offer (GET /api/auth/options, public). */
+export interface AuthOptions {
+  guest_access: boolean;
 }
 
 export interface TokenResponse {

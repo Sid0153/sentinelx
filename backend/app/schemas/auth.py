@@ -19,6 +19,12 @@ class LoginRequest(BaseModel):
         return value.strip().lower()
 
 
+class AuthOptions(BaseModel):
+    """What the sign-in page may offer (public)."""
+
+    guest_access: bool
+
+
 class TokenResponse(BaseModel):
     access_token: str
     expires_in: int  # seconds

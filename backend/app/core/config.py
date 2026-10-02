@@ -6,10 +6,11 @@ laptop but unsafe on a server are rejected when APP_ENV=production.
 """
 
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 from app.core.client_ip import Network, parse_networks
 
@@ -32,7 +33,10 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # json: one JSON object per line (containers, log shippers). text: readable local output.
     log_format: Literal["json", "text"] = "json"
-    database_url: str  # the application's least-privilege role (app/database/roles.py)
+    # The application's least-privilege role (app/database/roles.py). When unset, it is
+    # derived from MIGRATION_DATABASE_URL with APP_DB_USER and APP_DB_PASSWORD (a hosted
+    # database where only the owner's address is given, e.g. Neon on Render).
+    database_url: str
     # The database owner, for migrations and for setting up the application's role. Unset:
     # DATABASE_URL is used for both (local runs and tests, where one user does everything).
     migration_database_url: str | None = None
@@ -68,6 +72,40 @@ class Settings(BaseSettings):
 
     # Threat hunting: each hunt query is cancelled after this long (docs/threat-hunting.md).
     hunt_timeout_ms: int = Field(default=5000, ge=100, le=60_000)
+
+    # Public demo: the shared, read-only guest account. When set, POST /api/auth/guest signs
+    # visitors in as it without a password, and the startup creates it as a VIEWER.
+    guest_email: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _derive_app_database_url(cls, data: Any) -> Any:
+        """DATABASE_URL = MIGRATION_DATABASE_URL with the application role's credentials."""
+        if not isinstance(data, dict):
+            return data
+        values = {key.lower(): value for key, value in data.items()}
+        owner, user, password = (
+            values.get("migration_database_url"),
+            values.get("app_db_user"),
+            values.get("app_db_password"),
+        )
+        if values.get("database_url") or not (owner and user and password):
+            return data
+        try:
+            derived = make_url(owner).set(username=user, password=password)
+        except Exception:  # noqa: BLE001 (the URL validator below reports a bad URL)
+            return data
+        return {**data, "database_url": derived.render_as_string(hide_password=False)}
+
+    @field_validator("guest_email")
+    @classmethod
+    def _guest_email_is_an_address(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        value = value.strip().lower()
+        if "@" not in value or len(value) > 254:
+            raise ValueError("GUEST_EMAIL must be an email address")
+        return value
 
     @field_validator("internal_networks")
     @classmethod

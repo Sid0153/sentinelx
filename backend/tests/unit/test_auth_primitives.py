@@ -1,5 +1,6 @@
 """Passwords, access tokens, refresh tokens, rate limiting and client-IP resolution."""
 
+import ipaddress
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -205,3 +206,20 @@ def test_missing_peer_is_passed_through() -> None:
 def test_invalid_trusted_proxy_setting_is_rejected() -> None:
     with pytest.raises(ValueError):
         parse_networks("172.28.0.10/33")
+
+
+def test_named_proxy_groups_expand() -> None:
+    """Render's chain (docs/deployment.md): private addresses, Cloudflare, Render's proxy."""
+    networks = parse_networks("private, Cloudflare, 74.220.48.0/20")
+    assert ipaddress.ip_network("10.0.0.0/8") in networks
+    assert ipaddress.ip_network("104.16.0.0/13") in networks
+    assert ipaddress.ip_network("2606:4700::/32") in networks
+    assert networks[-1] == ipaddress.ip_network("74.220.48.0/20")
+
+
+def test_rightmost_visitor_behind_render_and_cloudflare() -> None:
+    """The chain measured on Render for CloudSentinel, same proxies: forged left entries,
+    the visitor, Cloudflare, Render's proxy, Cloudflare, Render internal."""
+    chain = "1.2.3.4, 203.0.113.9, 172.68.1.1, 74.220.48.5, 162.158.2.2"
+    trusted = parse_networks("private, cloudflare, 74.220.48.0/20")
+    assert resolve_client_ip("10.1.2.3", headers(chain), trusted) == "203.0.113.9"

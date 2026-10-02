@@ -42,14 +42,31 @@ def setup_app_role(connection: Connection, role: str, password: str) -> int:
     name = sql.Identifier(role)
     with raw.cursor() as cursor:
         cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
-        verb = sql.SQL("ALTER") if cursor.fetchone() else sql.SQL("CREATE")
+        exists = cursor.fetchone() is not None
         # Utility statements take no bound parameters: the password is quoted as a literal.
-        cursor.execute(
-            sql.SQL(
-                "{} ROLE {} WITH LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE "
+        if exists:
+            # Only the password (and login) changes. Restating NOSUPERUSER and the like is
+            # refused to an owner that is not a superuser itself (a hosted database such as
+            # Neon), even to keep the default; the attributes are checked below instead.
+            statement = sql.SQL("ALTER ROLE {} WITH LOGIN PASSWORD {}")
+        else:
+            statement = sql.SQL(
+                "CREATE ROLE {} WITH LOGIN PASSWORD {} NOSUPERUSER NOCREATEDB NOCREATEROLE "
                 "NOREPLICATION NOBYPASSRLS INHERIT"
-            ).format(verb, name, sql.Literal(password))
+            )
+        cursor.execute(statement.format(name, sql.Literal(password)))
+        cursor.execute(
+            "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls"
+            " FROM pg_roles WHERE rolname = %s",
+            (role,),
         )
+        row = cursor.fetchone()
+        if row is None or row[0]:
+            # An existing role with more rights than rows: never run the app as it.
+            raise ValueError(
+                f"Role {role} has rights beyond rows (superuser, createdb, createrole, "
+                "replication or bypassrls); remove them or choose another APP_DB_USER"
+            )
         cursor.execute(
             sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
                 sql.Identifier(raw.info.dbname),

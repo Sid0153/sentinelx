@@ -24,6 +24,7 @@ pytestmark = pytest.mark.integration
 # State-changing routes a VIEWER (or anyone) may call, and why.
 WRITE_EXCEPTIONS = {
     ("POST", "/api/auth/login"): "signing in",
+    ("POST", "/api/auth/guest"): "signing in as the read-only guest of a public demo",
     ("POST", "/api/auth/refresh"): "renewing a session from its cookie",
     ("POST", "/api/auth/logout"): "ending one's own session",
     ("POST", "/api/auth/change-password"): "one's own password (docs/security.md)",

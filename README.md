@@ -85,6 +85,9 @@ ordinary activity and one example of every attack scenario: about 1,040 records,
 and 5 incidents. [docs/demo.md](docs/demo.md) walks through a demonstration;
 `scripts/demo_reset.sh` starts it over and keeps the accounts.
 
+**Free public deployment** (Render and Neon, a read-only guest, the demo loaded on the first
+start): [docs/deployment.md](docs/deployment.md#free-public-deployment-render-and-neon).
+
 Every port is bound to 127.0.0.1: 8081 (the app), 8001 (the API directly, with its docs at
 `/api/docs` in development) and 5433 (PostgreSQL). The production configuration (https,
 production settings, only the site published) and backups:
@@ -113,10 +116,10 @@ route is missing from the access table. Log shippers post batches to
 
 ## Testing
 
-- **Backend**: 1,427 tests at 98% line coverage. API and integration tests run on a real
+- **Backend**: 1,458 tests at 98% line coverage. API and integration tests run on a real
   PostgreSQL, not a mock. They cover parsers against malformed input, each rule on its
   scenario, real concurrency, query budgets, the RBAC table and the audit chain.
-- **Frontend**: 117 tests with coverage floors. Every page passes an axe WCAG 2 AA audit
+- **Frontend**: 121 tests with coverage floors. Every page passes an axe WCAG 2 AA audit
   ([review.md](docs/review.md)).
 - **CI**: on every push, lint, types, dependency audits, a secret scan and an image
   vulnerability scan. It also starts the development stack and the production configuration

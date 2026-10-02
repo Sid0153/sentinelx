@@ -29,6 +29,8 @@ with every role plus an unauthenticated call.
 | Method & path | Role | Phase | Purpose |
 |---|---|---|---|
 | GET `/api/health`, `/api/ready` | public | 2 ✅ | Liveness (no DB) / readiness (DB reachable and schema at the code's migration head; 503 with `checks` otherwise, no internal details) |
+| GET `/api/auth/options` | public | 19 ✅ | `{guest_access}`: whether the sign-in page offers "Explore as guest" (a public demo) |
+| POST `/api/auth/guest` | public (rate-limited like sign-in) | 19 ✅ | Signs in as the read-only guest (`GUEST_EMAIL`) without a password: 404 when off, 403 when the account is missing, disabled or not a VIEWER (audited `LOGIN_FAILED`). The guest gets 403 on the password and two-factor routes |
 | POST `/api/auth/login` | public (rate-limited, 10/min per client IP) | 3 ✅ | Email + password → access token (body) and refresh token (`sx_refresh` cookie). One generic 401 for every failure; lockout after 5 failures. With two-factor sign-in on: a right password alone gets 401 code `mfa_required`; send it again with `otp` (6 digits) or `recovery_code`. Wrong codes count towards the lockout (13) |
 | POST `/api/auth/refresh` | refresh cookie | 3 ✅ | Rotates the refresh token, returns a new access token. Replaying a rotated token revokes every session of the user |
 | POST `/api/auth/logout` | public (refresh cookie) | 3 ✅ | Revokes this session and clears the cookie; works after the access token expired |

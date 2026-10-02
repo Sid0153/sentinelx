@@ -23,6 +23,8 @@ PUBLIC_ROUTES: set[Route] = {
     ("GET", "/api/health"),
     ("GET", "/api/ready"),
     ("POST", "/api/auth/login"),
+    ("GET", "/api/auth/options"),  # whether the sign-in page offers guest access
+    ("POST", "/api/auth/guest"),  # the read-only guest of a public demo (404 when off)
     ("POST", "/api/auth/refresh"),
     ("POST", "/api/auth/logout"),  # works from the refresh cookie alone
 }

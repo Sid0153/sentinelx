@@ -122,6 +122,80 @@
         }
       }
     },
+    "/api/auth/options": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Options",
+        "description": "Public: whether the sign-in page offers \"Explore as guest\".",
+        "operationId": "options_api_auth_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/guest": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Guest Login",
+        "description": "Signs in as the shared, read-only guest account (only when GUEST_EMAIL is set).\n\nNo password: the account is public by design and can only read. The login rate limit\napplies as for a normal sign-in.",
+        "operationId": "guest_login_api_auth_guest_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see Retry-After",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/refresh": {
       "post": {
         "tags": [
@@ -247,6 +321,16 @@
               }
             }
           },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -286,6 +370,16 @@
           },
           "401": {
             "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
             "content": {
               "application/json": {
                 "schema": {
@@ -353,6 +447,16 @@
           },
           "401": {
             "description": "Not signed in, or the session expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but the role does not allow this",
             "content": {
               "application/json": {
                 "schema": {
@@ -8793,6 +8897,20 @@
         ],
         "title": "AuditResult"
       },
+      "AuthOptions": {
+        "properties": {
+          "guest_access": {
+            "type": "boolean",
+            "title": "Guest Access"
+          }
+        },
+        "type": "object",
+        "required": [
+          "guest_access"
+        ],
+        "title": "AuthOptions",
+        "description": "What the sign-in page may offer (public)."
+      },
       "BatchChannel": {
         "type": "string",
         "enum": [
@@ -15632,6 +15750,11 @@
           "must_change_password": {
             "type": "boolean",
             "title": "Must Change Password",
+            "default": false
+          },
+          "is_guest": {
+            "type": "boolean",
+            "title": "Is Guest",
             "default": false
           }
         },

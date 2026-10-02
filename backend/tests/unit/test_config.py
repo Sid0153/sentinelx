@@ -83,3 +83,48 @@ def test_production_disables_interactive_docs() -> None:
     production = make(app_env="production", cors_origins="https://soc.example")
     assert production.docs_enabled is False
     assert make().docs_enabled is True
+
+
+# ---------- hosted database (Phase 19 deployment: Neon on Render) ----------
+
+OWNER = "postgresql+psycopg://neondb_owner:owner-pw@ep-x.neon.tech/neondb?sslmode=verify-full&sslrootcert=system"
+
+
+def test_the_app_url_is_derived_from_the_owner_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Only the owner's address is pasted; the app connects as its own role, same host."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    settings = Settings(  # type: ignore[call-arg]
+        _env_file=None,
+        secret_key=SECRET,
+        migration_database_url=OWNER,
+        app_db_user="sentinelx_app",
+        app_db_password="p@ss/w:rd-12345678",
+    )
+    assert settings.database_url == (
+        "postgresql+psycopg://sentinelx_app:p%40ss%2Fw%3Ard-12345678@ep-x.neon.tech/neondb"
+        "?sslmode=verify-full&sslrootcert=system"
+    )
+    assert settings.owner_database_url == OWNER
+
+
+def test_an_explicit_app_url_wins() -> None:
+    settings = make(migration_database_url=OWNER, app_db_user="a", app_db_password="b" * 16)
+    assert settings.database_url == VALID_URL
+
+
+def test_without_the_role_credentials_nothing_is_derived(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    with pytest.raises(ValidationError, match="database_url"):
+        Settings(_env_file=None, secret_key=SECRET, migration_database_url=OWNER)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(None, None), ("", None), (" Guest@X.example ", "guest@x.example")]
+)
+def test_guest_email_is_optional_and_normalized(value: str | None, expected: str | None) -> None:
+    assert make(guest_email=value).guest_email == expected
+
+
+def test_guest_email_must_be_an_address() -> None:
+    with pytest.raises(ValidationError, match="GUEST_EMAIL"):
+        make(guest_email="guest")

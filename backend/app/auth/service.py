@@ -13,7 +13,7 @@ from app.auth.passwords import verify_against_dummy, verify_password
 from app.auth.tokens import create_access_token, generate_refresh_token, hash_refresh_token
 from app.core.config import Settings
 from app.models.refresh_token import RefreshToken, RevokedReason
-from app.models.user import User
+from app.models.user import Role, User
 
 
 class InvalidCredentialsError(Exception):
@@ -26,6 +26,15 @@ class MfaRequiredError(Exception):
 
 class InvalidRefreshTokenError(Exception):
     """The refresh token is unknown, expired, revoked or belongs to a disabled user."""
+
+
+class GuestUnavailableError(Exception):
+    """Guest access is on, but the guest account is missing, disabled or not a VIEWER."""
+
+
+def is_guest(user: User, settings: Settings) -> bool:
+    """The shared account every visitor of a public demo uses (GUEST_EMAIL)."""
+    return settings.guest_email is not None and user.email == settings.guest_email
 
 
 def _login_failed(db: Session, user: User | None, reason: str) -> InvalidCredentialsError:
@@ -131,6 +140,38 @@ def authenticate(
     user.last_login_at = now
     record(
         db, AuditAction.LOGIN_SUCCEEDED, actor=user, entity_type=EntityType.USER, entity_id=user.id
+    )
+    db.commit()
+    return user
+
+
+def authenticate_guest(db: Session, settings: Settings) -> User:
+    """Signs a visitor in as the guest account, without a password.
+
+    Only a VIEWER qualifies: everyone shares the account, and notes, statuses and the audit
+    log are append-only, so a guest who could write would leave permanent text for the next
+    visitor. A misconfigured guest (an analyst or admin) is refused, never used. Lockout does
+    not apply: it protects a password, and nobody knows the guest's.
+    """
+    user = db.scalar(select(User).where(User.email == settings.guest_email))
+    if user is None or not user.is_active or user.role != Role.VIEWER:
+        reason = (
+            "guest_missing"
+            if user is None
+            else "guest_disabled"
+            if not user.is_active
+            else "guest_not_viewer"
+        )
+        _login_failed(db, user, reason)
+        raise GuestUnavailableError
+    user.last_login_at = datetime.now(UTC)
+    record(
+        db,
+        AuditAction.LOGIN_SUCCEEDED,
+        actor=user,
+        entity_type=EntityType.USER,
+        entity_id=user.id,
+        details={"method": "guest"},
     )
     db.commit()
     return user
