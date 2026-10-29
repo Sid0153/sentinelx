@@ -4,7 +4,7 @@
 # The official entrypoint uses gosu only to drop from root to the postgres user. This container
 # runs as postgres (uid 70) from the start (docker-compose.yml), so gosu is never executed;
 # removing it removes code that image scanners flag (its Go runtime) and that nothing uses.
-FROM postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+FROM postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
 
 # Security fixes released after the pinned base image (the base stays pinned by digest; CI's
 # image scan fails if a fixable HIGH or CRITICAL issue remains).
