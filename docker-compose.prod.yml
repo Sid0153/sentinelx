@@ -17,7 +17,7 @@
 services:
   # One-shot: the site's certificate from a private CA (same script as the database's).
   site-certs:
-    image: python:3.12-slim@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016
+    image: python:3.15-slim@sha256:8c13a3f37a6a5b71498228e902c4b9f51c1f7900d49fabf71f9a650c6120e0d0
     entrypoint: ["sh", "/make-certs.sh"]
     network_mode: none
     environment:
